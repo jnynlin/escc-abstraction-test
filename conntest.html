@@ -106,9 +106,13 @@ function step(name, ok, detail) { R.steps.push({ name, ok, detail }); row($("res
 
 $("bLogin").onclick = async () => {
   $("loginMsg").textContent = "登入中…"; const t0 = performance.now();
-  try { await signInWithEmailAndPassword(auth, $("em").value.trim(), $("pw").value);
+  const email = $("em").value.normalize("NFKC").replace(/\s+/g, "");
+  if (!/^[^@]+@[^@]+\.[^@]+$/.test(email)) { $("loginMsg").textContent = "請輸入完整電子郵件(Firebase 建立的測試帳號,灰色字只是範例;@ 請用英文輸入法)"; return; }
+  $("em").value = email;
+  try { await signInWithEmailAndPassword(auth, email, $("pw").value);
         step("登入", true, Math.round(performance.now() - t0) + " ms"); $("loginMsg").textContent = ""; }
-  catch (e) { step("登入", false, e.code || e.message); $("loginMsg").textContent = "登入失敗:" + (e.code || e.message); }
+  catch (e) { const hint = { "auth/invalid-email": "電子郵件格式不對", "auth/invalid-credential": "帳號或密碼錯誤(請核對 Firebase → Authentication → Users 裡的帳號)", "auth/network-request-failed": "連不到 Google(醫院網路可能擋住)", "auth/unauthorized-domain": "網域未授權" }[e.code] || "";
+    step("登入", false, e.code || e.message); $("loginMsg").textContent = "登入失敗:" + (e.code || e.message) + (hint ? " — " + hint : ""); }
 };
 $("bOut").onclick = () => signOut(auth);
 onAuthStateChanged(auth, (u) => { const on = !!u; $("bRun").disabled = !on; $("bOff").disabled = !on; $("bOut").disabled = !on; $("bLogin").disabled = on;
