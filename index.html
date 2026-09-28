@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ESCC 病歷摘錄工作台</title>
 <!-- secure copy 2026-09-28: accounts + AES-GCM encryption at rest (IndexedDB) + auto-lock + role-gated exports; SCHEMA/RULES identical to the original -->
-<!-- schema v2 (2026-09-28): 處方選單擴充(暫定,可依藥物重新推導)+ 本線藥物 + 同線修改 + 給付 + 治療時機擴充 -->
+<!-- schema v2 (2026-09-28): 處方選單擴充(暫定,可依藥物重新推導)+ 本線藥物 + 主藥 mg/m² + 口服天數 + 同線修改 + 給付 + 治療時機擴充 -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
 :root{
@@ -215,6 +215,10 @@ body[data-role="auditor"] .bar{border-bottom:3px solid var(--iodine);}
 .adesc{font-size:.88rem;margin:0 0 10px;} .rcode{font-family:ui-monospace,Consolas,monospace;font-size:1.05rem;letter-spacing:.04em;background:var(--well);border:1px dashed var(--rule);border-radius:6px;padding:10px;word-break:break-all;user-select:all;}
 .ck{display:flex;gap:8px;align-items:center;margin:10px 0 12px;font-size:.88rem;}
 .alinks{margin:14px 0 0;display:flex;gap:14px;flex-wrap:wrap;} .lk{background:none;border:none;padding:0;color:var(--focus);font-size:.84rem;text-decoration:underline;}
+.draftbox{margin:0 0 14px;padding:10px 12px;border:1px dashed var(--iodine);border-radius:8px;background:var(--iodine-soft);}
+.drafth{margin:2px 0 8px;font-size:.9rem;font-weight:600;color:var(--iodine);}
+.inst.draft{border-style:dashed;}
+.dflags{margin:4px 0 6px 18px;font-size:.84rem;color:var(--iodine);}
 .testban{margin:12px 0 0;padding:8px 10px;border-radius:6px;background:var(--err-soft);color:var(--err);font-size:.86rem;font-weight:600;}
 .testchip{font-size:.78rem;font-weight:600;color:var(--err);border:1px solid var(--err);border-radius:10px;padding:1px 8px;}
 </style>
@@ -229,6 +233,8 @@ body[data-role="auditor"] .bar{border-bottom:3px solid var(--iodine);}
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
       <button type="button" data-act="load">載入預填檔（CSV）</button>
+      <button type="button" data-act="chemoin">匯入化療明細表（QRP，可多選）</button>
+      <button type="button" data-act="shadow">影子模式比對報告</button>
       <hr>
       <button type="button" data-act="qout">匯出待醫師確認問題（CSV）</button>
       <button type="button" data-act="qin">匯入醫師回覆（CSV）</button>
@@ -271,11 +277,12 @@ body[data-role="auditor"] .bar{border-bottom:3px solid var(--iodine);}
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="modal" role="dialog" aria-modal="true"><div class="box"><div id="mBody"></div><div class="acts"><button class="btn" type="button" id="mNo">取消</button><button class="btn go" type="button" id="mYes">確定</button></div></div></div>
 <input type="file" id="fCsv" accept=".csv,text/csv">
+<input type="file" id="fQrp" accept=".qrp,.QRP" multiple>
 <input type="file" id="fJson" accept=".json,application/json">
 <script>
 (function(){
 "use strict";
-var SCHEMA=[{"v": "record_id", "f": "registry_prefill", "t": "text", "l": "研究編號（study_id）", "sec": "癌登帶入資料（唯讀，請勿修改；如有錯誤寫在核心補登的備註）"}, {"v": "dx_year", "f": "registry_prefill", "t": "text", "l": "診斷年", "val": "integer", "min": 2003.0, "max": 2030.0}, {"v": "dx_date", "f": "registry_prefill", "t": "text", "l": "最初診斷日", "n": "由院內癌登識別檔帶入；去識別測試檔為空白", "val": "date_ymd"}, {"v": "sex", "f": "registry_prefill", "t": "radio", "l": "性別", "ch": [["1", "男"], ["2", "女"]]}, {"v": "age_dx", "f": "registry_prefill", "t": "text", "l": "診斷年齡", "val": "integer", "min": 18.0, "max": 100.0}, {"v": "topography", "f": "registry_prefill", "t": "text", "l": "原發部位 ICD-O-3"}, {"v": "morphology", "f": "registry_prefill", "t": "text", "l": "組織型態 ICD-O-3"}, {"v": "cancer_seq", "f": "registry_prefill", "t": "text", "l": "癌症發生順序", "n": "≥2 表示在此之前有其他原發癌", "val": "integer", "min": 1.0, "max": 9.0}, {"v": "ajcc_edition", "f": "registry_prefill", "t": "radio", "l": "原始 AJCC 版次", "ch": [["6", "第 6 版"], ["7", "第 7 版"], ["8", "第 8 版"], ["9", "不明"]]}, {"v": "ctnm_text", "f": "registry_prefill", "t": "text", "l": "臨床 TNM（原始）"}, {"v": "cstage_orig", "f": "registry_prefill", "t": "text", "l": "臨床期別組合（原始）"}, {"v": "tx_pathway", "f": "registry_prefill", "t": "dropdown", "l": "治療路徑（程式推導）", "ch": [["1", "內視鏡或局部切除"], ["2", "直接食道切除"], ["3", "術前放（化）療後食道切除"], ["4", "定義性放化療（≥50 Gy）"], ["5", "放化療 <50 Gy"], ["6", "單純放療"], ["7", "單純化療"], ["8", "未接受抗癌治療"]], "n": "決定下方哪些表單需要填寫"}, {"v": "rt_dose_gy", "f": "registry_prefill", "t": "text", "l": "首次療程最高放療劑量（Gy）", "val": "number", "min": 0.0, "max": 100.0}, {"v": "chemo_tcr", "f": "registry_prefill", "t": "text", "l": "癌登化療碼（163）"}, {"v": "vital_status", "f": "registry_prefill", "t": "radio", "l": "生存狀態", "ch": [["0", "死亡"], ["1", "存活"]]}, {"v": "os_months", "f": "registry_prefill", "t": "text", "l": "存活時間（月）", "val": "number"}, {"v": "core_intro", "f": "core_abstraction", "t": "descriptive", "l": "<b>核心補登</b>：依病歷順序填寫。查不到請選「不明」，不要留空。建議順序：①首次內視鏡報告 → ②團隊會議紀錄或首次治療前病程 → ③入院病歷的過去病史。"}, {"v": "detection_mode", "f": "core_abstraction", "t": "radio", "l": "發現方式：第一次發現食道病灶的情境", "sec": "① 首次內視鏡報告", "ch": [["1", "因症狀就醫"], ["2", "其他癌症追蹤內視鏡（如頭頸癌）"], ["3", "健檢或篩檢"], ["4", "其他疾病檢查偶然發現"], ["9", "不明"]], "req": 1}, {"v": "tumor_upper_cm", "f": "core_abstraction", "t": "text", "l": "腫瘤上緣距門齒（cm）", "n": "以診斷時第一次內視鏡為準；無記載留空並勾選下方不明", "val": "number", "min": 15.0, "max": 45.0}, {"v": "tumor_lower_cm", "f": "core_abstraction", "t": "text", "l": "腫瘤下緣距門齒（cm）", "val": "number", "min": 15.0, "max": 45.0}, {"v": "tumor_dist_unknown", "f": "core_abstraction", "t": "yesno", "l": "內視鏡報告無距離記載", "ch": [["1", "是"], ["0", "否"]]}, {"v": "tumor_length_cm", "f": "core_abstraction", "t": "calc", "l": "腫瘤長度（cm，自動計算）", "calc": "if([tumor_upper_cm]<>'' and [tumor_lower_cm]<>'', [tumor_lower_cm]-[tumor_upper_cm], '')"}, {"v": "location_ajcc", "f": "core_abstraction", "t": "text", "l": "AJCC 位置（自動判定）", "calctext": "if([tumor_upper_cm]='' or [tumor_lower_cm]='', '', if(([tumor_upper_cm]+[tumor_lower_cm])/2<20, '頸段', if(([tumor_upper_cm]+[tumor_lower_cm])/2<25, '上胸段', if(([tumor_upper_cm]+[tumor_lower_cm])/2<30, '中胸段', '下胸段'))))", "n": "以腫瘤中心：頸段 15–20、上胸段 20–25、中胸段 25–30、下胸段 30–40 cm"}, {"v": "first_course_intent", "f": "core_abstraction", "t": "radio", "l": "首次療程意圖", "sec": "② 團隊會議紀錄／首次治療前病程", "ch": [["1", "根治"], ["2", "緩和"], ["3", "未接受抗癌治療（僅支持性照護）"], ["9", "不明"]], "req": 1}, {"v": "ecog_dx", "f": "core_abstraction", "t": "radio", "l": "治療前體能狀態 ECOG", "ch": [["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["9", "不明"]], "n": "只有 KPS 時：90–100→0、70–80→1、50–60→2、30–40→3、10–20→4", "req": 1}, {"v": "weight_loss_6m_pct", "f": "core_abstraction", "t": "text", "l": "診斷前 6 個月體重減輕（%）", "n": "無記載請留空", "val": "number", "min": 0.0, "max": 50.0}, {"v": "comorb", "f": "core_abstraction", "t": "checkbox", "l": "共病（可複選）", "sec": "③ 入院病歷：過去病史", "ch": [["1", "肝硬化"], ["2", "COPD"], ["3", "心衰竭"], ["4", "心肌梗塞"], ["5", "中重度腎病（Cr > 3 mg/dL、透析或移植）"], ["6", "糖尿病"], ["7", "腦中風或 TIA"], ["8", "失智"], ["9", "周邊血管疾病"], ["0", "以上皆無"], ["99", "病歷無法判斷"]], "req": 1}, {"v": "child_pugh", "f": "core_abstraction", "t": "radio", "l": "肝硬化 Child-Pugh 分級", "ch": [["1", "A"], ["2", "B"], ["3", "C"], ["9", "不明"]], "br": "[comorb(1)]='1'"}, {"v": "dm_organ", "f": "core_abstraction", "t": "yesno", "l": "糖尿病合併器官損傷（視網膜、腎、神經病變）", "ch": [["1", "是"], ["0", "否"]], "br": "[comorb(6)]='1'"}, {"v": "cci_score", "f": "core_abstraction", "t": "calc", "l": "Charlson 共病指數（本表項目加權，自動計算）", "calc": "if([comorb(1)]='1', if([child_pugh]='2' or [child_pugh]='3', 3, 1), 0) + [comorb(2)] + [comorb(3)] + [comorb(4)] + 2*[comorb(5)] + if([comorb(6)]='1', if([dm_organ]='1', 2, 1), 0) + [comorb(7)] + [comorb(8)] + [comorb(9)]", "br": "[comorb(99)]<>'1'"}, {"v": "smoking_status", "f": "core_abstraction", "t": "radio", "l": "吸菸狀態", "sec": "④ 生活習慣（僅 2010 年以前診斷者需填；2011 年起由癌登帶入）", "ch": [["0", "從不"], ["1", "已戒"], ["2", "目前"], ["9", "不明"]], "br": "[dx_year]<2011"}, {"v": "pack_years", "f": "core_abstraction", "t": "text", "l": "吸菸包年", "val": "number", "min": 0.0, "max": 200.0, "br": "[dx_year]<2011 and ([smoking_status]='1' or [smoking_status]='2')"}, {"v": "alcohol_status", "f": "core_abstraction", "t": "radio", "l": "飲酒狀態", "ch": [["0", "從不"], ["1", "已戒"], ["2", "目前"], ["9", "不明"]], "br": "[dx_year]<2011"}, {"v": "betel_status", "f": "core_abstraction", "t": "radio", "l": "嚼檳榔狀態", "ch": [["0", "從不"], ["1", "已戒"], ["2", "目前"], ["9", "不明"]], "br": "[dx_year]<2011"}, {"v": "betel_years", "f": "core_abstraction", "t": "text", "l": "嚼檳榔年數", "val": "integer", "min": 0.0, "max": 80.0, "br": "[dx_year]<2011 and ([betel_status]='1' or [betel_status]='2')"}, {"v": "core_notes", "f": "core_abstraction", "t": "notes", "l": "備註：矛盾、待查、癌登帶入資料疑似錯誤", "sec": "⑤ 完成"}, {"v": "core_verified", "f": "core_abstraction", "t": "yesno", "l": "已與原始病歷逐欄核對", "ch": [["1", "是"], ["0", "否"]], "req": 1}, {"v": "stg_intro", "f": "staging_workup", "t": "descriptive", "l": "<b>分期檢查</b>（論文 3）：只記首次治療前做的檢查。"}, {"v": "stg_ct", "f": "staging_workup", "t": "radio", "l": "治療前是否做 胸腹部 CT", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "req": 1}, {"v": "stg_ct_date", "f": "staging_workup", "t": "text", "l": "胸腹部 CT 日期", "val": "date_ymd", "br": "[stg_ct]='1'"}, {"v": "stg_pet", "f": "staging_workup", "t": "radio", "l": "治療前是否做 PET-CT", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "req": 1}, {"v": "stg_pet_date", "f": "staging_workup", "t": "text", "l": "PET-CT 日期", "val": "date_ymd", "br": "[stg_pet]='1'"}, {"v": "stg_eus", "f": "staging_workup", "t": "radio", "l": "治療前是否做 內視鏡超音波 EUS", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "req": 1}, {"v": "stg_eus_date", "f": "staging_workup", "t": "text", "l": "內視鏡超音波 EUS 日期", "val": "date_ymd", "br": "[stg_eus]='1'"}, {"v": "stg_verified", "f": "staging_workup", "t": "yesno", "l": "已核對", "ch": [["1", "是"], ["0", "否"]], "req": 1}, {"v": "dcrt_intro", "f": "dcrt_detail", "t": "descriptive", "l": "<b>定義性放化療細節</b>（論文 2）。治療路徑不是定義性放化療時，此表無須填寫，直接標記完成。"}, {"v": "ccrt_response", "f": "dcrt_detail", "t": "radio", "l": "放化療後臨床反應（結束後 8–12 週）", "ch": [["1", "臨床完全反應（內視鏡與切片無殘存）"], ["2", "殘存"], ["3", "惡化"], ["4", "未評估"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "ccrt_response_date", "f": "dcrt_detail", "t": "text", "l": "反應評估日期", "val": "date_ymd", "br": "[tx_pathway]='4' and [ccrt_response]<>'4'"}, {"v": "ccrt_nodal", "f": "dcrt_detail", "t": "radio", "l": "淋巴結照射策略", "ch": [["1", "選擇性淋巴區照射（ENI）"], ["2", "僅累及區（IFI）"], ["9", "不明"]], "n": "依放療計畫書或放腫紀錄", "br": "[tx_pathway]='4'", "req": 1}, {"v": "ccrt_completed", "f": "dcrt_detail", "t": "radio", "l": "放療是否依計畫完成", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "ccrt_interrupt_days", "f": "dcrt_detail", "t": "text", "l": "非計畫性中斷天數", "val": "integer", "min": 0.0, "max": 60.0, "br": "[tx_pathway]='4'"}, {"v": "ccrt_regimen", "f": "dcrt_detail", "t": "dropdown", "l": "同步化療處方", "ch": [["pf", "Cisplatin＋5-FU"], ["cis_weekly", "每週 Cisplatin"], ["cp_weekly", "每週 Carboplatin＋Paclitaxel"], ["pf_weekly", "Weekly PF"], ["carbo_5fu", "Carboplatin＋5-FU"], ["carbo_5fu_weekly", "每週 Carboplatin＋5-FU"], ["tp", "Paclitaxel＋Cisplatin"], ["cis_q3w", "三週 Cisplatin"], ["cet_combo", "含 Cetuximab 的組合"], ["other", "其他"], ["unknown", "病歷未載明"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "ccrt_regimen_other", "f": "dcrt_detail", "t": "text", "l": "其他處方名稱", "br": "[tx_pathway]='4' and [ccrt_regimen]='other'"}, {"v": "salvage_esoph", "f": "dcrt_detail", "t": "yesno", "l": "是否接受救援性食道切除", "ch": [["1", "是"], ["0", "否"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "salvage_date", "f": "dcrt_detail", "t": "text", "l": "救援手術日期", "val": "date_ymd", "br": "[tx_pathway]='4' and [salvage_esoph]='1'"}, {"v": "dcrt_verified", "f": "dcrt_detail", "t": "yesno", "l": "已核對", "ch": [["1", "是"], ["0", "否"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "rt_intent", "f": "rt_course", "t": "radio", "l": "放療目的", "sec": "每個放療療程一筆（重複表單）", "ch": [["1", "術前"], ["2", "定義性"], ["3", "術後"], ["4", "緩和"], ["5", "救援"]], "req": 1}, {"v": "rt_start", "f": "rt_course", "t": "text", "l": "開始日", "val": "date_ymd", "req": 1}, {"v": "rt_end", "f": "rt_course", "t": "text", "l": "結束日", "val": "date_ymd"}, {"v": "rt_dose_total", "f": "rt_course", "t": "text", "l": "總劑量（Gy）", "val": "number", "min": 0.0, "max": 80.0, "req": 1}, {"v": "rt_fx", "f": "rt_course", "t": "text", "l": "分次數", "val": "integer", "min": 1.0, "max": 45.0, "req": 1}, {"v": "rt_dpf", "f": "rt_course", "t": "calc", "l": "每次劑量（Gy，自動）", "calc": "if([rt_dose_total]<>'' and [rt_fx]<>'', round([rt_dose_total]/[rt_fx],2), '')"}, {"v": "rt_eqd2", "f": "rt_course", "t": "calc", "l": "EQD2（α/β=10，自動）", "calc": "if([rt_dose_total]<>'' and [rt_fx]<>'', round([rt_dose_total]*([rt_dose_total]/[rt_fx]+10)/12,1), '')"}, {"v": "rt_technique", "f": "rt_course", "t": "dropdown", "l": "照射技術", "ch": [["1", "3D"], ["2", "IMRT"], ["3", "VMAT"], ["4", "質子"], ["8", "其他"], ["9", "不明"]]}, {"v": "rt_completed", "f": "rt_course", "t": "radio", "l": "是否依計畫完成", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]]}, {"v": "line_no", "f": "systemic_line", "t": "text", "l": "線別（0＝首次療程的術前／同步／術後；1、2、3＝緩和第幾線）", "sec": "每個治療線別一筆（重複表單）", "val": "integer", "min": 0.0, "max": 9.0, "req": 1}, {"v": "line_setting", "f": "systemic_line", "t": "radio", "l": "治療時機", "ch": [["1", "術前"], ["2", "同步放化療"], ["3", "術後"], ["4", "緩和第一線"], ["5", "緩和第二線以後"], ["6", "誘導化療"], ["7", "術後同步放化療"], ["8", "維持治療"]], "req": 1}, {"v": "line_regimen", "f": "systemic_line", "t": "dropdown", "l": "處方", "ch": [["pf", "Cisplatin＋5-FU"], ["cis_weekly", "每週 Cisplatin"], ["cp_weekly", "每週 Carboplatin＋Paclitaxel"], ["chemo_pembro", "化療＋Pembrolizumab"], ["chemo_nivo", "化療＋Nivolumab"], ["nivo", "Nivolumab 單藥"], ["paclitaxel", "Paclitaxel 單藥"], ["docetaxel", "Docetaxel 單藥"], ["pf_weekly", "Weekly PF"], ["carbo_5fu", "Carboplatin＋5-FU"], ["carbo_5fu_weekly", "每週 Carboplatin＋5-FU"], ["tp", "Paclitaxel＋Cisplatin"], ["dc", "Docetaxel＋Cisplatin(DC)"], ["oxali_fp", "Oxaliplatin＋Fluoropyrimidine(XELOX／FOLFOX)"], ["cis_q3w", "三週 Cisplatin"], ["dcf", "DCF／TPF"], ["cet_combo", "含 Cetuximab 的組合"], ["pembro", "Pembrolizumab 單藥"], ["phdfl", "PHDFL"], ["uft", "UFT"], ["ts1", "TS-1"], ["other", "其他"], ["unknown", "病歷未載明"]], "req": 1}, {"v": "line_regimen_other", "f": "systemic_line", "t": "text", "l": "其他處方名稱", "br": "[line_regimen]='other'", "req": 1}, {"v": "line_drugs", "f": "systemic_line", "t": "checkbox", "l": "本線使用的抗癌藥（可複選）", "ch": [["1", "Cisplatin"], ["2", "Carboplatin"], ["3", "Oxaliplatin"], ["4", "5-FU"], ["5", "Capecitabine"], ["6", "UFT"], ["7", "TS-1"], ["8", "Leucovorin"], ["9", "Paclitaxel"], ["10", "Docetaxel"], ["11", "Cetuximab"], ["12", "Nivolumab"], ["13", "Pembrolizumab"], ["88", "其他"]], "n": "處方名稱由藥物組合推導；只勾抗癌藥與 leucovorin，止吐、G-CSF、類固醇前置、水化不勾"}, {"v": "line_drugs_other", "f": "systemic_line", "t": "text", "l": "其他抗癌藥名稱", "br": "[line_drugs(88)]='1'"}, {"v": "line_start", "f": "systemic_line", "t": "text", "l": "開始日", "val": "date_ymd", "req": 1}, {"v": "line_end", "f": "systemic_line", "t": "text", "l": "結束日", "val": "date_ymd"}, {"v": "line_cycles", "f": "systemic_line", "t": "text", "l": "實際給藥次數", "val": "integer", "min": 1.0, "max": 99.0}, {"v": "line_dose_red", "f": "systemic_line", "t": "radio", "l": "是否減量", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]]}, {"v": "line_modification", "f": "systemic_line", "t": "radio", "l": "同一線內的修改", "ch": [["0", "無"], ["1", "因毒性更換同類藥（如 cisplatin→carboplatin）"], ["2", "因毒性停用其中一種藥"], ["3", "其他修改"]], "n": "因毒性換藥仍屬同一線；因疾病惡化而換藥才算新的一線"}, {"v": "line_mod_note", "f": "systemic_line", "t": "text", "l": "修改說明", "br": "[line_modification]='1' or [line_modification]='2' or [line_modification]='3'"}, {"v": "line_stop", "f": "systemic_line", "t": "radio", "l": "停藥原因", "ch": [["1", "完成預定療程"], ["2", "疾病惡化"], ["3", "毒性"], ["4", "死亡"], ["5", "病人意願"], ["8", "其他"], ["9", "仍在治療或不明"]]}, {"v": "line_selfpay", "f": "systemic_line", "t": "radio", "l": "給付", "ch": [["1", "全部健保"], ["2", "部分自費"], ["3", "全部自費"], ["9", "不明"]], "n": "明細表藥名前有「自」＝自費"}, {"v": "line_source", "f": "systemic_line", "t": "radio", "l": "資料來源", "ch": [["1", "系統匯出"], ["2", "人工補登"]], "req": 1}, {"v": "ev_type", "f": "clin_event", "t": "radio", "l": "事件類型", "sec": "每次事件一筆（重複表單）", "ch": [["1", "局部復發"], ["2", "區域淋巴結復發"], ["3", "遠處轉移"], ["4", "殘存疾病（治療後從未無病）"], ["5", "惡化（緩和治療中）"], ["6", "新原發癌"]], "req": 1}, {"v": "ev_date", "f": "clin_event", "t": "text", "l": "事件日期（影像或切片確認日）", "val": "date_ymd", "req": 1}, {"v": "ev_sites", "f": "clin_event", "t": "checkbox", "l": "部位（可複選）", "ch": [["1", "食道原發處"], ["2", "區域淋巴結"], ["3", "肝"], ["4", "肺"], ["5", "骨"], ["6", "遠處淋巴結"], ["7", "肋膜或腹膜"], ["8", "腦"], ["88", "其他"]], "br": "[ev_type]<>'6'"}, {"v": "ev_confirm", "f": "clin_event", "t": "radio", "l": "確認方式", "ch": [["1", "病理"], ["2", "影像"], ["3", "臨床"]], "req": 1}, {"v": "ev_detected", "f": "clin_event", "t": "radio", "l": "發現情境", "ch": [["1", "例行追蹤"], ["2", "症狀"], ["9", "不明"]]}, {"v": "oc_seq", "f": "other_cancer", "t": "text", "l": "該癌症發生順序", "sec": "ESCC 以外的每個原發癌一筆（重複表單；部位與日期由院內癌登帶入）", "val": "integer", "min": 1.0, "max": 9.0, "req": 1}, {"v": "oc_topography", "f": "other_cancer", "t": "text", "l": "部位 ICD-O-3", "req": 1}, {"v": "oc_morphology", "f": "other_cancer", "t": "text", "l": "組織型態 ICD-O-3"}, {"v": "oc_days_from_escc", "f": "other_cancer", "t": "text", "l": "距 ESCC 診斷日數（負值＝早於 ESCC）", "val": "integer", "min": -20000.0, "max": 20000.0, "req": 1}, {"v": "oc_timing", "f": "other_cancer", "t": "text", "l": "時序（自動判定）", "calctext": "if([oc_days_from_escc]='', '', if([oc_days_from_escc]<-182, '先前異時', if([oc_days_from_escc]<=182, '同時', '後續異時')))"}, {"v": "oc_neck_chest_rt", "f": "other_cancer", "t": "radio", "l": "該癌症是否曾接受頸部或胸部放療", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "req": 1}, {"v": "oc_status", "f": "other_cancer", "t": "radio", "l": "ESCC 診斷時該癌症的狀態", "ch": [["1", "無病"], ["2", "治療中"], ["3", "復發或殘存"], ["4", "同時診斷"], ["9", "不明"]], "req": 1}];
+var SCHEMA=[{"v": "record_id", "f": "registry_prefill", "t": "text", "l": "研究編號（study_id）", "sec": "癌登帶入資料（唯讀，請勿修改；如有錯誤寫在核心補登的備註）"}, {"v": "dx_year", "f": "registry_prefill", "t": "text", "l": "診斷年", "val": "integer", "min": 2003.0, "max": 2030.0}, {"v": "dx_date", "f": "registry_prefill", "t": "text", "l": "最初診斷日", "n": "由院內癌登識別檔帶入；去識別測試檔為空白", "val": "date_ymd"}, {"v": "sex", "f": "registry_prefill", "t": "radio", "l": "性別", "ch": [["1", "男"], ["2", "女"]]}, {"v": "age_dx", "f": "registry_prefill", "t": "text", "l": "診斷年齡", "val": "integer", "min": 18.0, "max": 100.0}, {"v": "topography", "f": "registry_prefill", "t": "text", "l": "原發部位 ICD-O-3"}, {"v": "morphology", "f": "registry_prefill", "t": "text", "l": "組織型態 ICD-O-3"}, {"v": "cancer_seq", "f": "registry_prefill", "t": "text", "l": "癌症發生順序", "n": "≥2 表示在此之前有其他原發癌", "val": "integer", "min": 1.0, "max": 9.0}, {"v": "ajcc_edition", "f": "registry_prefill", "t": "radio", "l": "原始 AJCC 版次", "ch": [["6", "第 6 版"], ["7", "第 7 版"], ["8", "第 8 版"], ["9", "不明"]]}, {"v": "ctnm_text", "f": "registry_prefill", "t": "text", "l": "臨床 TNM（原始）"}, {"v": "cstage_orig", "f": "registry_prefill", "t": "text", "l": "臨床期別組合（原始）"}, {"v": "tx_pathway", "f": "registry_prefill", "t": "dropdown", "l": "治療路徑（程式推導）", "ch": [["1", "內視鏡或局部切除"], ["2", "直接食道切除"], ["3", "術前放（化）療後食道切除"], ["4", "定義性放化療（≥50 Gy）"], ["5", "放化療 <50 Gy"], ["6", "單純放療"], ["7", "單純化療"], ["8", "未接受抗癌治療"]], "n": "決定下方哪些表單需要填寫"}, {"v": "rt_dose_gy", "f": "registry_prefill", "t": "text", "l": "首次療程最高放療劑量（Gy）", "val": "number", "min": 0.0, "max": 100.0}, {"v": "chemo_tcr", "f": "registry_prefill", "t": "text", "l": "癌登化療碼（163）"}, {"v": "vital_status", "f": "registry_prefill", "t": "radio", "l": "生存狀態", "ch": [["0", "死亡"], ["1", "存活"]]}, {"v": "os_months", "f": "registry_prefill", "t": "text", "l": "存活時間（月）", "val": "number"}, {"v": "core_intro", "f": "core_abstraction", "t": "descriptive", "l": "<b>核心補登</b>：依病歷順序填寫。查不到請選「不明」，不要留空。建議順序：①首次內視鏡報告 → ②團隊會議紀錄或首次治療前病程 → ③入院病歷的過去病史。"}, {"v": "detection_mode", "f": "core_abstraction", "t": "radio", "l": "發現方式：第一次發現食道病灶的情境", "sec": "① 首次內視鏡報告", "ch": [["1", "因症狀就醫"], ["2", "其他癌症追蹤內視鏡（如頭頸癌）"], ["3", "健檢或篩檢"], ["4", "其他疾病檢查偶然發現"], ["9", "不明"]], "req": 1}, {"v": "tumor_upper_cm", "f": "core_abstraction", "t": "text", "l": "腫瘤上緣距門齒（cm）", "n": "以診斷時第一次內視鏡為準；無記載留空並勾選下方不明", "val": "number", "min": 15.0, "max": 45.0}, {"v": "tumor_lower_cm", "f": "core_abstraction", "t": "text", "l": "腫瘤下緣距門齒（cm）", "val": "number", "min": 15.0, "max": 45.0}, {"v": "tumor_dist_unknown", "f": "core_abstraction", "t": "yesno", "l": "內視鏡報告無距離記載", "ch": [["1", "是"], ["0", "否"]]}, {"v": "tumor_length_cm", "f": "core_abstraction", "t": "calc", "l": "腫瘤長度（cm，自動計算）", "calc": "if([tumor_upper_cm]<>'' and [tumor_lower_cm]<>'', [tumor_lower_cm]-[tumor_upper_cm], '')"}, {"v": "location_ajcc", "f": "core_abstraction", "t": "text", "l": "AJCC 位置（自動判定）", "calctext": "if([tumor_upper_cm]='' or [tumor_lower_cm]='', '', if(([tumor_upper_cm]+[tumor_lower_cm])/2<20, '頸段', if(([tumor_upper_cm]+[tumor_lower_cm])/2<25, '上胸段', if(([tumor_upper_cm]+[tumor_lower_cm])/2<30, '中胸段', '下胸段'))))", "n": "以腫瘤中心：頸段 15–20、上胸段 20–25、中胸段 25–30、下胸段 30–40 cm"}, {"v": "first_course_intent", "f": "core_abstraction", "t": "radio", "l": "首次療程意圖", "sec": "② 團隊會議紀錄／首次治療前病程", "ch": [["1", "根治"], ["2", "緩和"], ["3", "未接受抗癌治療（僅支持性照護）"], ["9", "不明"]], "req": 1}, {"v": "ecog_dx", "f": "core_abstraction", "t": "radio", "l": "治療前體能狀態 ECOG", "ch": [["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["9", "不明"]], "n": "只有 KPS 時：90–100→0、70–80→1、50–60→2、30–40→3、10–20→4", "req": 1}, {"v": "weight_loss_6m_pct", "f": "core_abstraction", "t": "text", "l": "診斷前 6 個月體重減輕（%）", "n": "無記載請留空", "val": "number", "min": 0.0, "max": 50.0}, {"v": "comorb", "f": "core_abstraction", "t": "checkbox", "l": "共病（可複選）", "sec": "③ 入院病歷：過去病史", "ch": [["1", "肝硬化"], ["2", "COPD"], ["3", "心衰竭"], ["4", "心肌梗塞"], ["5", "中重度腎病（Cr > 3 mg/dL、透析或移植）"], ["6", "糖尿病"], ["7", "腦中風或 TIA"], ["8", "失智"], ["9", "周邊血管疾病"], ["0", "以上皆無"], ["99", "病歷無法判斷"]], "req": 1}, {"v": "child_pugh", "f": "core_abstraction", "t": "radio", "l": "肝硬化 Child-Pugh 分級", "ch": [["1", "A"], ["2", "B"], ["3", "C"], ["9", "不明"]], "br": "[comorb(1)]='1'"}, {"v": "dm_organ", "f": "core_abstraction", "t": "yesno", "l": "糖尿病合併器官損傷（視網膜、腎、神經病變）", "ch": [["1", "是"], ["0", "否"]], "br": "[comorb(6)]='1'"}, {"v": "cci_score", "f": "core_abstraction", "t": "calc", "l": "Charlson 共病指數（本表項目加權，自動計算）", "calc": "if([comorb(1)]='1', if([child_pugh]='2' or [child_pugh]='3', 3, 1), 0) + [comorb(2)] + [comorb(3)] + [comorb(4)] + 2*[comorb(5)] + if([comorb(6)]='1', if([dm_organ]='1', 2, 1), 0) + [comorb(7)] + [comorb(8)] + [comorb(9)]", "br": "[comorb(99)]<>'1'"}, {"v": "smoking_status", "f": "core_abstraction", "t": "radio", "l": "吸菸狀態", "sec": "④ 生活習慣（僅 2010 年以前診斷者需填；2011 年起由癌登帶入）", "ch": [["0", "從不"], ["1", "已戒"], ["2", "目前"], ["9", "不明"]], "br": "[dx_year]<2011"}, {"v": "pack_years", "f": "core_abstraction", "t": "text", "l": "吸菸包年", "val": "number", "min": 0.0, "max": 200.0, "br": "[dx_year]<2011 and ([smoking_status]='1' or [smoking_status]='2')"}, {"v": "alcohol_status", "f": "core_abstraction", "t": "radio", "l": "飲酒狀態", "ch": [["0", "從不"], ["1", "已戒"], ["2", "目前"], ["9", "不明"]], "br": "[dx_year]<2011"}, {"v": "betel_status", "f": "core_abstraction", "t": "radio", "l": "嚼檳榔狀態", "ch": [["0", "從不"], ["1", "已戒"], ["2", "目前"], ["9", "不明"]], "br": "[dx_year]<2011"}, {"v": "betel_years", "f": "core_abstraction", "t": "text", "l": "嚼檳榔年數", "val": "integer", "min": 0.0, "max": 80.0, "br": "[dx_year]<2011 and ([betel_status]='1' or [betel_status]='2')"}, {"v": "core_notes", "f": "core_abstraction", "t": "notes", "l": "備註：矛盾、待查、癌登帶入資料疑似錯誤", "sec": "⑤ 完成"}, {"v": "core_verified", "f": "core_abstraction", "t": "yesno", "l": "已與原始病歷逐欄核對", "ch": [["1", "是"], ["0", "否"]], "req": 1}, {"v": "stg_intro", "f": "staging_workup", "t": "descriptive", "l": "<b>分期檢查</b>（論文 3）：只記首次治療前做的檢查。"}, {"v": "stg_ct", "f": "staging_workup", "t": "radio", "l": "治療前是否做 胸腹部 CT", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "req": 1}, {"v": "stg_ct_date", "f": "staging_workup", "t": "text", "l": "胸腹部 CT 日期", "val": "date_ymd", "br": "[stg_ct]='1'"}, {"v": "stg_pet", "f": "staging_workup", "t": "radio", "l": "治療前是否做 PET-CT", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "req": 1}, {"v": "stg_pet_date", "f": "staging_workup", "t": "text", "l": "PET-CT 日期", "val": "date_ymd", "br": "[stg_pet]='1'"}, {"v": "stg_eus", "f": "staging_workup", "t": "radio", "l": "治療前是否做 內視鏡超音波 EUS", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "req": 1}, {"v": "stg_eus_date", "f": "staging_workup", "t": "text", "l": "內視鏡超音波 EUS 日期", "val": "date_ymd", "br": "[stg_eus]='1'"}, {"v": "stg_verified", "f": "staging_workup", "t": "yesno", "l": "已核對", "ch": [["1", "是"], ["0", "否"]], "req": 1}, {"v": "dcrt_intro", "f": "dcrt_detail", "t": "descriptive", "l": "<b>定義性放化療細節</b>（論文 2）。治療路徑不是定義性放化療時，此表無須填寫，直接標記完成。"}, {"v": "ccrt_response", "f": "dcrt_detail", "t": "radio", "l": "放化療後臨床反應（結束後 8–12 週）", "ch": [["1", "臨床完全反應（內視鏡與切片無殘存）"], ["2", "殘存"], ["3", "惡化"], ["4", "未評估"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "ccrt_response_date", "f": "dcrt_detail", "t": "text", "l": "反應評估日期", "val": "date_ymd", "br": "[tx_pathway]='4' and [ccrt_response]<>'4'"}, {"v": "ccrt_nodal", "f": "dcrt_detail", "t": "radio", "l": "淋巴結照射策略", "ch": [["1", "選擇性淋巴區照射（ENI）"], ["2", "僅累及區（IFI）"], ["9", "不明"]], "n": "依放療計畫書或放腫紀錄", "br": "[tx_pathway]='4'", "req": 1}, {"v": "ccrt_completed", "f": "dcrt_detail", "t": "radio", "l": "放療是否依計畫完成", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "ccrt_interrupt_days", "f": "dcrt_detail", "t": "text", "l": "非計畫性中斷天數", "val": "integer", "min": 0.0, "max": 60.0, "br": "[tx_pathway]='4'"}, {"v": "ccrt_regimen", "f": "dcrt_detail", "t": "dropdown", "l": "同步化療處方", "ch": [["pf", "Cisplatin＋5-FU"], ["cis_weekly", "每週 Cisplatin"], ["cp_weekly", "每週 Carboplatin＋Paclitaxel"], ["pf_weekly", "Weekly PF"], ["carbo_5fu", "Carboplatin＋5-FU"], ["carbo_5fu_weekly", "每週 Carboplatin＋5-FU"], ["tp", "Paclitaxel＋Cisplatin"], ["cis_q3w", "三週 Cisplatin"], ["cet_combo", "含 Cetuximab 的組合"], ["other", "其他"], ["unknown", "病歷未載明"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "ccrt_regimen_other", "f": "dcrt_detail", "t": "text", "l": "其他處方名稱", "br": "[tx_pathway]='4' and [ccrt_regimen]='other'"}, {"v": "salvage_esoph", "f": "dcrt_detail", "t": "yesno", "l": "是否接受救援性食道切除", "ch": [["1", "是"], ["0", "否"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "salvage_date", "f": "dcrt_detail", "t": "text", "l": "救援手術日期", "val": "date_ymd", "br": "[tx_pathway]='4' and [salvage_esoph]='1'"}, {"v": "dcrt_verified", "f": "dcrt_detail", "t": "yesno", "l": "已核對", "ch": [["1", "是"], ["0", "否"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "rt_intent", "f": "rt_course", "t": "radio", "l": "放療目的", "sec": "每個放療療程一筆（重複表單）", "ch": [["1", "術前"], ["2", "定義性"], ["3", "術後"], ["4", "緩和"], ["5", "救援"]], "req": 1}, {"v": "rt_start", "f": "rt_course", "t": "text", "l": "開始日", "val": "date_ymd", "req": 1}, {"v": "rt_end", "f": "rt_course", "t": "text", "l": "結束日", "val": "date_ymd"}, {"v": "rt_dose_total", "f": "rt_course", "t": "text", "l": "總劑量（Gy）", "val": "number", "min": 0.0, "max": 80.0, "req": 1}, {"v": "rt_fx", "f": "rt_course", "t": "text", "l": "分次數", "val": "integer", "min": 1.0, "max": 45.0, "req": 1}, {"v": "rt_dpf", "f": "rt_course", "t": "calc", "l": "每次劑量（Gy，自動）", "calc": "if([rt_dose_total]<>'' and [rt_fx]<>'', round([rt_dose_total]/[rt_fx],2), '')"}, {"v": "rt_eqd2", "f": "rt_course", "t": "calc", "l": "EQD2（α/β=10，自動）", "calc": "if([rt_dose_total]<>'' and [rt_fx]<>'', round([rt_dose_total]*([rt_dose_total]/[rt_fx]+10)/12,1), '')"}, {"v": "rt_technique", "f": "rt_course", "t": "dropdown", "l": "照射技術", "ch": [["1", "3D"], ["2", "IMRT"], ["3", "VMAT"], ["4", "質子"], ["8", "其他"], ["9", "不明"]]}, {"v": "rt_completed", "f": "rt_course", "t": "radio", "l": "是否依計畫完成", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]]}, {"v": "line_no", "f": "systemic_line", "t": "text", "l": "線別（0＝首次療程的術前／同步／術後；1、2、3＝緩和第幾線）", "sec": "每個治療線別一筆（重複表單）", "val": "integer", "min": 0.0, "max": 9.0, "req": 1}, {"v": "line_setting", "f": "systemic_line", "t": "radio", "l": "治療時機", "ch": [["1", "術前"], ["2", "同步放化療"], ["3", "術後"], ["4", "緩和第一線"], ["5", "緩和第二線以後"], ["6", "誘導化療"], ["7", "術後同步放化療"], ["8", "維持治療"]], "req": 1}, {"v": "line_regimen", "f": "systemic_line", "t": "dropdown", "l": "處方", "ch": [["pf", "Cisplatin＋5-FU"], ["cis_weekly", "每週 Cisplatin"], ["cp_weekly", "每週 Carboplatin＋Paclitaxel"], ["chemo_pembro", "化療＋Pembrolizumab"], ["chemo_nivo", "化療＋Nivolumab"], ["nivo", "Nivolumab 單藥"], ["paclitaxel", "Paclitaxel 單藥"], ["docetaxel", "Docetaxel 單藥"], ["pf_weekly", "Weekly PF"], ["carbo_5fu", "Carboplatin＋5-FU"], ["carbo_5fu_weekly", "每週 Carboplatin＋5-FU"], ["tp", "Paclitaxel＋Cisplatin"], ["dc", "Docetaxel＋Cisplatin(DC)"], ["oxali_fp", "Oxaliplatin＋Fluoropyrimidine(XELOX／FOLFOX)"], ["cis_q3w", "三週 Cisplatin"], ["dcf", "DCF／TPF"], ["cet_combo", "含 Cetuximab 的組合"], ["pembro", "Pembrolizumab 單藥"], ["phdfl", "PHDFL"], ["uft", "UFT"], ["ts1", "TS-1"], ["other", "其他"], ["unknown", "病歷未載明"]], "req": 1}, {"v": "line_regimen_other", "f": "systemic_line", "t": "text", "l": "其他處方名稱", "br": "[line_regimen]='other'", "req": 1}, {"v": "line_drugs", "f": "systemic_line", "t": "checkbox", "l": "本線使用的抗癌藥（可複選）", "ch": [["1", "Cisplatin"], ["2", "Carboplatin"], ["3", "Oxaliplatin"], ["4", "5-FU"], ["5", "Capecitabine"], ["6", "UFT"], ["7", "TS-1"], ["8", "Leucovorin"], ["9", "Paclitaxel"], ["10", "Docetaxel"], ["11", "Cetuximab"], ["12", "Nivolumab"], ["13", "Pembrolizumab"], ["88", "其他"]], "n": "處方名稱由藥物組合推導；只勾抗癌藥與 leucovorin，止吐、G-CSF、類固醇前置、水化不勾"}, {"v": "line_drugs_other", "f": "systemic_line", "t": "text", "l": "其他抗癌藥名稱", "br": "[line_drugs(88)]='1'"}, {"v": "line_start", "f": "systemic_line", "t": "text", "l": "開始日", "val": "date_ymd", "req": 1}, {"v": "line_end", "f": "systemic_line", "t": "text", "l": "結束日", "val": "date_ymd"}, {"v": "line_cycles", "f": "systemic_line", "t": "text", "l": "實際給藥次數", "val": "integer", "min": 1.0, "max": 99.0}, {"v": "line_dose_m2", "f": "systemic_line", "t": "text", "l": "主藥中位劑量（mg/m²）", "val": "number", "min": 0.0, "max": 5000.0, "n": "從明細表自動計算：主藥每次劑量 ÷ 體表面積 的中位數；人工登錄可留空"}, {"v": "line_oral_days", "f": "systemic_line", "t": "text", "l": "口服藥開藥總天數", "val": "integer", "min": 1.0, "max": 5000.0, "br": "[line_drugs(5)]='1' or [line_drugs(6)]='1' or [line_drugs(7)]='1'", "n": "口服藥（Capecitabine、UFT、TS-1）處方天數加總；實際服藥順從性未知"}, {"v": "line_dose_red", "f": "systemic_line", "t": "radio", "l": "是否減量", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]]}, {"v": "line_modification", "f": "systemic_line", "t": "radio", "l": "同一線內的修改", "ch": [["0", "無"], ["1", "因毒性更換同類藥（如 cisplatin→carboplatin）"], ["2", "因毒性停用其中一種藥"], ["3", "其他修改"]], "n": "因毒性換藥仍屬同一線；因疾病惡化而換藥才算新的一線"}, {"v": "line_mod_note", "f": "systemic_line", "t": "text", "l": "修改說明", "br": "[line_modification]='1' or [line_modification]='2' or [line_modification]='3'"}, {"v": "line_stop", "f": "systemic_line", "t": "radio", "l": "停藥原因", "ch": [["1", "完成預定療程"], ["2", "疾病惡化"], ["3", "毒性"], ["4", "死亡"], ["5", "病人意願"], ["8", "其他"], ["9", "仍在治療或不明"]]}, {"v": "line_selfpay", "f": "systemic_line", "t": "radio", "l": "給付", "ch": [["1", "全部健保"], ["2", "部分自費"], ["3", "全部自費"], ["9", "不明"]], "n": "明細表藥名前有「自」＝自費"}, {"v": "line_source", "f": "systemic_line", "t": "radio", "l": "資料來源", "ch": [["1", "系統匯出"], ["2", "人工補登"]], "req": 1}, {"v": "ev_type", "f": "clin_event", "t": "radio", "l": "事件類型", "sec": "每次事件一筆（重複表單）", "ch": [["1", "局部復發"], ["2", "區域淋巴結復發"], ["3", "遠處轉移"], ["4", "殘存疾病（治療後從未無病）"], ["5", "惡化（緩和治療中）"], ["6", "新原發癌"]], "req": 1}, {"v": "ev_date", "f": "clin_event", "t": "text", "l": "事件日期（影像或切片確認日）", "val": "date_ymd", "req": 1}, {"v": "ev_sites", "f": "clin_event", "t": "checkbox", "l": "部位（可複選）", "ch": [["1", "食道原發處"], ["2", "區域淋巴結"], ["3", "肝"], ["4", "肺"], ["5", "骨"], ["6", "遠處淋巴結"], ["7", "肋膜或腹膜"], ["8", "腦"], ["88", "其他"]], "br": "[ev_type]<>'6'"}, {"v": "ev_confirm", "f": "clin_event", "t": "radio", "l": "確認方式", "ch": [["1", "病理"], ["2", "影像"], ["3", "臨床"]], "req": 1}, {"v": "ev_detected", "f": "clin_event", "t": "radio", "l": "發現情境", "ch": [["1", "例行追蹤"], ["2", "症狀"], ["9", "不明"]]}, {"v": "oc_seq", "f": "other_cancer", "t": "text", "l": "該癌症發生順序", "sec": "ESCC 以外的每個原發癌一筆（重複表單；部位與日期由院內癌登帶入）", "val": "integer", "min": 1.0, "max": 9.0, "req": 1}, {"v": "oc_topography", "f": "other_cancer", "t": "text", "l": "部位 ICD-O-3", "req": 1}, {"v": "oc_morphology", "f": "other_cancer", "t": "text", "l": "組織型態 ICD-O-3"}, {"v": "oc_days_from_escc", "f": "other_cancer", "t": "text", "l": "距 ESCC 診斷日數（負值＝早於 ESCC）", "val": "integer", "min": -20000.0, "max": 20000.0, "req": 1}, {"v": "oc_timing", "f": "other_cancer", "t": "text", "l": "時序（自動判定）", "calctext": "if([oc_days_from_escc]='', '', if([oc_days_from_escc]<-182, '先前異時', if([oc_days_from_escc]<=182, '同時', '後續異時')))"}, {"v": "oc_neck_chest_rt", "f": "other_cancer", "t": "radio", "l": "該癌症是否曾接受頸部或胸部放療", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "req": 1}, {"v": "oc_status", "f": "other_cancer", "t": "radio", "l": "ESCC 診斷時該癌症的狀態", "ch": [["1", "無病"], ["2", "治療中"], ["3", "復發或殘存"], ["4", "同時診斷"], ["9", "不明"]], "req": 1}];
 var RULES=[{"s": "E", "f": "core_abstraction", "n": "腫瘤下緣距離小於上緣", "x": "[tumor_lower_cm]<>'' and [tumor_upper_cm]<>'' and [tumor_lower_cm]<[tumor_upper_cm]", "at": "tumor_lower_cm"}, {"s": "W", "f": "core_abstraction", "n": "腫瘤長度超過 20 cm，請再核對", "x": "[tumor_length_cm]<>'' and [tumor_length_cm]>20", "at": "tumor_lower_cm"}, {"s": "E", "f": "core_abstraction", "n": "缺距離時須勾選「內視鏡報告無距離記載」", "x": "([tumor_upper_cm]='' or [tumor_lower_cm]='') and [tumor_dist_unknown]<>'1'", "at": "tumor_dist_unknown", "onComplete": 1}, {"s": "W", "f": "core_abstraction", "n": "部位碼與內視鏡距離判定的位置不符", "x": "[location_ajcc]<>'' and (([topography]='C150' and [location_ajcc]<>'頸段') or ([topography]='C153' and [location_ajcc]<>'上胸段') or ([topography]='C154' and [location_ajcc]<>'中胸段') or ([topography]='C155' and [location_ajcc]<>'下胸段'))", "at": "tumor_upper_cm"}, {"s": "E", "f": "core_abstraction", "n": "共病勾「以上皆無」又勾了其他項目", "x": "[comorb(0)]='1' and ([comorb(1)]='1' or [comorb(2)]='1' or [comorb(3)]='1' or [comorb(4)]='1' or [comorb(5)]='1' or [comorb(6)]='1' or [comorb(7)]='1' or [comorb(8)]='1' or [comorb(9)]='1' or [comorb(99)]='1')", "at": "comorb"}, {"s": "E", "f": "core_abstraction", "n": "共病勾「病歷無法判斷」又勾了其他項目", "x": "[comorb(99)]='1' and ([comorb(1)]='1' or [comorb(2)]='1' or [comorb(3)]='1' or [comorb(4)]='1' or [comorb(5)]='1' or [comorb(6)]='1' or [comorb(7)]='1' or [comorb(8)]='1' or [comorb(9)]='1')", "at": "comorb"}, {"s": "E", "f": "core_abstraction", "n": "意圖為「未接受抗癌治療」，但治療路徑顯示有治療", "x": "[first_course_intent]='3' and [tx_pathway]<>'8'", "at": "first_course_intent"}, {"s": "W", "f": "core_abstraction", "n": "ECOG 3–4 但意圖為根治，請確認", "x": "([ecog_dx]='3' or [ecog_dx]='4') and [first_course_intent]='1'", "at": "ecog_dx"}, {"s": "W", "f": "dcrt_detail", "n": "已填同步化療處方，但癌登化療碼為 00（未化療）", "x": "[ccrt_regimen]<>'' and [ccrt_regimen]<>'unknown' and [chemo_tcr]='00'", "at": "ccrt_regimen"}, {"s": "E", "f": "dcrt_detail", "n": "救援手術日期早於反應評估日期", "x": "[salvage_date]<>'' and [ccrt_response_date]<>'' and datediff([ccrt_response_date],[salvage_date],'d',true)<0", "at": "salvage_date"}, {"s": "E", "f": "rt_course", "n": "放療結束日早於開始日", "x": "[rt_end]<>'' and [rt_start]<>'' and datediff([rt_start],[rt_end],'d',true)<0", "at": "rt_end"}, {"s": "W", "f": "rt_course", "n": "每次劑量不在 1.2–4 Gy，請核對總劑量與分次數", "x": "[rt_dpf]<>'' and ([rt_dpf]<1.2 or [rt_dpf]>4)", "at": "rt_fx"}, {"s": "E", "f": "systemic_line", "n": "治療線結束日早於開始日", "x": "[line_end]<>'' and [line_start]<>'' and datediff([line_start],[line_end],'d',true)<0", "at": "line_end"}, {"s": "E", "f": "clin_event", "n": "事件日期早於診斷日", "x": "[dx_date]<>'' and [ev_date]<>'' and datediff([dx_date],[ev_date],'d',true)<0", "at": "ev_date"}, {"s": "W", "f": "systemic_line", "n": "處方為 PF，但藥物未同時勾 Cisplatin 與 5-FU", "x": "([line_regimen]='pf' or [line_regimen]='pf_weekly') and ([line_drugs(1)]<>'1' or [line_drugs(4)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方為 Carboplatin＋5-FU，但藥物未同時勾 Carboplatin 與 5-FU", "x": "([line_regimen]='carbo_5fu' or [line_regimen]='carbo_5fu_weekly') and ([line_drugs(2)]<>'1' or [line_drugs(4)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方為每週 Carboplatin＋Paclitaxel，但藥物未同時勾兩者", "x": "([line_regimen]='cp_weekly') and ([line_drugs(2)]<>'1' or [line_drugs(9)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方為 Paclitaxel＋Cisplatin，但藥物未同時勾兩者", "x": "([line_regimen]='tp') and ([line_drugs(9)]<>'1' or [line_drugs(1)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方為 DC，但藥物未同時勾 Docetaxel 與 Cisplatin", "x": "([line_regimen]='dc') and ([line_drugs(10)]<>'1' or [line_drugs(1)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方為 DCF，但藥物未同時勾 Docetaxel、Cisplatin、5-FU", "x": "([line_regimen]='dcf') and ([line_drugs(10)]<>'1' or [line_drugs(1)]<>'1' or [line_drugs(4)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方為 Cisplatin 單藥，但未勾 Cisplatin", "x": "([line_regimen]='cis_q3w' or [line_regimen]='cis_weekly') and ([line_drugs(1)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方含 Cetuximab，但未勾 Cetuximab", "x": "([line_regimen]='cet_combo') and ([line_drugs(11)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方含 Nivolumab，但未勾 Nivolumab", "x": "([line_regimen]='chemo_nivo' or [line_regimen]='nivo') and ([line_drugs(12)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方含 Pembrolizumab，但未勾 Pembrolizumab", "x": "([line_regimen]='chemo_pembro' or [line_regimen]='pembro') and ([line_drugs(13)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方為 PHDFL，但藥物未同時勾 Cisplatin、5-FU、Leucovorin", "x": "([line_regimen]='phdfl') and ([line_drugs(1)]<>'1' or [line_drugs(4)]<>'1' or [line_drugs(8)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方為 UFT，但未勾 UFT", "x": "([line_regimen]='uft') and ([line_drugs(6)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方為 TS-1，但未勾 TS-1", "x": "([line_regimen]='ts1') and ([line_drugs(7)]<>'1')", "at": "line_drugs"}, {"s": "W", "f": "systemic_line", "n": "處方為 Oxaliplatin 組合，但未勾 Oxaliplatin", "x": "([line_regimen]='oxali_fp') and ([line_drugs(3)]<>'1')", "at": "line_drugs"}];
 var DRUG_MAP=[{"code": "ICISP50", "generic": "cisplatin", "drug_key": "1", "category": "anticancer", "route": "iv", "note": "50mg/100ml/BT"}, {"code": "ICISP501", "generic": "cisplatin", "drug_key": "1", "category": "anticancer", "route": "iv", "note": "50mg/50mL DBL"}, {"code": "ICISP502", "generic": "cisplatin", "drug_key": "1", "category": "anticancer", "route": "iv", "note": "50mg/100mL Fresenius"}, {"code": "ICARBO", "generic": "carboplatin", "drug_key": "2", "category": "anticancer", "route": "iv", "note": "150mg/Vial"}, {"code": "ICARBO1", "generic": "carboplatin", "drug_key": "2", "category": "anticancer", "route": "iv", "note": "150mg/Vial"}, {"code": "IFLUORO", "generic": "fluorouracil", "drug_key": "4", "category": "anticancer", "route": "iv", "note": "1000mg/20mL"}, {"code": "IFLUORO1", "generic": "fluorouracil", "drug_key": "4", "category": "anticancer", "route": "iv", "note": "500mg/10mL"}, {"code": "IPACL10", "generic": "paclitaxel", "drug_key": "9", "category": "anticancer", "route": "iv", "note": "60mg/10mL"}, {"code": "IDOCET2", "generic": "docetaxel", "drug_key": "10", "category": "anticancer", "route": "iv", "note": "20mg/0.5ml"}, {"code": "IDOCET8", "generic": "docetaxel", "drug_key": "10", "category": "anticancer", "route": "iv", "note": "80mg/2ml"}, {"code": "ICETUXI", "generic": "cetuximab", "drug_key": "11", "category": "anticancer", "route": "iv", "note": "100mg/50ml"}, {"code": "ICETUXI5", "generic": "cetuximab", "drug_key": "11", "category": "anticancer", "route": "iv", "note": "5mg/mL 20mL"}, {"code": "IBEVACI3", "generic": "bevacizumab", "drug_key": "88", "category": "anticancer", "route": "iv", "note": "100mg/4mL(ESCC 清單外→其他)"}, {"code": "TUFT", "generic": "tegafur-uracil (UFT)", "drug_key": "6", "category": "anticancer", "route": "oral", "note": "複方 Cap"}, {"code": "TAKYNZE", "generic": "netupitant+palonosetron", "drug_key": "", "category": "supportive", "route": "oral", "note": "止吐"}, {"code": "TAPRE12", "generic": "aprepitant", "drug_key": "", "category": "supportive", "route": "oral", "note": "止吐"}]; /* ../drug_code_map.csv */
 var KEY="escc-abstraction-v1", KEY_WHO="escc-abstraction-who", KEY_ROLE="escc-abstraction-role", KEY_BK="escc-abstraction-backup", KEY_DOC="escc-abstraction-lastdoc";
@@ -651,6 +658,7 @@ function renderForm(){
       guardEdit(fm,x,function(){ask("刪除第 "+(i+1)+" 筆"+fm.name+"？").then(function(ok){if(!ok)return;arr.splice(i,1);logChange(fm.id,"刪除第 "+(i+1)+" 筆");persist();renderForm();refreshCur();});});};});
     $$("[data-done]",area).forEach(function(b){b.onclick=function(){completeInst(fm,arr[+b.dataset.done]);};});
   }
+  if(tab==="systemic_line"&&typeof CHEMO!=="undefined"&&!auditMode())CHEMO.renderDrafts(area);
   updateDock();
 }
 function summary(fm,x){
@@ -889,7 +897,7 @@ function completeInst(fm,x){
   if(!needWho())return;
   var c=checkForm(cur,fm,x,true);
   if(c.E.length){showAllMsgs();$("#issues").classList.add("open");toast("這一筆還有 "+c.E.length+" 項待處理");return;}
-  var fin=function(){x._s=2;logChange(fm.id,"標記一筆完成");persist(true);renderForm();refreshCur();};
+  var fin=function(){x._s=2;if(fm.id==="systemic_line"&&typeof CHEMO!=="undefined")CHEMO.shadow(cur,x);logChange(fm.id,"標記一筆完成");persist(true);renderForm();refreshCur();};
   if(c.W.length)ask("這一筆有提醒：\n"+c.W.map(function(w){return "・"+w.m;}).join("\n")+"\n\n仍要標記完成？").then(function(ok){if(ok)fin();});else fin();
 }
 $("#bDone").onclick=completeForm;
@@ -1110,6 +1118,8 @@ $$("#menu .dd button").forEach(function(b){b.onclick=function(){
   if(!SEC.can(a)){toast("你的身分沒有這個權限");return;}
   if(["qout","redcap","redcapx","srcs","load","qin","restore","sample"].indexOf(a)>=0)SEC.secLog("資料選單："+b.textContent.trim());
   if(a==="load")pickFile($("#fCsv"),loadCsv);
+  else if(a==="chemoin")CHEMO.pickQrp();
+  else if(a==="shadow")CHEMO.renderShadow();
   else if(a==="qout"){var n=DB.q.filter(function(q){return q.status==="open";}).length;if(!n){toast("目前沒有待醫師確認的問題");return;}offer("ESCC_待確認問題_"+nameStamp()+".csv",queriesCsv());}
   else if(a==="qin")pickFile($("#fCsv"),importAnswers);
   else if(a==="sample")drawSample();
@@ -1181,7 +1191,7 @@ var SEC=(function(){
       return crypto.subtle.digest("SHA-256",enc.encode(prev+JSON.stringify({t:e.t,by:e.by,role:e.role,act:e.act}))).then(function(h){e.h=b64(h);persist();});});
   }
   var PERM={load:["manager"],qout:["abstractor","manager"],qin:["physician","manager"],sample:["manager"],report:["manager"],
-            redcap:["manager"],redcapx:["manager"],srcs:["manager"],backup:["manager","abstractor","physician","auditor"],restore:["manager"]};
+            redcap:["manager"],redcapx:["manager"],srcs:["manager"],chemoin:["manager","abstractor"],shadow:["manager"],backup:["manager","abstractor","physician","auditor"],restore:["manager"]};
   function can(a){return !!SESSION&&(PERM[a]||[]).indexOf(SESSION.role)>=0;}
   function pwOk(pw){return String(pw||"").length>=8;}
 
@@ -1392,6 +1402,282 @@ var SEC=(function(){
     return get("meta").then(function(m){META=m||null;showAuth();});
   }
   return {session:function(){return SESSION;},init:init,can:can,backupString:backupString,restoreText:restoreText,saveVault:saveVault,secLog:secLog};
+})();
+
+/* ---------- 化療明細表匯入 + 治療線草稿 + 影子模式(2026-09-28,phase 3) ----------
+   JS port of tools/chemo_sheet/{parse_chemo_sheet,chemo_to_lines}.py — keep the two in sync (parity test in selftest run7).
+   Raw files are parsed in memory and never stored; only drafts (inside the encrypted DB) are kept. */
+var CHEMO=(function(){
+  var CODE="[IT][A-Z0-9]{3,9}";
+  var ROW=new RegExp("^(?<code>"+CODE+")\\s+(?<start>\\d{7})\\s+(?<stop>\\d{7})\\s+(?<drug>.+)\\s+(?<dose>\\d+(?:\\.\\d+)?)\\s+(?<unit>[A-Za-z]+)\\s+"+
+    "(?<qty>\\d+(?:\\.\\d+)?)\\s+(?<qunit>[A-Za-z]+)\\s*(?<freq>(?:QD|QW|QOD|BID|TID|QID|STAT|ST|ONCE|PRN|HS|Q\\d+[HDW])\\b.*)?$");
+  var KEY_NAME={"1":"Cisplatin","2":"Carboplatin","3":"Oxaliplatin","4":"5-FU","5":"Capecitabine","6":"UFT","7":"TS-1","8":"Leucovorin","9":"Paclitaxel","10":"Docetaxel","11":"Cetuximab","12":"Nivolumab","13":"Pembrolizumab","88":"其他"};
+  var NAME_FALLBACK=[[/cisplatin|cddp/i,"1"],[/carboplatin/i,"2"],[/oxaliplatin/i,"3"],[/fluorouracil|5-?fu/i,"4"],[/capecitabine|xeloda/i,"5"],[/\buft\b|tegafur/i,"6"],
+    [/ts-?1|s-1\b|gimeracil/i,"7"],[/leucovorin|folinic/i,"8"],[/paclitaxel/i,"9"],[/docetaxel/i,"10"],[/cetuximab/i,"11"],[/nivolumab/i,"12"],[/pembrolizumab/i,"13"]];
+  var SUPPORTIVE=/akynzeo|aprepitant|emend|ondansetron|granisetron|palonosetron|dexamethasone|filgrastim|g-csf|pegfilgrastim|normal saline|mannitol/i;
+  var SAME_CLASS=[["1","2","3"],["9","10"],["4","5","6","7"]], MAINT=["5","6","7","11","12","13"];
+  var CYCLE_WINDOW=6, NEW_LINE_GAP=60, CONTINUE_WINDOW=42;
+  var DMAP={};(typeof DRUG_MAP!=="undefined"?DRUG_MAP:[]).forEach(function(r){DMAP[r.code]=r;});
+  function bynum(a,b){return (+a)-(+b);}
+  function setOf(a){var s={};a.forEach(function(k){s[k]=1;});return s;}
+  function keys(s){return Object.keys(s).sort(bynum);}
+  function union(){var s={};for(var i=0;i<arguments.length;i++)Object.keys(arguments[i]).forEach(function(k){s[k]=1;});return s;}
+  function minus(a,b){var s={};Object.keys(a).forEach(function(k){if(!b[k])s[k]=1;});return s;}
+  function inter(a,b){var s={};Object.keys(a).forEach(function(k){if(b[k])s[k]=1;});return s;}
+  function size(s){return Object.keys(s).length;}
+  function subset(a,b){return Object.keys(a).every(function(k){return b[k];});}
+  function median(v){if(!v.length)return null;var s=v.slice().sort(function(a,b){return a-b;}),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+  function pyRound1(x){return Math.round(x*10)/10;}
+  /* ---- QRP (QuickReport = concatenated EMF pages; text in EMR_EXTTEXTOUTW records) ---- */
+  function qrpLines(buf){
+    var b=new Uint8Array(buf),dv=new DataView(buf),pages=[],dec=new TextDecoder("utf-16le");
+    for(var i=0;i+4<=b.length;i++){
+      if(b[i]!==0x20||b[i+1]!==0x45||b[i+2]!==0x4D||b[i+3]!==0x46)continue;
+      var off=i-40;if(off<0||off+52>b.length)continue;
+      var total=dv.getUint32(off+48,true),p=off,end=Math.min(off+total,b.length),items=[];
+      while(p+8<=end){var t=dv.getUint32(p,true),sz=dv.getUint32(p+4,true);if(sz<8)break;
+        if(t===84&&p+52<=b.length){var x=dv.getInt32(p+36,true),y=dv.getInt32(p+40,true),n=dv.getUint32(p+44,true),o=dv.getUint32(p+48,true);
+          var s=dec.decode(b.subarray(p+o,p+o+2*n)).trim();if(s)items.push([y,x,s]);}
+        p+=sz;if(t===14)break;}
+      pages.push(items);
+    }
+    var lines=[];
+    pages.forEach(function(items){
+      items.sort(function(a,b){return a[0]-b[0]||a[1]-b[1]||(a[2]<b[2]?-1:a[2]>b[2]?1:0);});
+      var cur=[],cy=null;
+      items.forEach(function(it){if(cy===null||Math.abs(it[0]-cy)>8){if(cur.length)lines.push(cur.sort(function(a,b){return a[0]-b[0]||(a[1]<b[1]?-1:1);}).map(function(z){return z[1];}));cur=[];cy=it[0];}cur.push([it[1],it[2]]);});
+      if(cur.length)lines.push(cur.sort(function(a,b){return a[0]-b[0]||(a[1]<b[1]?-1:1);}).map(function(z){return z[1];}));
+    });
+    return lines;
+  }
+  function rowStrings(lines){
+    var L=lines.map(function(l){return l.filter(function(t){return t!=="("&&t!==")"&&!/^\(\s*\)$/.test(t);});});
+    L=L.map(function(l){var o=[];l.forEach(function(t){t.replace(/[()]/g," ").split(/\s+/).forEach(function(x){if(x)o.push(x);});});return o;});
+    var out=[];
+    L.forEach(function(l){
+      if(!l.length)return;
+      if(new RegExp("^"+CODE+"\\d{7}$").test(l[0])&&!new RegExp("^"+CODE+"$").test(l[0]))l=[l[0].slice(0,-7),l[0].slice(-7)].concat(l.slice(1));
+      if(l.length===1&&new RegExp("^"+CODE+"$").test(l[0])&&out.length&&/^\d{7} /.test(out[out.length-1])){out[out.length-1]=l[0]+" "+out[out.length-1];return;}
+      out.push(l.join(" "));
+    });
+    return out;
+  }
+  function parseSheet(lines){
+    var flat=lines.map(function(l){return l.join(" ");}).join("\n"),hdr={},m;
+    m=flat.match(/Chart No:?\s*(\d{7,10})/)||flat.match(/\b(\d{10})\b/);hdr.chart_no=m?m[1]:"";
+    m=flat.match(/Diagnosis\s+(?:[\d.]+\s+)?([A-Z][A-Z ,'\-]+)/);hdr.diagnosis=m?m[1].trim():"";
+    [["height_cm",/身高[：:]\s*([\d.]+)/],["weight_kg",/體重[：:]\s*([\d.]+)/],["bsa",/體表面積[：:]\s*([\d.]+)/],["bsa_date",/體表面積[：:]\s*[\d.]+\s*\((\d{7})\)/]]
+      .forEach(function(kp){var mm=flat.match(kp[1]);hdr[kp[0]]=mm?mm[1]:"";});
+    var rows=[],unparsed=[];
+    rowStrings(lines).forEach(function(r){var mm=ROW.exec(r);
+      if(mm){var g=mm.groups,o={};Object.keys(g).forEach(function(k){o[k]=(g[k]||"").trim();});rows.push(o);}
+      else if(new RegExp("^"+CODE+"\\s+\\d{7}").test(r)||/^\d{7}\s+\d{7}/.test(r))unparsed.push(r);});
+    return {header:hdr,rows:rows,unparsed:unparsed};
+  }
+  /* ---- rows → draft lines (mirror of chemo_to_lines.build_lines) ---- */
+  function day(d){return Date.UTC(+d.slice(0,3)+1911,+d.slice(3,5)-1,+d.slice(5,7))/86400000;}
+  function iso(n){var d=new Date(n*86400000);return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate());}
+  function classify(r){var m=DMAP[r.code];if(m)return [m.drug_key||null,m.category,false];
+    if(SUPPORTIVE.test(r.drug))return [null,"supportive",true];
+    for(var i=0;i<NAME_FALLBACK.length;i++)if(NAME_FALLBACK[i][0].test(r.drug))return [NAME_FALLBACK[i][1],"anticancer",true];
+    return ["88","unknown",true];}
+  function regimenOf(S0,interval){
+    var S=minus(S0,{"88":1}),weekly=interval!==null&&interval<=10,chemo=minus(S,{"11":1,"12":1,"13":1}),has=function(k){return !!S[k];},eq=function(a){return size(S)===a.length&&a.every(has);};
+    if(has("12"))return [size(chemo)?"chemo_nivo":"nivo",""];
+    if(has("13"))return [size(chemo)?"chemo_pembro":"pembro",""];
+    if(has("11"))return size(chemo)?["cet_combo",""]:["other","Cetuximab 單藥"];
+    if(["1","4","10"].every(has))return ["dcf",""];
+    if(["1","4","8"].every(has))return ["phdfl",""];
+    if(eq(["1","4"]))return [weekly?"pf_weekly":"pf",""];
+    if(eq(["2","4"]))return [weekly?"carbo_5fu_weekly":"carbo_5fu",""];
+    if(eq(["2","9"]))return weekly?["cp_weekly",""]:["other","Carboplatin＋Paclitaxel（非每週）"];
+    if(eq(["1","9"]))return ["tp",""];
+    if(eq(["1","10"]))return ["dc",""];
+    if(has("3")&&(has("4")||has("5")))return ["oxali_fp",""];
+    if(eq(["1"]))return [weekly?"cis_weekly":"cis_q3w",""];
+    if(eq(["9"]))return ["paclitaxel",""];
+    if(eq(["10"]))return ["docetaxel",""];
+    if(eq(["6"]))return ["uft",""];
+    if(eq(["7"]))return ["ts1",""];
+    return ["other",keys(S).map(function(k){return KEY_NAME[k];}).join("＋")||"不明"];
+  }
+  function nm(s){return keys(s).map(function(k){return KEY_NAME[k];}).join("、");}
+  function buildLines(rows,bsa){
+    var unmapped={},adm=[];
+    rows.forEach(function(r){var c=classify(r),key=c[0],cat=c[1];
+      if(c[2]&&!DMAP[r.code])unmapped[r.code]=[r.code,r.drug,cat];
+      if(cat==="supportive"||key===null)return;
+      var dm=/x\s*(\d+)\s*天/.exec(r.freq),nd=dm?+dm[1]:1;
+      adm.push({date:day(r.start),stop:day(r.stop),key:key,dose:r.dose?parseFloat(r.dose):null,unit:r.unit,selfpay:r.drug.charAt(0)==="自",
+        oral:((DMAP[r.code]||{}).route==="oral")||r.unit==="CA"||r.unit==="TB",days:nd});});
+    adm=adm.map(function(a,i){a._i=i;return a;}).sort(function(a,b){return a.date-b.date||a._i-b._i;});
+    var cycles=[];
+    adm.forEach(function(a){var last=cycles[cycles.length-1];
+      var sameOral=a.oral&&last&&last.adm.some(function(x){return x.key===a.key;});
+      if(last&&(a.date-last.start)<=CYCLE_WINDOW&&!sameOral){last.adm.push(a);last.end=Math.max(last.end,a.stop);}
+      else cycles.push({start:a.date,end:a.stop,adm:[a]});});
+    cycles.forEach(function(c){c.keys=setOf(c.adm.map(function(a){return a.key;}));});
+    var lines=[];
+    cycles.forEach(function(c,idx){
+      var cur=lines[lines.length-1];
+      if(!cur){lines.push({cycles:[c],flags:[],core:union(c.keys)});return;}
+      var prevEnd=Math.max.apply(null,cur.cycles.map(function(x){return x.end;})),lineKeys=union.apply(null,cur.cycles.map(function(x){return x.keys;}));
+      var gap=c.start-prevEnd,newD=minus(c.keys,lineKeys);
+      var subst=size(newD)>0&&Object.keys(newD).every(function(n){return SAME_CLASS.some(function(g){return g.indexOf(n)>=0&&g.some(function(k){return lineKeys[k];});});});
+      if(gap>NEW_LINE_GAP){lines.push({cycles:[c],flags:["停藥 "+gap+" 天後重新開始"],core:union(c.keys)});return;}
+      if(size(newD)&&!subst){
+        var cont=cycles.slice(idx+1).some(function(x){var d=x.start-c.start;return d>0&&d<=CONTINUE_WINDOW&&size(inter(lineKeys,x.keys));});
+        if(!cont){lines.push({cycles:[c],flags:["換藥(新增 "+nm(newD)+",原藥物停用)"],core:union(c.keys)});return;}
+        if(!cur.addnote){cur.flags.push(iso(c.start)+" 加入 "+nm(newD)+"(原藥物持續使用,視為同一線的合併或交替給藥;請確認)");cur.addnote=true;}
+      }
+      var dropped=minus(cur.core,c.keys);
+      if(size(dropped)&&!size(newD)){
+        var back=cycles.slice(idx+1).some(function(x){return (x.start-c.start)<=NEW_LINE_GAP&&size(inter(dropped,x.keys));});
+        if(!back){
+          if(subset(c.keys,setOf(MAINT))&&size(minus(cur.core,setOf(MAINT)))){lines.push({cycles:[c],flags:["藥物是前一線的子集,可能為維持治療(治療時機選「維持治療」)"],core:union(c.keys),maint:true});return;}
+          if(!cur.dropnote){cur.flags.push(iso(c.start)+" 起停用 "+nm(dropped)+" → 可能為「因毒性停用其中一種藥」");cur.dropnote=true;if(!cur.mod)cur.mod="2";}
+        }
+      }
+      if(subst){cur.flags.push(iso(c.start)+" 同類藥替換("+nm(newD)+")→ 同一線內的修改");cur.mod="1";cur.core=union(cur.core,newD);}
+      cur.cycles.push(c);
+    });
+    var out=lines.map(function(L){
+      var K=union.apply(null,L.cycles.map(function(c){return c.keys;})),adms=[];L.cycles.forEach(function(c){adms=adms.concat(c.adm);});
+      var counts=new Map();adms.forEach(function(a){counts.set(a.key,(counts.get(a.key)||0)+1);});
+      var nont=new Map();counts.forEach(function(v,k){if(["11","12","13"].indexOf(k)<0)nont.set(k,v);});
+      var pool=nont.size?nont:counts,backbone=null,bv=-1;pool.forEach(function(v,k){if(v>bv){bv=v;backbone=k;}});
+      var starts=Object.keys(setOf(adms.filter(function(a){return a.key===backbone;}).map(function(a){return String(a.date);}))).map(Number).sort(function(a,b){return a-b;});
+      var iv=[];for(var i=1;i<starts.length;i++)iv.push(starts[i]-starts[i-1]);
+      var interval=iv.length?median(iv):null,rg=regimenOf(K,interval);
+      var per=new Map(),daysum=new Map();   /* same drug on the same day (several vial codes) = one dose */
+      adms.slice().sort(function(a,b){return a.date-b.date||a._i-b._i;}).forEach(function(a){if(a.unit==="mg"&&a.dose){if(!daysum.has(a.key))daysum.set(a.key,new Map());var m=daysum.get(a.key);m.set(a.date,(m.get(a.date)||0)+a.dose);}});
+      if(bsa)daysum.forEach(function(m,k){per.set(k,Array.from(m.keys()).sort(function(a,b){return a-b;}).map(function(d){return pyRound1(m.get(d)/bsa);}));});
+      var reduced=[];per.forEach(function(v,k){var ref=k==="11"&&v.length>1?v[1]:v[0],rest=k==="11"?v.slice(2):v.slice(1);if(rest.length&&Math.min.apply(null,rest)<0.85*ref)reduced.push(KEY_NAME[k]);});
+      var sp=adms.map(function(a){return a.selfpay;}),selfpay=sp.every(Boolean)?"3":(sp.some(Boolean)?"2":"1");
+      var oral=adms.filter(function(a){return a.oral;}).reduce(function(s,a){return s+a.days;},0),flags=L.flags.slice();
+      if((rg[0]==="cis_q3w"||rg[0]==="cis_weekly")&&per.has("1")){var m2=median(per.get("1"));
+        if(rg[0]==="cis_q3w"&&m2<50)flags.push("cisplatin 中位 "+m2+" mg/m² 偏低,與三週方案不符,請確認");
+        if(rg[0]==="cis_weekly"&&m2>50)flags.push("cisplatin 中位 "+m2+" mg/m² 偏高,與每週方案不符,請確認");}
+      if(reduced.length)flags.push("可能減量:"+reduced.join("、")+"(之後週期 < 參考劑量 85%,已校正體表面積;需確認)");
+      if(K["88"])flags.push("含 ESCC 清單外的抗癌藥,請在「其他抗癌藥名稱」填寫");
+      var dm2={};per.forEach(function(v,k){dm2[KEY_NAME[k]]=v;});
+      return {line_start:iso(Math.min.apply(null,adms.map(function(a){return a.date;}))),line_end:iso(Math.max.apply(null,L.cycles.map(function(c){return c.end;}))),
+        line_regimen:rg[0],line_regimen_other:rg[1],line_drugs:keys(K),line_cycles:starts.length,backbone:KEY_NAME[backbone],median_interval_days:interval,
+        line_dose_m2:per.has(backbone)?median(per.get(backbone)):null,line_oral_days:oral||null,dose_mg_m2:dm2,line_dose_red:reduced.length?"1":"",
+        line_modification:L.mod||"",line_selfpay:selfpay,line_setting_hint:L.maint?"8":"",line_source:"1",flags:flags};
+    });
+    return {lines:out,unmapped:Object.keys(unmapped).sort().map(function(k){return unmapped[k];})};
+  }
+  function convertBuffer(buf){var lines=qrpLines(buf),p=parseSheet(lines),bsa=p.header.bsa?parseFloat(p.header.bsa):null,b=buildLines(p.rows,bsa);
+    return {header:p.header,n_rows:p.rows.length,unparsed:p.unparsed,lines:b.lines,unmapped:b.unmapped};}
+
+  /* ---- import UI ---- */
+  function normChart(c){return String(c||"").replace(/^0+/,"");}
+  function readBuf(f){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(r.result);};r.onerror=function(){rej(r.error);};r.readAsArrayBuffer(f);});}
+  function importFiles(files){
+    var s=SEC.session(),byChart={};DB.order.forEach(function(id){var m=normChart((DB.pre[id]||{}).mrn);if(m)byChart[m]=id;});
+    return Promise.all(Array.prototype.map.call(files,function(f){return readBuf(f).then(function(buf){
+      var res={file:f.name};
+      try{var r=convertBuffer(buf);res.rows=r.n_rows;res.unparsed=r.unparsed.length;res.unmapped=r.unmapped;
+        if(!r.n_rows){res.status="無法解析(不是化療明細表 QRP?)";return res;}
+        var id=byChart[normChart(r.header.chart_no)];
+        if(!id){res.status="不在本機名單(可能非 ESCC 或未匯入)";res.preview=r;return res;}   /* preview only: kept in memory, never saved */
+        if(s.role==="abstractor"&&(DB.assign||{})[id]!==s.name){res.status="不是分派給你的病人";res.sid=id;return res;}
+        var rec=recOf(id),old=(rec.chemo&&rec.chemo.drafts)||[];
+        var keep=old.filter(function(d){return d.status!=="pending";});
+        var drafts=r.lines.map(function(l){return Object.assign({_did:uid("d"),status:"pending"},l);});
+        rec.chemo={at:stamp(),by:s.name,file:f.name,rows:r.n_rows,bsa:r.header.bsa,bsa_date:r.header.bsa_date,diagnosis:r.header.diagnosis,drafts:keep.concat(drafts)};
+        res.sid=id;res.drafts=drafts.length;res.status="已產生草稿";
+        rec.log.push({t:stamp(),by:s.name,role:s.role,f:"systemic_line",w:"匯入化療明細表 "+f.name+":"+r.n_rows+" 列 → "+drafts.length+" 條草稿"});
+      }catch(e){res.status="解析失敗:"+e.message;}
+      return res;});})).then(function(results){
+        SEC.secLog("匯入化療明細表 "+results.length+" 檔");persist(true);refreshStates();renderRail();return results;});
+  }
+  function renderImportReport(results){
+    cur=null;$("#dock").hidden=true;
+    var ok=results.filter(function(r){return r.drafts;}).length;
+    $("#main").innerHTML='<section class="sheet report"><h3>化療明細表匯入結果</h3><p class="desc">共 '+results.length+' 檔,'+ok+' 檔產生草稿。原始檔只在記憶體中解析,沒有保存。草稿在各病人的「治療線別」分頁,逐筆確認後才會成為正式資料。</p>'+
+      '<div class="tw"><table><thead><tr><th>檔案</th><th>結果</th><th>病人</th><th>用藥列</th><th>草稿</th></tr></thead><tbody>'+
+      results.map(function(r){return '<tr><td>'+esc(r.file)+'</td><td>'+esc(r.status)+(r.unmapped&&r.unmapped.length?'<br><small>未知醫令代碼:'+esc(r.unmapped.map(function(u){return u[0];}).join("、"))+'</small>':"")+'</td><td>'+
+        (r.sid&&r.drafts?'<button class="btn" type="button" data-open="'+esc(r.sid)+'">'+esc(r.sid)+'</button>':r.preview?'<button class="btn" type="button" data-prev="'+results.indexOf(r)+'">預覽解析結果</button>':esc(r.sid||"—"))+'</td><td>'+(r.rows||"—")+'</td><td>'+(r.drafts||(r.preview?r.preview.lines.length+"(僅預覽)":"—"))+'</td></tr>';}).join("")+
+      '</tbody></table></div></section>';
+    $$("[data-open]",$("#main")).forEach(function(b){b.onclick=function(){tab="systemic_line";openPt(b.dataset.open);};});
+    $$("[data-prev]",$("#main")).forEach(function(b){b.onclick=function(){renderPreview(results[+b.dataset.prev],results);};});
+  }
+  function renderPreview(r,results){
+    var p=r.preview,h=p.header;
+    $("#main").innerHTML='<section class="sheet report"><h3>解析預覽(不會儲存)</h3><p class="desc">'+esc(r.file)+':病歷號不在本機名單,以下僅供核對解析是否正確,關閉後即消失。診斷:'+esc(h.diagnosis||"—")+'・身高 '+esc(h.height_cm||"—")+' cm・體重 '+esc(h.weight_kg||"—")+' kg・體表面積 '+esc(h.bsa||"—")+'(量測日 民國 '+esc(h.bsa_date||"—")+')・用藥 '+p.n_rows+' 列 → '+p.lines.length+' 條草稿'+(p.unmapped.length?'・未知醫令代碼:'+esc(p.unmapped.map(function(u){return u[0];}).join("、")):"")+'</p>'+
+      '<p><button class="btn" type="button" id="bPrevBack">← 回匯入結果</button></p>'+p.lines.map(function(d){return draftCard(Object.assign({_did:"preview"},d));}).join("")+'</section>';
+    $$("[data-adopt],[data-skip]",$("#main")).forEach(function(b){b.remove();});
+    $$(".draft .desc:last-child",$("#main")).forEach(function(x){x.remove();});
+    $("#bPrevBack").onclick=function(){renderImportReport(results);};
+  }
+  function pickQrp(){var inp=$("#fQrp");inp.onchange=function(){var fs=inp.files;if(!fs||!fs.length)return;
+    importFiles(fs).then(function(r){inp.value="";renderImportReport(r);});};inp.click();}
+  function draftCard(d){
+    var drugs=d.line_drugs.map(function(k){return KEY_NAME[k];}).join("、");
+    var dm=Object.keys(d.dose_mg_m2||{}).map(function(k){var v=d.dose_mg_m2[k];return k+" "+median(v)+" mg/m²";}).join("、");
+    return '<div class="inst draft" data-did="'+d._did+'"><div class="ih"><b>草稿</b><span>'+esc(d.line_start)+' → '+esc(d.line_end)+'・'+esc(lbl("line_regimen",d.line_regimen))+(d.line_regimen_other?"("+esc(d.line_regimen_other)+")":"")+'</span>'+
+      '<button class="btn go" type="button" data-adopt="'+d._did+'">採用</button><button class="btn" type="button" data-skip="'+d._did+'">略過</button></div>'+
+      '<div class="ib"><p class="desc">藥物:'+esc(drugs)+'・週期 '+d.line_cycles+'(主藥 '+esc(d.backbone)+(d.median_interval_days?',間隔中位 '+d.median_interval_days+' 天':"")+')'+(dm?'・'+esc(dm):"")+
+      (d.line_oral_days?'・口服 '+d.line_oral_days+' 天':"")+'・給付:'+esc(lbl("line_selfpay",d.line_selfpay))+'</p>'+
+      (d.flags.length?'<ul class="dflags">'+d.flags.map(function(f){return '<li>'+esc(f)+'</li>';}).join("")+'</ul>':"")+
+      '<p class="desc">採用後請補:線別、治療時機'+(d.line_setting_hint==="8"?'(提示:可能為維持治療)':"")+'、停藥原因。</p></div></div>';
+  }
+  function renderDrafts(area){
+    var rec=recOf(cur),ch=rec.chemo;if(!ch)return;
+    var pend=(ch.drafts||[]).filter(function(d){return d.status==="pending";});
+    var box=document.createElement("div");box.className="draftbox";
+    box.innerHTML='<h3 class="drafth">化療明細表草稿('+pend.length+' 筆待確認・'+esc(ch.file)+'・'+esc(ch.at)+')</h3>'+(pend.length?pend.map(draftCard).join(""):'<p class="empty">草稿都已處理。</p>');
+    area.insertBefore(box,area.firstChild);
+    $$("[data-adopt]",box).forEach(function(b){b.onclick=function(){adopt(b.dataset.adopt);};});
+    $$("[data-skip]",box).forEach(function(b){b.onclick=function(){var d=ch.drafts.filter(function(x){return x._did===b.dataset.skip;})[0];if(!d)return;
+      d.status="skipped";logChange("systemic_line","略過草稿 "+d.line_start+" "+d.line_regimen);persist(true);renderForm();};});
+  }
+  function adopt(did){
+    if(!needWho())return;var rec=recOf(cur),d=rec.chemo.drafts.filter(function(x){return x._did===did;})[0];if(!d)return;
+    var inst={_s:1,_uid:uid("i"),_draft:did,line_regimen:d.line_regimen,line_regimen_other:d.line_regimen_other,line_drugs:d.line_drugs.slice(),
+      line_start:d.line_start,line_end:d.line_end,line_cycles:String(d.line_cycles),line_dose_m2:d.line_dose_m2==null?"":String(d.line_dose_m2),
+      line_oral_days:d.line_oral_days==null?"":String(d.line_oral_days),line_dose_red:d.line_dose_red,line_modification:d.line_modification,
+      line_selfpay:d.line_selfpay,line_source:"1",line_no:"",line_setting:"",line_stop:""};
+    rec.systemic_line.push(inst);d.status="adopted";d.inst=inst._uid;
+    logChange("systemic_line","採用草稿為第 "+rec.systemic_line.length+" 筆("+d.line_start+" "+d.line_regimen+")");persist(true);renderForm();refreshCur();
+    toast("已採用,請補線別、治療時機與停藥原因");
+  }
+  /* ---- shadow mode: suggestion recorded when a line is completed; never shown to abstractors ---- */
+  function dnum(s){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||"");return m?Date.UTC(+m[1],+m[2]-1,+m[3])/86400000:null;}
+  function suggest(id,inst){
+    var r=recOf(id),st=dnum(inst.line_start),en=dnum(inst.line_end)||st;if(st===null)return null;
+    var ev=(r.clin_event||[]).filter(function(e){return ["1","2","3","4","5"].indexOf(e.ev_type)>=0&&dnum(e.ev_date)!==null;}).map(function(e){return dnum(e.ev_date);});
+    var prog=ev.some(function(t){return t<=st;});
+    var prior=(r.systemic_line||[]).filter(function(x){return x!==inst&&dnum(x.line_start)!==null&&dnum(x.line_start)<st;});
+    if(prog){var pal=prior.filter(function(x){var t=dnum(x.line_start);return ev.some(function(e){return e<=t;});}).length;
+      return {setting:pal===0?"4":"5",no:String(pal+1),basis:"開始前已有復發/惡化事件"};}
+    var rts=(r.rt_course||[]).map(function(x){return {s:dnum(x.rt_start),e:dnum(x.rt_end)||dnum(x.rt_start),intent:x.rt_intent};}).filter(function(x){return x.s!==null;});
+    var ov=rts.filter(function(x){return st<=x.e+7&&en>=x.s-7;})[0];
+    if(ov)return {setting:ov.intent==="3"?"7":"2",no:"0",basis:"與放療期間重疊"};
+    var after=rts.filter(function(x){return x.s>en&&x.s-en<=90;})[0];
+    if(after)return {setting:"6",no:"0",basis:"放療開始前 90 天內結束"};
+    if(inst._draft){var d=(r.chemo&&r.chemo.drafts||[]).filter(function(x){return x._did===inst._draft;})[0];if(d&&d.line_setting_hint==="8")return {setting:"8",no:"0",basis:"藥物為前一線子集"};}
+    return {setting:"",no:"",basis:"資料不足"};
+  }
+  function shadow(id,inst){
+    try{var sg=suggest(id,inst);if(!sg)return;DB.shadow=DB.shadow||[];
+      DB.shadow=DB.shadow.filter(function(x){return !(x.sid===id&&x.inst===inst._uid);});
+      DB.shadow.push({sid:id,inst:inst._uid,at:stamp(),sugg:sg,human:{setting:inst.line_setting||"",no:inst.line_no||""},fromDraft:!!inst._draft});}catch(e){}
+  }
+  function renderShadow(){
+    cur=null;$("#dock").hidden=true;var S=DB.shadow||[];
+    var f=function(k){var n=S.filter(function(x){return x.sugg[k];}),a=n.filter(function(x){return x.sugg[k]===x.human[k];});return [n.length,a.length];};
+    var st=f("setting"),no=f("no"),pct=function(p){return p[0]?Math.round(p[1]/p[0]*100)+"%":"—";};
+    var dis=S.filter(function(x){return (x.sugg.setting&&x.sugg.setting!==x.human.setting)||(x.sugg.no&&x.sugg.no!==x.human.no);});
+    $("#main").innerHTML='<section class="sheet report"><h3>影子模式比對(僅資料管理可見)</h3><p class="desc">登錄人員完成每筆治療線時,系統在背景記錄自己的建議,不顯示給登錄人員。一致率夠高(例如 ≥ 95%)的欄位才考慮開放自動建議。已比對 '+S.length+' 筆。</p>'+
+      '<div class="tw"><table><thead><tr><th>欄位</th><th>系統有建議</th><th>與人工一致</th><th>一致率</th></tr></thead><tbody>'+
+      '<tr><td>治療時機</td><td>'+st[0]+'</td><td>'+st[1]+'</td><td>'+pct(st)+'</td></tr><tr><td>線別</td><td>'+no[0]+'</td><td>'+no[1]+'</td><td>'+pct(no)+'</td></tr></tbody></table></div>'+
+      '<h3>不一致(最近 50 筆)</h3>'+(dis.length?'<div class="tw"><table><thead><tr><th>病人</th><th>系統</th><th>人工</th><th>依據</th></tr></thead><tbody>'+dis.slice(-50).reverse().map(function(x){
+        return '<tr><td>'+esc(x.sid)+'</td><td>'+esc(lbl("line_setting",x.sugg.setting))+' / 線別 '+esc(x.sugg.no)+'</td><td>'+esc(lbl("line_setting",x.human.setting))+' / 線別 '+esc(x.human.no)+'</td><td>'+esc(x.sugg.basis)+'</td></tr>';}).join("")+'</tbody></table></div>':'<p class="desc">目前沒有不一致。</p>')+'</section>';
+  }
+  return {_report:renderImportReport,pickQrp:pickQrp,importFiles:importFiles,renderDrafts:renderDrafts,shadow:shadow,renderShadow:renderShadow,convertBuffer:convertBuffer,buildLines:buildLines,parseSheet:parseSheet,qrpLines:qrpLines,suggest:suggest,adopt:adopt};
 })();
 
 /* ---------- init ---------- */
