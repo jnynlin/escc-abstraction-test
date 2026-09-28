@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ESCC 病歷摘錄工作台</title>
+<!-- secure copy 2026-09-28: accounts + AES-GCM encryption at rest (IndexedDB) + auto-lock + role-gated exports; SCHEMA/RULES identical to the original -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#F6F7F5; --sheet:#FFFFFF; --ink:#1E2A32; --soft:#5E6C74; --rule:#D8DEDA; --well:#EEF1EE;
+  --done:#1F6B5C; --done-soft:#E1EFEA; --iodine:#8A5A14; --iodine-soft:#F6EBD8;
+  --err:#B42318; --err-soft:#FCEBE9; --focus:#2F6FA3;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#12181C; --sheet:#1A2227; --ink:#E4EAEC; --soft:#97A6AD; --rule:#2F3B41; --well:#151D21;
+    --done:#6CC3AC; --done-soft:#17302A; --iodine:#E0B56C; --iodine-soft:#33291A;
+    --err:#F2877C; --err-soft:#3A1F1C; --focus:#7FB4E0;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#12181C; --sheet:#1A2227; --ink:#E4EAEC; --soft:#97A6AD; --rule:#2F3B41; --well:#151D21;
+  --done:#6CC3AC; --done-soft:#17302A; --iodine:#E0B56C; --iodine-soft:#33291A;
+  --err:#F2877C; --err-soft:#3A1F1C; --focus:#7FB4E0;
+}
+html{height:100%;scroll-padding-top:calc(env(safe-area-inset-top,0px) + 64px);}
+*,*::before,*::after{box-sizing:inherit;}
+body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans","Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  font-size:15px;line-height:1.55;font-variant-numeric:tabular-nums;}
+button,input,select,textarea{font:inherit;color:inherit;}
+button{cursor:pointer;}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+
+/* bar */
+.bar{position:sticky;top:0;z-index:30;background:var(--sheet);border-bottom:1px solid var(--rule);
+  padding:calc(env(safe-area-inset-top,0px) + 9px) 16px 9px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.bar h1{margin:0;font-size:1rem;font-weight:600;letter-spacing:.01em;}
+.bar .sp{flex:1;}
+.bar label{font-size:.82rem;color:var(--soft);}
+.bar input{width:120px;padding:6px 9px;border:1px solid var(--rule);border-radius:5px;background:var(--well);}
+.bar input.need{border-color:var(--err);background:var(--err-soft);}
+.btn{padding:6px 12px;border:1px solid var(--rule);border-radius:5px;background:var(--sheet);font-size:.86rem;font-weight:500;white-space:nowrap;}
+.btn.go{background:var(--done);border-color:var(--done);color:#fff;}
+:root[data-theme="dark"] .btn.go{color:#0E1714;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.go{color:#0E1714;}}
+.btn.warn{color:var(--err);border-color:var(--err);}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+.menu{position:relative;}
+.menu .dd{position:absolute;right:0;top:calc(100% + 4px);min-width:230px;background:var(--sheet);border:1px solid var(--rule);
+  border-radius:7px;padding:4px;display:none;z-index:40;box-shadow:0 8px 24px rgba(0,0,0,.14);}
+.menu.open .dd{display:block;}
+.menu .dd button{display:block;width:100%;text-align:left;border:none;background:none;padding:8px 10px;border-radius:5px;font-size:.88rem;}
+.menu .dd button:hover{background:var(--well);}
+.menu .dd hr{border:none;border-top:1px solid var(--rule);margin:4px 0;}
+
+/* shell */
+.shell{display:grid;grid-template-columns:300px minmax(0,1fr);min-height:calc(100vh - 56px);}
+@media (max-width:880px){.shell{grid-template-columns:1fr;}}
+.rail{border-right:1px solid var(--rule);background:var(--sheet);padding:14px 14px 20px;
+  position:sticky;top:calc(env(safe-area-inset-top,0px) + 53px);height:calc(100vh - 53px);display:flex;flex-direction:column;overflow:hidden;}
+@media (max-width:880px){.rail{position:static;height:auto;border-right:none;border-bottom:1px solid var(--rule);}}
+.meter{margin:0 0 12px;}
+.meter .row{display:flex;justify-content:space-between;font-size:.8rem;color:var(--soft);margin-bottom:4px;}
+.meter .row b{color:var(--ink);font-weight:600;}
+.track{height:6px;border-radius:3px;background:var(--well);overflow:hidden;}
+.track i{display:block;height:100%;background:var(--done);width:0;transition:width .3s;}
+@media (prefers-reduced-motion: reduce){.track i{transition:none;}}
+.queues{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 10px;}
+.queues button{border:1px solid var(--rule);background:var(--sheet);border-radius:14px;padding:3px 10px;font-size:.78rem;color:var(--soft);}
+.queues button.on{border-color:var(--ink);color:var(--ink);font-weight:600;background:var(--well);}
+.queues button span{margin-left:4px;color:var(--soft);font-weight:400;}
+.rail input.q{width:100%;padding:7px 9px;border:1px solid var(--rule);border-radius:5px;background:var(--well);margin-bottom:8px;}
+.list{overflow:auto;flex:1;margin:0 -6px;padding:0 6px;}
+@media (max-width:880px){.list{max-height:240px;}}
+.pt{display:grid;grid-template-columns:auto 1fr auto;gap:0 9px;align-items:center;width:100%;text-align:left;background:none;
+  border:1px solid transparent;border-radius:6px;padding:7px 8px;}
+.pt:hover{background:var(--well);}
+.pt.cur{border-color:var(--ink);background:var(--well);}
+.pt .dots{display:flex;gap:3px;}
+.pt .dots i{width:7px;height:7px;border-radius:50%;background:var(--rule);}
+.pt .dots i.s1{background:var(--iodine);} .pt .dots i.s2{background:var(--done);} .pt .dots i.bad{background:var(--err);}
+.pt b{font-weight:600;font-size:.9rem;}
+.pt small{color:var(--soft);font-size:.76rem;}
+.empty{color:var(--soft);font-size:.88rem;padding:18px 4px;}
+.legend{font-size:.72rem;color:var(--soft);margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;}
+.legend i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+
+/* main */
+main{padding:18px 22px 130px;max-width:1040px;width:100%;}
+@media (max-width:600px){main{padding:14px 12px 150px;}}
+.spine{background:var(--sheet);border:1px solid var(--rule);border-left:4px solid var(--ink);border-radius:6px;padding:12px 16px;margin-bottom:14px;}
+.spine h2{margin:0 0 6px;font-size:1.25rem;font-weight:600;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;}
+.spine h2 small{font-size:.82rem;font-weight:400;color:var(--soft);}
+.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 18px;margin:0;}
+.facts div{min-width:0;}
+.facts dt{font-size:.72rem;color:var(--soft);}
+.facts dd{margin:0;font-size:.9rem;font-weight:500;overflow-wrap:anywhere;}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--rule);margin-bottom:14px;overflow-x:auto;}
+.tabs button{border:none;background:none;padding:9px 12px;font-size:.88rem;color:var(--soft);border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:6px;}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600;}
+.tabs button i{width:7px;height:7px;border-radius:50%;background:var(--rule);}
+.tabs button i.s1{background:var(--iodine);} .tabs button i.s2{background:var(--done);}
+.tabs button em{font-style:normal;font-size:.74rem;color:var(--soft);}
+.sheet{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:4px 18px 10px;}
+.sheet h3{font-size:.92rem;font-weight:600;margin:16px 0 8px;padding-top:12px;border-top:1px solid var(--rule);color:var(--ink);}
+.sheet h3:first-child{border-top:none;padding-top:4px;}
+.desc{font-size:.86rem;color:var(--soft);margin:10px 0 4px;}
+.f{padding:7px 0;display:grid;grid-template-columns:minmax(160px,34%) 1fr;gap:4px 16px;align-items:start;}
+@media (max-width:640px){.f{grid-template-columns:1fr;}}
+.f > .lab{font-size:.88rem;padding-top:5px;}
+.f > .lab i{color:var(--err);font-style:normal;margin-left:3px;}
+.f > .lab small{display:block;color:var(--soft);font-size:.74rem;line-height:1.4;margin-top:2px;}
+.f .in{min-width:0;}
+.f input[type=text],.f select,.f textarea{width:100%;max-width:340px;padding:6px 9px;border:1px solid var(--rule);border-radius:5px;background:var(--well);}
+.f textarea{max-width:none;min-height:64px;resize:vertical;}
+.f .hint{font-size:.76rem;color:var(--soft);margin-top:3px;}
+.f .msg{font-size:.78rem;margin-top:3px;}
+.f .msg:empty,.f .hint:empty{display:none;}
+.f.e .msg{color:var(--err);} .f.e input,.f.e select,.f.e .opts{border-color:var(--err);}
+.f.w .msg{color:var(--iodine);}
+.f.flash{animation:fl 1.1s ease;}
+@keyframes fl{0%,40%{background:var(--iodine-soft);}100%{background:transparent;}}
+@media (prefers-reduced-motion: reduce){.f.flash{animation:none;}}
+.opts{display:flex;flex-wrap:wrap;gap:5px;border:1px solid transparent;border-radius:6px;}
+.opts button{border:1px solid var(--rule);background:var(--well);border-radius:5px;padding:5px 10px;font-size:.86rem;text-align:left;}
+.opts button.on{background:var(--ink);border-color:var(--ink);color:var(--sheet);}
+.calc{padding:6px 9px;border:1px dashed var(--rule);border-radius:5px;min-height:34px;max-width:340px;font-weight:600;}
+.calc:empty::before{content:"—";color:var(--soft);font-weight:400;}
+.inst{border:1px solid var(--rule);border-radius:6px;margin:12px 0;background:var(--sheet);}
+.inst > .ih{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--rule);background:var(--well);border-radius:6px 6px 0 0;}
+.inst > .ih b{font-weight:600;font-size:.9rem;}
+.inst > .ih span{color:var(--soft);font-size:.82rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.inst > .ib{padding:4px 14px 8px;}
+.addrow{margin:10px 0 4px;}
+.nodata{padding:40px 10px;text-align:center;color:var(--soft);}
+.nodata h2{color:var(--ink);font-size:1.1rem;font-weight:600;margin:0 0 8px;}
+.nodata ol{text-align:left;display:inline-block;margin:10px 0 16px;}
+
+/* dock */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:25;background:var(--sheet);border-top:1px solid var(--rule);
+  padding:9px 16px calc(9px + env(safe-area-inset-bottom,0px));}
+.dock .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:1340px;margin:0 auto;}
+.dock .st{font-size:.84rem;color:var(--soft);}
+.dock .st b{color:var(--ink);font-weight:600;}
+.pill{border:none;border-radius:12px;padding:3px 10px;font-size:.8rem;font-weight:600;}
+.pill.e{background:var(--err-soft);color:var(--err);} .pill.w{background:var(--iodine-soft);color:var(--iodine);} .pill.ok{background:var(--done-soft);color:var(--done);}
+.dock .sp{flex:1;}
+.issues{max-width:1340px;margin:6px auto 0;max-height:32vh;overflow:auto;display:none;}
+.issues.open{display:block;}
+.issues button{display:block;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--rule);padding:6px 2px;font-size:.84rem;}
+.issues button b{margin-right:6px;}
+.issues button.e b{color:var(--err);} .issues button.w b{color:var(--iodine);}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);
+  padding:8px 16px;border-radius:16px;font-size:.86rem;opacity:0;pointer-events:none;transition:opacity .2s;z-index:60;max-width:90vw;}
+#toast.show{opacity:1;}
+#modal{position:fixed;inset:0;background:rgba(10,18,22,.45);display:none;align-items:center;justify-content:center;z-index:70;padding:18px;}
+#modal.open{display:flex;}
+#modal .box{background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:18px 20px;max-width:460px;width:100%;}
+#modal p{margin:0 0 14px;white-space:pre-line;}
+#modal .acts{display:flex;justify-content:flex-end;gap:8px;}
+input[type=file]{display:none;}
+
+.bar select{padding:6px 8px;border:1px solid var(--rule);border-radius:5px;background:var(--well);}
+.meter .row span b{color:var(--ink);font-weight:600;}
+.pt small.tag{font-size:.72rem;}
+.pt small.tag.opn{color:var(--iodine);font-weight:600;}
+.pt small.tag.ret{color:var(--err);font-weight:600;}
+.banner{border-radius:6px;padding:9px 14px;margin:-4px 0 14px;font-size:.86rem;}
+.banner.ok{background:var(--done-soft);color:var(--done);}
+.banner.aud{background:var(--iodine-soft);color:var(--iodine);}
+.tabs b.qn{background:var(--iodine);color:var(--sheet);border-radius:9px;font-size:.7rem;padding:0 6px;font-weight:600;}
+.qbtn{display:inline-block;margin-top:5px;border:1px dashed var(--rule);background:none;border-radius:10px;padding:1px 9px;font-size:.72rem;color:var(--soft);}
+.qbtn:hover{border-color:var(--iodine);color:var(--iodine);}
+.qbtn.on{border-style:solid;border-color:var(--iodine);color:var(--iodine);font-weight:600;}
+.f.hasq{background:linear-gradient(90deg,var(--iodine-soft),transparent 60%);margin:0 -18px;padding-left:18px;padding-right:18px;}
+.qbox{margin-top:8px;border-left:3px solid var(--iodine);background:var(--well);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.84rem;max-width:560px;}
+.qbox.ret{border-left-color:var(--err);}
+.qbox.closed{border-left-color:var(--done);opacity:.85;}
+.qbox .qh{font-weight:600;margin-bottom:4px;}
+.qbox ul{margin:0;padding-left:18px;}
+.qbox li{margin:2px 0;}
+.qbox li small{display:block;color:var(--soft);font-size:.72rem;}
+.qacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.srcrow{background:var(--well);border-radius:6px;padding:7px 10px !important;margin:2px 0 6px;}
+.srcin{display:flex;gap:8px;flex-wrap:wrap;}
+.srcin select{max-width:200px !important;}
+.srcin input{max-width:190px !important;}
+.small{font-size:.8rem;margin-top:14px;}
+#modal .box h3{margin:0 0 10px;font-size:1rem;}
+.mf{display:block;margin:0 0 10px;}
+.mf span{display:block;font-size:.82rem;color:var(--soft);margin-bottom:3px;}
+.mf i{color:var(--err);font-style:normal;}
+.mf select,.mf input,.mf textarea{width:100%;padding:7px 9px;border:1px solid var(--rule);border-radius:5px;background:var(--well);}
+.mf textarea{min-height:70px;resize:vertical;}
+.merr{color:var(--err);font-size:.82rem;margin:0 0 8px;min-height:0;}
+.merr:empty{display:none;}
+.report .tw{overflow-x:auto;}
+.report table{border-collapse:collapse;width:100%;font-size:.86rem;margin:6px 0 14px;}
+.report th,.report td{border-bottom:1px solid var(--rule);padding:6px 8px;text-align:left;}
+.report th{color:var(--soft);font-weight:500;}
+.report tr.lo td{color:var(--err);}
+body[data-role="physician"] .bar{border-bottom:3px solid var(--done);}
+body[data-role="auditor"] .bar{border-bottom:3px solid var(--iodine);}
+.chip{font-size:.84rem;color:var(--soft);} .chip b{color:var(--ink);font-weight:600;}
+#auth{position:fixed;inset:0;z-index:90;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto;}
+#auth[hidden]{display:none!important;}
+.abox{background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:22px 24px;max-width:420px;width:100%;}
+.abox h2{margin:0 0 4px;font-size:1.15rem;font-weight:600;} .asub{margin:0 0 16px;color:var(--soft);font-size:.9rem;}
+.aerr{color:var(--err);font-size:.86rem;min-height:1.2em;margin:8px 0 0;} .afoot{color:var(--soft);font-size:.76rem;margin:14px 0 0;}
+.adesc{font-size:.88rem;margin:0 0 10px;} .rcode{font-family:ui-monospace,Consolas,monospace;font-size:1.05rem;letter-spacing:.04em;background:var(--well);border:1px dashed var(--rule);border-radius:6px;padding:10px;word-break:break-all;user-select:all;}
+.ck{display:flex;gap:8px;align-items:center;margin:10px 0 12px;font-size:.88rem;}
+.alinks{margin:14px 0 0;display:flex;gap:14px;flex-wrap:wrap;} .lk{background:none;border:none;padding:0;color:var(--focus);font-size:.84rem;text-decoration:underline;}
+.testban{margin:12px 0 0;padding:8px 10px;border-radius:6px;background:var(--err-soft);color:var(--err);font-size:.86rem;font-weight:600;}
+.testchip{font-size:.78rem;font-weight:600;color:var(--err);border:1px solid var(--err);border-radius:10px;padding:1px 8px;}
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>ESCC 病歷摘錄工作台</h1>
+  <span class="sp"></span>
+  <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
+  <span class="testchip">測試版・勿輸入真實資料</span><span class="chip" id="chip"></span><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">鎖定</button>
+  <div class="menu" id="menu">
+    <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
+    <div class="dd" role="menu">
+      <button type="button" data-act="load">載入預填檔（CSV）</button>
+      <hr>
+      <button type="button" data-act="qout">匯出待醫師確認問題（CSV）</button>
+      <button type="button" data-act="qin">匯入醫師回覆（CSV）</button>
+      <hr>
+      <button type="button" data-act="sample">稽核：隨機抽樣 5%</button>
+      <button type="button" data-act="report">稽核：一致性報告</button>
+      <hr>
+      <button type="button" data-act="redcapx">匯出 REDCap 匯入檔（可直接上傳）</button>
+      <button type="button" data-act="redcap">匯出 REDCap 原始檔（備查，不可直接上傳）</button>
+      <button type="button" data-act="srcs">匯出來源文件清單（CSV）</button>
+      <button type="button" data-act="backup">匯出完整備份（JSON）</button>
+      <button type="button" data-act="restore">還原備份（JSON）</button>
+    </div>
+  </div>
+</div>
+<div class="shell">
+  <aside class="rail" aria-label="病人清單">
+    <div class="meter"><div class="row"><span id="m1"></span></div><div class="track"><i id="tCore"></i></div></div>
+    <div class="meter"><div class="row"><span id="m2"></span></div></div>
+    <div class="queues" id="queues"></div>
+    <input class="q" id="q" placeholder="搜尋研究編號" autocomplete="off">
+    <div class="list" id="list"></div>
+    <div class="legend"><span><i style="background:var(--rule)"></i>未開始</span><span><i style="background:var(--iodine)"></i>進行中</span><span><i style="background:var(--done)"></i>完成</span><span><i style="background:var(--err)"></i>有錯誤</span></div>
+  </aside>
+  <main id="main"></main>
+</div>
+<div class="dock" id="dock" hidden>
+  <div class="row">
+    <button type="button" class="pill ok" id="pE">待處理 0</button>
+    <button type="button" class="pill ok" id="pW">提醒 0</button>
+    <span class="st" id="stTxt"></span>
+    <span class="sp"></span>
+    <button class="btn" type="button" id="bDone">標記此表單完成</button>
+    <button class="btn go" type="button" id="bSign" hidden>簽核此病人</button>
+    <button class="btn go" type="button" id="bNext">下一位 ›</button>
+  </div>
+  <div class="issues" id="issues"></div>
+</div>
+<div id="auth" hidden><div class="abox"><h2>ESCC 病歷摘錄工作台</h2><p class="asub" id="aSub"></p><div id="aBody"></div><p class="aerr" id="aErr" role="alert"></p><p class="afoot">資料以帳號密碼加密存在這台電腦的瀏覽器中；閒置 15 分鐘自動鎖定。</p><p class="testban">測試版：僅供試用，請勿輸入任何真實病人資料。</p></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="modal" role="dialog" aria-modal="true"><div class="box"><div id="mBody"></div><div class="acts"><button class="btn" type="button" id="mNo">取消</button><button class="btn go" type="button" id="mYes">確定</button></div></div></div>
+<input type="file" id="fCsv" accept=".csv,text/csv">
+<input type="file" id="fJson" accept=".json,application/json">
+<script>
+(function(){
+"use strict";
+var SCHEMA=[{"v": "record_id", "f": "registry_prefill", "t": "text", "l": "研究編號（study_id）", "sec": "癌登帶入資料（唯讀，請勿修改；如有錯誤寫在核心補登的備註）"}, {"v": "dx_year", "f": "registry_prefill", "t": "text", "l": "診斷年", "val": "integer", "min": 2003.0, "max": 2030.0}, {"v": "dx_date", "f": "registry_prefill", "t": "text", "l": "最初診斷日", "n": "由院內癌登識別檔帶入；去識別測試檔為空白", "val": "date_ymd"}, {"v": "sex", "f": "registry_prefill", "t": "radio", "l": "性別", "ch": [["1", "男"], ["2", "女"]]}, {"v": "age_dx", "f": "registry_prefill", "t": "text", "l": "診斷年齡", "val": "integer", "min": 18.0, "max": 100.0}, {"v": "topography", "f": "registry_prefill", "t": "text", "l": "原發部位 ICD-O-3"}, {"v": "morphology", "f": "registry_prefill", "t": "text", "l": "組織型態 ICD-O-3"}, {"v": "cancer_seq", "f": "registry_prefill", "t": "text", "l": "癌症發生順序", "n": "≥2 表示在此之前有其他原發癌", "val": "integer", "min": 1.0, "max": 9.0}, {"v": "ajcc_edition", "f": "registry_prefill", "t": "radio", "l": "原始 AJCC 版次", "ch": [["6", "第 6 版"], ["7", "第 7 版"], ["8", "第 8 版"], ["9", "不明"]]}, {"v": "ctnm_text", "f": "registry_prefill", "t": "text", "l": "臨床 TNM（原始）"}, {"v": "cstage_orig", "f": "registry_prefill", "t": "text", "l": "臨床期別組合（原始）"}, {"v": "tx_pathway", "f": "registry_prefill", "t": "dropdown", "l": "治療路徑（程式推導）", "ch": [["1", "內視鏡或局部切除"], ["2", "直接食道切除"], ["3", "術前放（化）療後食道切除"], ["4", "定義性放化療（≥50 Gy）"], ["5", "放化療 <50 Gy"], ["6", "單純放療"], ["7", "單純化療"], ["8", "未接受抗癌治療"]], "n": "決定下方哪些表單需要填寫"}, {"v": "rt_dose_gy", "f": "registry_prefill", "t": "text", "l": "首次療程最高放療劑量（Gy）", "val": "number", "min": 0.0, "max": 100.0}, {"v": "chemo_tcr", "f": "registry_prefill", "t": "text", "l": "癌登化療碼（163）"}, {"v": "vital_status", "f": "registry_prefill", "t": "radio", "l": "生存狀態", "ch": [["0", "死亡"], ["1", "存活"]]}, {"v": "os_months", "f": "registry_prefill", "t": "text", "l": "存活時間（月）", "val": "number"}, {"v": "core_intro", "f": "core_abstraction", "t": "descriptive", "l": "<b>核心補登</b>：依病歷順序填寫。查不到請選「不明」，不要留空。建議順序：①首次內視鏡報告 → ②團隊會議紀錄或首次治療前病程 → ③入院病歷的過去病史。"}, {"v": "detection_mode", "f": "core_abstraction", "t": "radio", "l": "發現方式：第一次發現食道病灶的情境", "sec": "① 首次內視鏡報告", "ch": [["1", "因症狀就醫"], ["2", "其他癌症追蹤內視鏡（如頭頸癌）"], ["3", "健檢或篩檢"], ["4", "其他疾病檢查偶然發現"], ["9", "不明"]], "req": 1}, {"v": "tumor_upper_cm", "f": "core_abstraction", "t": "text", "l": "腫瘤上緣距門齒（cm）", "n": "以診斷時第一次內視鏡為準；無記載留空並勾選下方不明", "val": "number", "min": 15.0, "max": 45.0}, {"v": "tumor_lower_cm", "f": "core_abstraction", "t": "text", "l": "腫瘤下緣距門齒（cm）", "val": "number", "min": 15.0, "max": 45.0}, {"v": "tumor_dist_unknown", "f": "core_abstraction", "t": "yesno", "l": "內視鏡報告無距離記載", "ch": [["1", "是"], ["0", "否"]]}, {"v": "tumor_length_cm", "f": "core_abstraction", "t": "calc", "l": "腫瘤長度（cm，自動計算）", "calc": "if([tumor_upper_cm]<>'' and [tumor_lower_cm]<>'', [tumor_lower_cm]-[tumor_upper_cm], '')"}, {"v": "location_ajcc", "f": "core_abstraction", "t": "text", "l": "AJCC 位置（自動判定）", "calctext": "if([tumor_upper_cm]='' or [tumor_lower_cm]='', '', if(([tumor_upper_cm]+[tumor_lower_cm])/2<20, '頸段', if(([tumor_upper_cm]+[tumor_lower_cm])/2<25, '上胸段', if(([tumor_upper_cm]+[tumor_lower_cm])/2<30, '中胸段', '下胸段'))))", "n": "以腫瘤中心：頸段 15–20、上胸段 20–25、中胸段 25–30、下胸段 30–40 cm"}, {"v": "first_course_intent", "f": "core_abstraction", "t": "radio", "l": "首次療程意圖", "sec": "② 團隊會議紀錄／首次治療前病程", "ch": [["1", "根治"], ["2", "緩和"], ["3", "未接受抗癌治療（僅支持性照護）"], ["9", "不明"]], "req": 1}, {"v": "ecog_dx", "f": "core_abstraction", "t": "radio", "l": "治療前體能狀態 ECOG", "ch": [["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["9", "不明"]], "n": "只有 KPS 時：90–100→0、70–80→1、50–60→2、30–40→3、10–20→4", "req": 1}, {"v": "weight_loss_6m_pct", "f": "core_abstraction", "t": "text", "l": "診斷前 6 個月體重減輕（%）", "n": "無記載請留空", "val": "number", "min": 0.0, "max": 50.0}, {"v": "comorb", "f": "core_abstraction", "t": "checkbox", "l": "共病（可複選）", "sec": "③ 入院病歷：過去病史", "ch": [["1", "肝硬化"], ["2", "COPD"], ["3", "心衰竭"], ["4", "心肌梗塞"], ["5", "中重度腎病（Cr > 3 mg/dL、透析或移植）"], ["6", "糖尿病"], ["7", "腦中風或 TIA"], ["8", "失智"], ["9", "周邊血管疾病"], ["0", "以上皆無"], ["99", "病歷無法判斷"]], "req": 1}, {"v": "child_pugh", "f": "core_abstraction", "t": "radio", "l": "肝硬化 Child-Pugh 分級", "ch": [["1", "A"], ["2", "B"], ["3", "C"], ["9", "不明"]], "br": "[comorb(1)]='1'"}, {"v": "dm_organ", "f": "core_abstraction", "t": "yesno", "l": "糖尿病合併器官損傷（視網膜、腎、神經病變）", "ch": [["1", "是"], ["0", "否"]], "br": "[comorb(6)]='1'"}, {"v": "cci_score", "f": "core_abstraction", "t": "calc", "l": "Charlson 共病指數（本表項目加權，自動計算）", "calc": "if([comorb(1)]='1', if([child_pugh]='2' or [child_pugh]='3', 3, 1), 0) + [comorb(2)] + [comorb(3)] + [comorb(4)] + 2*[comorb(5)] + if([comorb(6)]='1', if([dm_organ]='1', 2, 1), 0) + [comorb(7)] + [comorb(8)] + [comorb(9)]", "br": "[comorb(99)]<>'1'"}, {"v": "smoking_status", "f": "core_abstraction", "t": "radio", "l": "吸菸狀態", "sec": "④ 生活習慣（僅 2010 年以前診斷者需填；2011 年起由癌登帶入）", "ch": [["0", "從不"], ["1", "已戒"], ["2", "目前"], ["9", "不明"]], "br": "[dx_year]<2011"}, {"v": "pack_years", "f": "core_abstraction", "t": "text", "l": "吸菸包年", "val": "number", "min": 0.0, "max": 200.0, "br": "[dx_year]<2011 and ([smoking_status]='1' or [smoking_status]='2')"}, {"v": "alcohol_status", "f": "core_abstraction", "t": "radio", "l": "飲酒狀態", "ch": [["0", "從不"], ["1", "已戒"], ["2", "目前"], ["9", "不明"]], "br": "[dx_year]<2011"}, {"v": "betel_status", "f": "core_abstraction", "t": "radio", "l": "嚼檳榔狀態", "ch": [["0", "從不"], ["1", "已戒"], ["2", "目前"], ["9", "不明"]], "br": "[dx_year]<2011"}, {"v": "betel_years", "f": "core_abstraction", "t": "text", "l": "嚼檳榔年數", "val": "integer", "min": 0.0, "max": 80.0, "br": "[dx_year]<2011 and ([betel_status]='1' or [betel_status]='2')"}, {"v": "core_notes", "f": "core_abstraction", "t": "notes", "l": "備註：矛盾、待查、癌登帶入資料疑似錯誤", "sec": "⑤ 完成"}, {"v": "core_verified", "f": "core_abstraction", "t": "yesno", "l": "已與原始病歷逐欄核對", "ch": [["1", "是"], ["0", "否"]], "req": 1}, {"v": "stg_intro", "f": "staging_workup", "t": "descriptive", "l": "<b>分期檢查</b>（論文 3）：只記首次治療前做的檢查。"}, {"v": "stg_ct", "f": "staging_workup", "t": "radio", "l": "治療前是否做 胸腹部 CT", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "req": 1}, {"v": "stg_ct_date", "f": "staging_workup", "t": "text", "l": "胸腹部 CT 日期", "val": "date_ymd", "br": "[stg_ct]='1'"}, {"v": "stg_pet", "f": "staging_workup", "t": "radio", "l": "治療前是否做 PET-CT", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "req": 1}, {"v": "stg_pet_date", "f": "staging_workup", "t": "text", "l": "PET-CT 日期", "val": "date_ymd", "br": "[stg_pet]='1'"}, {"v": "stg_eus", "f": "staging_workup", "t": "radio", "l": "治療前是否做 內視鏡超音波 EUS", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "req": 1}, {"v": "stg_eus_date", "f": "staging_workup", "t": "text", "l": "內視鏡超音波 EUS 日期", "val": "date_ymd", "br": "[stg_eus]='1'"}, {"v": "stg_verified", "f": "staging_workup", "t": "yesno", "l": "已核對", "ch": [["1", "是"], ["0", "否"]], "req": 1}, {"v": "dcrt_intro", "f": "dcrt_detail", "t": "descriptive", "l": "<b>定義性放化療細節</b>（論文 2）。治療路徑不是定義性放化療時，此表無須填寫，直接標記完成。"}, {"v": "ccrt_response", "f": "dcrt_detail", "t": "radio", "l": "放化療後臨床反應（結束後 8–12 週）", "ch": [["1", "臨床完全反應（內視鏡與切片無殘存）"], ["2", "殘存"], ["3", "惡化"], ["4", "未評估"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "ccrt_response_date", "f": "dcrt_detail", "t": "text", "l": "反應評估日期", "val": "date_ymd", "br": "[tx_pathway]='4' and [ccrt_response]<>'4'"}, {"v": "ccrt_nodal", "f": "dcrt_detail", "t": "radio", "l": "淋巴結照射策略", "ch": [["1", "選擇性淋巴區照射（ENI）"], ["2", "僅累及區（IFI）"], ["9", "不明"]], "n": "依放療計畫書或放腫紀錄", "br": "[tx_pathway]='4'", "req": 1}, {"v": "ccrt_completed", "f": "dcrt_detail", "t": "radio", "l": "放療是否依計畫完成", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "ccrt_interrupt_days", "f": "dcrt_detail", "t": "text", "l": "非計畫性中斷天數", "val": "integer", "min": 0.0, "max": 60.0, "br": "[tx_pathway]='4'"}, {"v": "ccrt_regimen", "f": "dcrt_detail", "t": "dropdown", "l": "同步化療處方", "ch": [["pf", "Cisplatin＋5-FU"], ["cis_weekly", "每週 Cisplatin"], ["cp_weekly", "每週 Carboplatin＋Paclitaxel"], ["other", "其他"], ["unknown", "病歷未載明"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "ccrt_regimen_other", "f": "dcrt_detail", "t": "text", "l": "其他處方名稱", "br": "[tx_pathway]='4' and [ccrt_regimen]='other'"}, {"v": "salvage_esoph", "f": "dcrt_detail", "t": "yesno", "l": "是否接受救援性食道切除", "ch": [["1", "是"], ["0", "否"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "salvage_date", "f": "dcrt_detail", "t": "text", "l": "救援手術日期", "val": "date_ymd", "br": "[tx_pathway]='4' and [salvage_esoph]='1'"}, {"v": "dcrt_verified", "f": "dcrt_detail", "t": "yesno", "l": "已核對", "ch": [["1", "是"], ["0", "否"]], "br": "[tx_pathway]='4'", "req": 1}, {"v": "rt_intent", "f": "rt_course", "t": "radio", "l": "放療目的", "sec": "每個放療療程一筆（重複表單）", "ch": [["1", "術前"], ["2", "定義性"], ["3", "術後"], ["4", "緩和"], ["5", "救援"]], "req": 1}, {"v": "rt_start", "f": "rt_course", "t": "text", "l": "開始日", "val": "date_ymd", "req": 1}, {"v": "rt_end", "f": "rt_course", "t": "text", "l": "結束日", "val": "date_ymd"}, {"v": "rt_dose_total", "f": "rt_course", "t": "text", "l": "總劑量（Gy）", "val": "number", "min": 0.0, "max": 80.0, "req": 1}, {"v": "rt_fx", "f": "rt_course", "t": "text", "l": "分次數", "val": "integer", "min": 1.0, "max": 45.0, "req": 1}, {"v": "rt_dpf", "f": "rt_course", "t": "calc", "l": "每次劑量（Gy，自動）", "calc": "if([rt_dose_total]<>'' and [rt_fx]<>'', round([rt_dose_total]/[rt_fx],2), '')"}, {"v": "rt_eqd2", "f": "rt_course", "t": "calc", "l": "EQD2（α/β=10，自動）", "calc": "if([rt_dose_total]<>'' and [rt_fx]<>'', round([rt_dose_total]*([rt_dose_total]/[rt_fx]+10)/12,1), '')"}, {"v": "rt_technique", "f": "rt_course", "t": "dropdown", "l": "照射技術", "ch": [["1", "3D"], ["2", "IMRT"], ["3", "VMAT"], ["4", "質子"], ["8", "其他"], ["9", "不明"]]}, {"v": "rt_completed", "f": "rt_course", "t": "radio", "l": "是否依計畫完成", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]]}, {"v": "line_no", "f": "systemic_line", "t": "text", "l": "線別（0＝首次療程的術前／同步／術後；1、2、3＝緩和第幾線）", "sec": "每個治療線別一筆（重複表單）", "val": "integer", "min": 0.0, "max": 9.0, "req": 1}, {"v": "line_setting", "f": "systemic_line", "t": "radio", "l": "治療時機", "ch": [["1", "術前"], ["2", "同步放化療"], ["3", "術後"], ["4", "緩和第一線"], ["5", "緩和第二線以後"]], "req": 1}, {"v": "line_regimen", "f": "systemic_line", "t": "dropdown", "l": "處方", "ch": [["pf", "Cisplatin＋5-FU"], ["cis_weekly", "每週 Cisplatin"], ["cp_weekly", "每週 Carboplatin＋Paclitaxel"], ["chemo_pembro", "化療＋Pembrolizumab"], ["chemo_nivo", "化療＋Nivolumab"], ["nivo", "Nivolumab 單藥"], ["paclitaxel", "Paclitaxel 單藥"], ["docetaxel", "Docetaxel 單藥"], ["other", "其他"], ["unknown", "病歷未載明"]], "req": 1}, {"v": "line_regimen_other", "f": "systemic_line", "t": "text", "l": "其他處方名稱", "br": "[line_regimen]='other'", "req": 1}, {"v": "line_start", "f": "systemic_line", "t": "text", "l": "開始日", "val": "date_ymd", "req": 1}, {"v": "line_end", "f": "systemic_line", "t": "text", "l": "結束日", "val": "date_ymd"}, {"v": "line_cycles", "f": "systemic_line", "t": "text", "l": "實際給藥次數", "val": "integer", "min": 1.0, "max": 99.0}, {"v": "line_dose_red", "f": "systemic_line", "t": "radio", "l": "是否減量", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]]}, {"v": "line_stop", "f": "systemic_line", "t": "radio", "l": "停藥原因", "ch": [["1", "完成預定療程"], ["2", "疾病惡化"], ["3", "毒性"], ["4", "死亡"], ["5", "病人意願"], ["8", "其他"], ["9", "仍在治療或不明"]]}, {"v": "line_source", "f": "systemic_line", "t": "radio", "l": "資料來源", "ch": [["1", "系統匯出"], ["2", "人工補登"]], "req": 1}, {"v": "ev_type", "f": "clin_event", "t": "radio", "l": "事件類型", "sec": "每次事件一筆（重複表單）", "ch": [["1", "局部復發"], ["2", "區域淋巴結復發"], ["3", "遠處轉移"], ["4", "殘存疾病（治療後從未無病）"], ["5", "惡化（緩和治療中）"], ["6", "新原發癌"]], "req": 1}, {"v": "ev_date", "f": "clin_event", "t": "text", "l": "事件日期（影像或切片確認日）", "val": "date_ymd", "req": 1}, {"v": "ev_sites", "f": "clin_event", "t": "checkbox", "l": "部位（可複選）", "ch": [["1", "食道原發處"], ["2", "區域淋巴結"], ["3", "肝"], ["4", "肺"], ["5", "骨"], ["6", "遠處淋巴結"], ["7", "肋膜或腹膜"], ["8", "腦"], ["88", "其他"]], "br": "[ev_type]<>'6'"}, {"v": "ev_confirm", "f": "clin_event", "t": "radio", "l": "確認方式", "ch": [["1", "病理"], ["2", "影像"], ["3", "臨床"]], "req": 1}, {"v": "ev_detected", "f": "clin_event", "t": "radio", "l": "發現情境", "ch": [["1", "例行追蹤"], ["2", "症狀"], ["9", "不明"]]}, {"v": "oc_seq", "f": "other_cancer", "t": "text", "l": "該癌症發生順序", "sec": "ESCC 以外的每個原發癌一筆（重複表單；部位與日期由院內癌登帶入）", "val": "integer", "min": 1.0, "max": 9.0, "req": 1}, {"v": "oc_topography", "f": "other_cancer", "t": "text", "l": "部位 ICD-O-3", "req": 1}, {"v": "oc_morphology", "f": "other_cancer", "t": "text", "l": "組織型態 ICD-O-3"}, {"v": "oc_days_from_escc", "f": "other_cancer", "t": "text", "l": "距 ESCC 診斷日數（負值＝早於 ESCC）", "val": "integer", "min": -20000.0, "max": 20000.0, "req": 1}, {"v": "oc_timing", "f": "other_cancer", "t": "text", "l": "時序（自動判定）", "calctext": "if([oc_days_from_escc]='', '', if([oc_days_from_escc]<-182, '先前異時', if([oc_days_from_escc]<=182, '同時', '後續異時')))"}, {"v": "oc_neck_chest_rt", "f": "other_cancer", "t": "radio", "l": "該癌症是否曾接受頸部或胸部放療", "ch": [["1", "有"], ["0", "無"], ["9", "不明"]], "req": 1}, {"v": "oc_status", "f": "other_cancer", "t": "radio", "l": "ESCC 診斷時該癌症的狀態", "ch": [["1", "無病"], ["2", "治療中"], ["3", "復發或殘存"], ["4", "同時診斷"], ["9", "不明"]], "req": 1}];
+var RULES=[{"s": "E", "f": "core_abstraction", "n": "腫瘤下緣距離小於上緣", "x": "[tumor_lower_cm]<>'' and [tumor_upper_cm]<>'' and [tumor_lower_cm]<[tumor_upper_cm]", "at": "tumor_lower_cm"}, {"s": "W", "f": "core_abstraction", "n": "腫瘤長度超過 20 cm，請再核對", "x": "[tumor_length_cm]<>'' and [tumor_length_cm]>20", "at": "tumor_lower_cm"}, {"s": "E", "f": "core_abstraction", "n": "缺距離時須勾選「內視鏡報告無距離記載」", "x": "([tumor_upper_cm]='' or [tumor_lower_cm]='') and [tumor_dist_unknown]<>'1'", "at": "tumor_dist_unknown", "onComplete": 1}, {"s": "W", "f": "core_abstraction", "n": "部位碼與內視鏡距離判定的位置不符", "x": "[location_ajcc]<>'' and (([topography]='C150' and [location_ajcc]<>'頸段') or ([topography]='C153' and [location_ajcc]<>'上胸段') or ([topography]='C154' and [location_ajcc]<>'中胸段') or ([topography]='C155' and [location_ajcc]<>'下胸段'))", "at": "tumor_upper_cm"}, {"s": "E", "f": "core_abstraction", "n": "共病勾「以上皆無」又勾了其他項目", "x": "[comorb(0)]='1' and ([comorb(1)]='1' or [comorb(2)]='1' or [comorb(3)]='1' or [comorb(4)]='1' or [comorb(5)]='1' or [comorb(6)]='1' or [comorb(7)]='1' or [comorb(8)]='1' or [comorb(9)]='1' or [comorb(99)]='1')", "at": "comorb"}, {"s": "E", "f": "core_abstraction", "n": "共病勾「病歷無法判斷」又勾了其他項目", "x": "[comorb(99)]='1' and ([comorb(1)]='1' or [comorb(2)]='1' or [comorb(3)]='1' or [comorb(4)]='1' or [comorb(5)]='1' or [comorb(6)]='1' or [comorb(7)]='1' or [comorb(8)]='1' or [comorb(9)]='1')", "at": "comorb"}, {"s": "E", "f": "core_abstraction", "n": "意圖為「未接受抗癌治療」，但治療路徑顯示有治療", "x": "[first_course_intent]='3' and [tx_pathway]<>'8'", "at": "first_course_intent"}, {"s": "W", "f": "core_abstraction", "n": "ECOG 3–4 但意圖為根治，請確認", "x": "([ecog_dx]='3' or [ecog_dx]='4') and [first_course_intent]='1'", "at": "ecog_dx"}, {"s": "W", "f": "dcrt_detail", "n": "已填同步化療處方，但癌登化療碼為 00（未化療）", "x": "[ccrt_regimen]<>'' and [ccrt_regimen]<>'unknown' and [chemo_tcr]='00'", "at": "ccrt_regimen"}, {"s": "E", "f": "dcrt_detail", "n": "救援手術日期早於反應評估日期", "x": "[salvage_date]<>'' and [ccrt_response_date]<>'' and datediff([ccrt_response_date],[salvage_date],'d',true)<0", "at": "salvage_date"}, {"s": "E", "f": "rt_course", "n": "放療結束日早於開始日", "x": "[rt_end]<>'' and [rt_start]<>'' and datediff([rt_start],[rt_end],'d',true)<0", "at": "rt_end"}, {"s": "W", "f": "rt_course", "n": "每次劑量不在 1.2–4 Gy，請核對總劑量與分次數", "x": "[rt_dpf]<>'' and ([rt_dpf]<1.2 or [rt_dpf]>4)", "at": "rt_fx"}, {"s": "E", "f": "systemic_line", "n": "治療線結束日早於開始日", "x": "[line_end]<>'' and [line_start]<>'' and datediff([line_start],[line_end],'d',true)<0", "at": "line_end"}, {"s": "E", "f": "clin_event", "n": "事件日期早於診斷日", "x": "[dx_date]<>'' and [ev_date]<>'' and datediff([dx_date],[ev_date],'d',true)<0", "at": "ev_date"}];
+var KEY="escc-abstraction-v1", KEY_WHO="escc-abstraction-who", KEY_ROLE="escc-abstraction-role", KEY_BK="escc-abstraction-backup", KEY_DOC="escc-abstraction-lastdoc";
+var $=function(s,r){return (r||document).querySelector(s);}, $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function pad(n){return (n<10?"0":"")+n;}
+function stamp(){var d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+" "+pad(d.getHours())+":"+pad(d.getMinutes());}
+function uid(p){return (p||"u")+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+
+/* ---------- schema ---------- */
+var FORMS=[
+  {id:"core_abstraction",name:"核心補登",min:15,audit:1},
+  {id:"staging_workup",name:"分期檢查",min:5,audit:1},
+  {id:"dcrt_detail",name:"放化療細節",min:20,show:"[tx_pathway]='4'"},
+  {id:"rt_course",name:"放療療程",rep:1},
+  {id:"systemic_line",name:"治療線別",rep:1},
+  {id:"clin_event",name:"復發與事件",rep:1},
+  {id:"other_cancer",name:"其他原發癌",rep:1}
+];
+var FORM_BY={};FORMS.forEach(function(f){FORM_BY[f.id]=f;});
+var FIELD={},BYFORM={};
+SCHEMA.forEach(function(f){FIELD[f.v]=f;(BYFORM[f.f]=BYFORM[f.f]||[]).push(f);});
+var PREFILL=BYFORM.registry_prefill.map(function(f){return f.v;});
+var SRC_TYPES=["內視鏡報告","門診紀錄","住院病歷／出院摘要","團隊會議紀錄","影像報告","病理報告","放療紀錄","化療紀錄","護理紀錄","其他"];
+var Q_TYPES=["病歷前後矛盾","找不到資料","需要臨床判斷","癌登帶入資料疑似錯誤","稽核不一致","其他"];
+function isData(f){return f.t!=="descriptive"&&f.calc===undefined&&f.calctext===undefined;}
+function editable(f){return isData(f)&&f.f!=="registry_prefill";}
+/* 每個區段：以帶有 sec 的欄位為起點 */
+function sectionsOf(fmId){
+  var out=[],curSec=null;
+  (BYFORM[fmId]||[]).forEach(function(f){
+    if(f.sec||!curSec){curSec={key:f.v,title:f.sec||"",fields:[]};out.push(curSec);}
+    curSec.fields.push(f);
+  });
+  return out;
+}
+
+/* ---------- REDCap logic evaluator ---------- */
+function tokenize(s){
+  var re=/\s*(\[[a-z0-9_]+(?:\(\d+\))?\]|'[^']*'|"[^"]*"|\d+(?:\.\d+)?|<>|<=|>=|=|<|>|\+|-|\*|\/|\(|\)|,|[A-Za-z_]+)/g,t=[],m,last=0;
+  while((m=re.exec(s))){ if(m.index!==last&&s.slice(last,m.index).trim())throw new Error("語法："+s); t.push(m[1]); last=re.lastIndex; }
+  if(s.slice(last).trim())throw new Error("語法："+s);
+  return t;
+}
+function parse(s){
+  var t=tokenize(s),i=0;
+  function peek(){return t[i];} function next(){return t[i++];}
+  function lower(x){return x&&x.toLowerCase();}
+  function expr(){return or_();}
+  function or_(){var a=and_();while(lower(peek())==="or"){next();a={o:"or",a:a,b:and_()};}return a;}
+  function and_(){var a=cmp();while(lower(peek())==="and"){next();a={o:"and",a:a,b:cmp()};}return a;}
+  function cmp(){var a=add();var p=peek();if(["=","<>","<",">","<=",">="].indexOf(p)>=0){next();a={o:p,a:a,b:add()};}return a;}
+  function add(){var a=mul();while(peek()==="+"||peek()==="-"){var o=next();a={o:o,a:a,b:mul()};}return a;}
+  function mul(){var a=un();while(peek()==="*"||peek()==="/"){var o=next();a={o:o,a:a,b:un()};}return a;}
+  function un(){if(peek()==="-"){next();return {o:"neg",a:un()};}return prim();}
+  function prim(){
+    var x=next();
+    if(x===undefined)throw new Error("運算式不完整："+s);
+    if(x==="("){var e=expr();if(next()!==")")throw new Error("缺右括號："+s);return e;}
+    if(x[0]==="["){var m=/^\[([a-z0-9_]+)(?:\((\d+)\))?\]$/.exec(x);return m[2]!==undefined?{o:"cb",v:m[1],c:m[2]}:{o:"var",v:m[1]};}
+    if(x[0]==="'"||x[0]==='"')return {o:"lit",v:x.slice(1,-1)};
+    if(/^\d/.test(x))return {o:"lit",v:x};
+    var lx=x.toLowerCase();
+    if(lx==="true")return {o:"lit",v:true}; if(lx==="false")return {o:"lit",v:false};
+    if(["if","round","datediff"].indexOf(lx)>=0){
+      if(next()!=="(")throw new Error("函式語法："+s);
+      var args=[];if(peek()!==")"){args.push(expr());while(peek()===","){next();args.push(expr());}}
+      if(next()!==")")throw new Error("缺右括號："+s);
+      return {o:"fn",f:lx,args:args};
+    }
+    throw new Error("未知符號 "+x);
+  }
+  var e=expr(); if(i<t.length)throw new Error("多餘內容："+s); return e;
+}
+var CACHE={};
+function compile(s){if(!CACHE[s])CACHE[s]=parse(s);return CACHE[s];}
+function isNum(x){return x!==""&&x!==null&&x!==true&&x!==false&&isFinite(Number(x));}
+function blank(x){return x===""||x===null||x===undefined;}
+function toMs(d){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d));return m?Date.UTC(+m[1],+m[2]-1,+m[3]):NaN;}
+function ev(n,get){
+  switch(n.o){
+    case "lit":return n.v;
+    case "var":var v=get(n.v);return Array.isArray(v)?v.join(","):(v==null?"":String(v));
+    case "cb":var a=get(n.v);return Array.isArray(a)&&a.indexOf(n.c)>=0?"1":"0";
+    case "and":return truthy(ev(n.a,get))&&truthy(ev(n.b,get));
+    case "or":return truthy(ev(n.a,get))||truthy(ev(n.b,get));
+    case "neg":var q=ev(n.a,get);return isNum(q)?-Number(q):"";
+    case "+":case "-":case "*":case "/":
+      var x=ev(n.a,get),y=ev(n.b,get);if(!isNum(x)||!isNum(y))return "";x=+x;y=+y;
+      return n.o==="+"?x+y:n.o==="-"?x-y:n.o==="*"?x*y:(y===0?"":x/y);
+    case "=":case "<>":
+      var l=ev(n.a,get),r=ev(n.b,get),eq=(isNum(l)&&isNum(r))?(+l===+r):(String(l)===String(r));
+      return n.o==="="?eq:!eq;
+    case "<":case ">":case "<=":case ">=":
+      var p=ev(n.a,get),q2=ev(n.b,get);if(blank(p)||blank(q2))return false;
+      var A=isNum(p)&&isNum(q2)?+p:String(p),B=isNum(p)&&isNum(q2)?+q2:String(q2);
+      return n.o==="<"?A<B:n.o===">"?A>B:n.o==="<="?A<=B:A>=B;
+    case "fn":
+      if(n.f==="if")return truthy(ev(n.args[0],get))?ev(n.args[1],get):ev(n.args[2],get);
+      if(n.f==="round"){var z=ev(n.args[0],get),dp=n.args[1]?+ev(n.args[1],get):0;if(!isNum(z))return "";var k=Math.pow(10,dp);return Math.round(+z*k)/k;}
+      if(n.f==="datediff"){var d1=toMs(ev(n.args[0],get)),d2=toMs(ev(n.args[1],get));if(isNaN(d1)||isNaN(d2))return "";
+        var days=(d2-d1)/86400000,signed=n.args[3]&&truthy(ev(n.args[3],get));return signed?days:Math.abs(days);}
+  }
+  return "";
+}
+function truthy(x){return x===true||(x!==false&&x!==""&&x!=="0"&&x!==0&&x!=null);}
+function evalStr(s,get){try{return ev(compile(s),get);}catch(e){console.error(e);return "";}}
+
+
+/* ---------- date parsing (民國／西元) ---------- */
+function parseDate(raw){
+  var s=String(raw||"").trim();if(!s)return {iso:""};
+  s=s.replace(/^民國/,"").replace(/\s+/g,"").replace(/[年月]/g,"/").replace(/日$/,"").replace(/[.\-]/g,"/");
+  var m,y,mo,d;
+  if((m=s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/))){y=+m[1];mo=+m[2];d=+m[3];}
+  else if((m=s.match(/^(\d{2,3})\/(\d{1,2})\/(\d{1,2})$/))){y=+m[1]+1911;mo=+m[2];d=+m[3];}
+  else if((m=s.match(/^((?:19|20)\d{2})(\d{2})(\d{2})$/))){y=+m[1];mo=+m[2];d=+m[3];}
+  else if((m=s.match(/^(\d{2,3})(\d{2})(\d{2})$/))){y=+m[1]+1911;mo=+m[2];d=+m[3];}
+  else return {iso:"",err:1};
+  var dt=new Date(Date.UTC(y,mo-1,d));
+  if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==mo-1||dt.getUTCDate()!==d)return {iso:"",err:1};
+  return {iso:y+"-"+pad(mo)+"-"+pad(d)};
+}
+function rocOf(iso){var y=+iso.slice(0,4)-1911;return "民國 "+y+"/"+iso.slice(5,7)+"/"+iso.slice(8,10);}
+
+
+
+/* ---------- storage ---------- */
+var DB={v:2,pre:{},rec:{},order:[],q:[],aud:{},audSample:[]};
+function migrate(x){x.v=2;x.q=x.q||[];x.aud=x.aud||{};x.audSample=x.audSample||[];x.assign=x.assign||{};return x;}
+function load(){} /* secure copy: data is loaded after login (SEC) */
+/* secure copy: the database is encrypted with the data key DK and written to IndexedDB; saves are serialized */
+var DK=null,saveT=null,saveChain=Promise.resolve();
+function flush(){clearTimeout(saveT);saveT=null;if(!DK)return saveChain;var snap=JSON.stringify(DB),k=DK;
+  saveChain=saveChain.then(function(){return SEC.saveVault(snap,k);}).catch(function(e){toast("儲存失敗，請立即匯出備份："+(e&&e.message||e));});return saveChain;}
+function persist(now){if(!DK)return Promise.resolve();if(now)return flush();clearTimeout(saveT);saveT=setTimeout(flush,400);return saveChain;}
+function lsGet(k){try{return localStorage.getItem(k)||"";}catch(e){return "";}}
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+function recOf(id){
+  var r=DB.rec[id];
+  if(!r){r=DB.rec[id]={log:[],time:0,sign:null};}
+  FORMS.forEach(function(f){if(!r[f.id])r[f.id]=f.rep?[]:{_s:0};});
+  return r;
+}
+function audOf(id){var a=DB.aud[id];if(!a){a=DB.aud[id]={by:"",done:0,data:{}};}FORMS.forEach(function(f){if(f.audit&&!a.data[f.id])a.data[f.id]={_s:0};});return a;}
+
+/* ---------- role & mode ---------- */
+function who(){return $("#who").value.trim();}
+function role(){return $("#role").value;}
+function auditMode(){return role()==="auditor";}
+
+/* ---------- getters ---------- */
+function formSrc(id,fmId,inst,mode){
+  var fm=FORM_BY[fmId];
+  if(fm.rep)return inst||{};
+  if(mode==="audit"&&fm.audit)return audOf(id).data[fmId];
+  return recOf(id)[fmId];
+}
+function getter(id,inst,mode){
+  var pre=DB.pre[id]||{};
+  return function(v){
+    var f=FIELD[v];if(!f)return "";
+    if(f.f==="registry_prefill")return pre[v]==null?"":pre[v];
+    if(f.calc!==undefined||f.calctext!==undefined)return computed(id,f,inst,mode);
+    var src=formSrc(id,f.f,FORM_BY[f.f].rep?inst:null,mode);
+    var val=src?src[v]:"";return val==null?"":val;
+  };
+}
+function computed(id,f,inst,mode){
+  var x=evalStr(f.calc!==undefined?f.calc:f.calctext,getter(id,inst,mode));
+  if(typeof x==="number")x=Math.round(x*100)/100;
+  return x===true?"1":x===false?"0":x;
+}
+function visible(id,f,inst,mode){return !f.br||truthy(evalStr(f.br,getter(id,inst,mode)));}
+function formShown(id,fm){return !fm.show||truthy(evalStr(fm.show,getter(id)));}
+function MODE(){return auditMode()?"audit":"main";}
+
+/* ---------- queries ---------- */
+function instKey(inst){return inst&&inst._uid?inst._uid:"";}
+function qFor(id,fmId,inst,v){
+  var k=instKey(inst),hit=null;
+  DB.q.forEach(function(q){if(q.sid===id&&q.form===fmId&&q.inst===k&&q.f===v&&q.status!=="withdrawn")hit=q;});
+  return hit;
+}
+function openQs(id,fmId){return DB.q.filter(function(q){return q.sid===id&&(!fmId||q.form===fmId)&&(q.status==="open"||q.status==="returned");});}
+function valText(f,v){
+  if(v==null||v===""||(Array.isArray(v)&&!v.length))return "（空白）";
+  if(Array.isArray(v))return v.map(function(c){return lbl(f.v,c);}).join("、");
+  return f.ch?lbl(f.v,v):String(v);
+}
+var Q_STATUS={open:"待醫師確認",returned:"退回補查",closed:"已結案",withdrawn:"已撤回"};
+var Q_ACT={ask:"提問",confirm:"確認原值",correct:"更正",unknown:"判定為無法確認",return:"退回補查",resend:"補查後再送",withdraw:"撤回"};
+
+/* ---------- validation ---------- */
+function checkForm(id,fm,inst,forComplete,mode){
+  mode=mode||"main";
+  var E=[],W=[],g=getter(id,inst,mode),src=formSrc(id,fm.id,inst,mode);
+  (BYFORM[fm.id]||[]).forEach(function(f){
+    if(!isData(f)||!visible(id,f,inst,mode))return;
+    var v=src[f.v],empty=v==null||v===""||(Array.isArray(v)&&!v.length);
+    if(src["_bad_"+f.v]){E.push({f:f.v,m:"日期無法辨識，請重新輸入"});return;}
+    if(!empty&&(f.val==="number"||f.val==="integer")){
+      if(!isNum(v))E.push({f:f.v,m:"請輸入數字"});
+      else if(f.val==="integer"&&+v!==Math.round(+v))E.push({f:f.v,m:"請輸入整數"});
+      else if((f.min!=null&&+v<f.min)||(f.max!=null&&+v>f.max))E.push({f:f.v,m:"應介於 "+f.min+"–"+f.max});
+    }
+    if(forComplete&&f.req&&empty)E.push({f:f.v,m:"必填"});
+    if(forComplete&&/_verified$/.test(f.v)&&!empty&&v!=="1")E.push({f:f.v,m:"逐欄核對後才能標記完成"});
+  });
+  if(mode==="main"){
+    /* 來源文件：區段內有資料就必須註明來源 */
+    var srcs=src._srcs||{};
+    sectionsOf(fm.id).forEach(function(sec){
+      var has=sec.fields.some(function(f){if(!isData(f)||/_verified$/.test(f.v)||!visible(id,f,inst,mode))return false;var v=src[f.v];return !(v==null||v===""||(Array.isArray(v)&&!v.length));});
+      if(!has)return;
+      var s=srcs[sec.key]||{};
+      if(!s.t)(forComplete?E:W).push({f:"src:"+sec.key,m:"請註明這一段資料的來源文件",sec:1});
+      else if(!s.d)W.push({f:"src:"+sec.key,m:"來源文件未填日期",sec:1});
+    });
+    /* 未結案問題 */
+    var oq=DB.q.filter(function(q){return q.sid===id&&q.form===fm.id&&(q.status==="open"||q.status==="returned")&&(!fm.rep||q.inst===instKey(inst));});
+    if(forComplete&&oq.length)oq.forEach(function(q){E.push({f:q.f,m:"有未結案的問題（"+Q_STATUS[q.status]+"）"});});
+    RULES.forEach(function(rl){
+      if(rl.f!==fm.id)return;if(rl.onComplete&&!forComplete)return;
+      if(truthy(evalStr(rl.x,g)))(rl.s==="E"?E:W).push({f:rl.at,m:rl.n});
+    });
+  }
+  return {E:E,W:W};
+}
+function recordState(id){
+  var r=recOf(id),out={bad:false,allDone:true};
+  FORMS.forEach(function(fm){
+    if(fm.rep){var arr=r[fm.id];out[fm.id]=arr.length?(arr.every(function(x){return x._s===2;})?2:1):0;
+      if(arr.some(function(x){return x._s!==2;}))out.allDone=false;
+      arr.forEach(function(x){if(checkForm(id,fm,x,false).E.length)out.bad=true;});}
+    else{out[fm.id]=r[fm.id]._s||0;
+      if(formShown(id,fm)){if(out[fm.id]!==2)out.allDone=false;if(checkForm(id,fm,null,false).E.length)out.bad=true;}}
+  });
+  out.open=DB.q.filter(function(q){return q.sid===id&&q.status==="open";}).length;
+  out.returned=DB.q.filter(function(q){return q.sid===id&&q.status==="returned";}).length;
+  out.signed=!!r.sign;
+  return out;
+}
+
+/* ---------- UI state ---------- */
+var cur=null, tab="core_abstraction", queue="core", touched={}, UNLOCK={}, STATE={};
+function refreshStates(){DB.order.forEach(function(id){STATE[id]=recordState(id);});}
+function lbl(v,code){var f=FIELD[v];if(!f||!f.ch)return code;for(var i=0;i<f.ch.length;i++)if(f.ch[i][0]===String(code))return f.ch[i][1];return code;}
+function mineQ(q){var w=who();return !q.to||!w||q.to===w;}
+var QUEUES={
+  abstractor:[
+    {id:"core",name:"核心待補",test:function(id,s){return s.core_abstraction!==2;}},
+    {id:"p1",name:"第二原發優先",test:function(id,s){return +(DB.pre[id].cancer_seq||1)>=2&&s.core_abstraction!==2;}},
+    {id:"p2",name:"放化療待補",test:function(id,s){return String(DB.pre[id].tx_pathway)==="4"&&s.dcrt_detail!==2;}},
+    {id:"p3",name:"分期檢查待補",test:function(id,s){return s.staging_workup!==2;}},
+    {id:"ret",name:"醫師退回補查",test:function(id,s){return s.returned>0;}},
+    {id:"wait",name:"等待醫師確認",test:function(id,s){return s.open>0;}},
+    {id:"bad",name:"有錯誤",test:function(id,s){return s.bad;}},
+    {id:"all",name:"全部",test:function(){return true;}}
+  ],
+  physician:[
+    {id:"mine",name:"待我確認",test:function(id){return DB.q.some(function(q){return q.sid===id&&q.status==="open"&&mineQ(q);});}},
+    {id:"tosign",name:"待簽核",test:function(id,s){return s.allDone&&!s.open&&!s.returned&&!s.signed;}},
+    {id:"signed",name:"已簽核",test:function(id,s){return s.signed;}},
+    {id:"all",name:"全部",test:function(){return true;}}
+  ],
+  auditor:[
+    {id:"audtodo",name:"稽核待重摘",test:function(id){return DB.audSample.indexOf(id)>=0&&!(DB.aud[id]&&DB.aud[id].done);}},
+    {id:"auddone",name:"稽核已完成",test:function(id){return !!(DB.aud[id]&&DB.aud[id].done);}}
+  ]
+};
+function curQueues(){return QUEUES[role()]||QUEUES.abstractor;}
+function queueIds(){var qs=curQueues(),q=qs.filter(function(x){return x.id===queue;})[0]||qs[0];queue=q.id;
+  return myIds().filter(function(id){return STATE[id]&&q.test(id,STATE[id]);});}
+/* secure copy: an abstractor sees only patients assigned to their account; manager, physician and auditor see all */
+function myIds(){var s=(typeof SEC!=="undefined")&&SEC.session();if(!s||s.role!=="abstractor")return DB.order;var A=DB.assign||{};return DB.order.filter(function(id){return A[id]===s.name;});}
+
+/* ---------- rail ---------- */
+function renderRail(){
+  var ids=myIds(),r=role();
+  var m1="",m2="",pct=0;
+  if(r==="physician"){
+    var op=DB.q.filter(function(q){return q.status==="open"&&mineQ(q);}).length;
+    var sg=ids.filter(function(id){return STATE[id]&&STATE[id].signed;}).length;
+    m1="待我確認的問題 <b>"+op+"</b>";m2="已簽核 <b>"+sg+" / "+ids.length+"</b>";pct=ids.length?sg/ids.length:0;
+  }else if(r==="auditor"){
+    var n=DB.audSample.length,dn=DB.audSample.filter(function(id){return DB.aud[id]&&DB.aud[id].done;}).length;
+    m1="稽核重摘 <b>"+dn+" / "+n+"</b>";m2=n?"":"尚未抽樣：由「資料」選單抽取 5%";pct=n?dn/n:0;
+  }else{
+    var done=ids.filter(function(id){return STATE[id]&&STATE[id].core_abstraction===2;}).length;
+    var tsum=0,tn=0;ids.forEach(function(id){var rr=DB.rec[id];if(rr&&rr.time&&STATE[id]&&STATE[id].core_abstraction===2){tsum+=rr.time;tn++;}});
+    var mins=0;ids.forEach(function(id){var s=STATE[id];if(!s)return;if(s.core_abstraction!==2)mins+=tn?tsum/tn/60:15;if(s.staging_workup!==2)mins+=5;if(String(DB.pre[id].tx_pathway)==="4"&&s.dcrt_detail!==2)mins+=20;});
+    m1="核心補登完成 <b>"+done+" / "+ids.length+"</b>";
+    m2="估計剩餘 <b>"+(ids.length?Math.round(mins/60)+" 小時":"—")+"</b>"+(tn?"（實測每位 "+Math.round(tsum/tn/60)+" 分）":"");
+    pct=ids.length?done/ids.length:0;
+  }
+  $("#m1").innerHTML=m1;$("#m2").innerHTML=m2;$("#tCore").style.width=Math.round(pct*100)+"%";
+  var qb=$("#queues"),qs=curQueues();
+  if(!qs.some(function(q){return q.id===queue;}))queue=qs[0].id;
+  qb.innerHTML=qs.map(function(q){var n=ids.filter(function(id){return STATE[id]&&q.test(id,STATE[id]);}).length;
+    return '<button type="button" data-q="'+q.id+'" class="'+(q.id===queue?"on":"")+'">'+q.name+'<span>'+n+'</span></button>';}).join("");
+  $$("button",qb).forEach(function(b){b.onclick=function(){queue=b.dataset.q;renderRail();};});
+  var list=$("#list"),term=$("#q").value.trim().toLowerCase();
+  var rows=queueIds().filter(function(id){return !term||id.toLowerCase().indexOf(term)>=0;});
+  if(!ids.length){list.innerHTML='<p class="empty">'+(DB.order.length?'尚未分派病人給你，請資料管理在「分派病人」頁分派。':'尚未載入病人。請由資料管理匯入加密分包或載入預填檔。')+'</p>';return;}
+  if(!rows.length){list.innerHTML='<p class="empty">這個清單目前沒有病人。</p>';return;}
+  list.innerHTML=rows.slice(0,400).map(function(id){
+    var p=DB.pre[id],s=STATE[id]||{};
+    var dot=function(k){return '<i class="'+(s.bad&&k==="core_abstraction"?"bad":"s"+(s[k]||0))+'"></i>';};
+    var tag=s.signed?"已簽核":s.returned?"退回 "+s.returned:s.open?"待確認 "+s.open:(+(p.cancer_seq||1)>=2?"第二原發":"");
+    return '<button type="button" class="pt'+(id===cur?" cur":"")+'" data-id="'+esc(id)+'"><span class="dots">'+dot("core_abstraction")+dot("staging_workup")+(String(p.tx_pathway)==="4"?dot("dcrt_detail"):"")+'</span>'+
+      '<span><b>'+esc(id)+'</b><br><small>'+esc(p.dx_year)+"・"+esc(lbl("tx_pathway",p.tx_pathway))+'</small></span><small class="tag'+(s.returned?" ret":s.open?" opn":"")+'">'+tag+'</small></button>';
+  }).join("")+(rows.length>400?'<p class="empty">只顯示前 400 位，請用搜尋縮小範圍。</p>':"");
+  $$(".pt",list).forEach(function(b){b.onclick=function(){openPt(b.dataset.id);};});
+}
+$("#q").addEventListener("input",renderRail);
+
+/* ---------- time tracking ---------- */
+var tStart=null;
+function tick(){if(cur&&tStart&&!auditMode()){var r=recOf(cur);r.time=(r.time||0)+Math.round((Date.now()-tStart)/1000);persist();}tStart=document.hidden?null:Date.now();}
+document.addEventListener("visibilitychange",function(){if(document.hidden)tick();else tStart=Date.now();});
+setInterval(function(){if(cur&&!document.hidden)tick();},60000);
+
+/* ---------- main ---------- */
+function openPt(id){tick();cur=id;touched={};UNLOCK={};tStart=Date.now();
+  if(auditMode()){audOf(id);if(!FORM_BY[tab].audit)tab="core_abstraction";}
+  var fm=FORM_BY[tab];if(fm&&!formShown(id,fm))tab="core_abstraction";
+  renderMain();renderRail();window.scrollTo(0,0);}
+function renderMain(){
+  var m=$("#main");
+  if(!DB.order.length){
+    $("#dock").hidden=true;
+    m.innerHTML='<div class="nodata"><h2>開始前</h2><ol><li>已用個人帳號登入（右上顯示目前身分）</li><li>「資料」→「載入預填檔」，選擇 ESCC_REDCap_prefill_import.csv</li><li>從左側清單選一位病人開始</li></ol><br><button class="btn go" type="button" id="bLoad0">載入預填檔</button><p class="small">資料只存在這台電腦的這個瀏覽器；每天結束前請匯出一次完整備份。</p></div>';
+    $("#bLoad0").onclick=function(){if(!SEC.can("load")){toast("預填檔由資料管理載入");return;}pickFile($("#fCsv"),loadCsv);};return;
+  }
+  if(!cur){$("#dock").hidden=true;
+    m.innerHTML='<div class="nodata"><h2>從左側清單選一位病人</h2><p>'+(role()==="physician"?"「待我確認」列出登錄人員送來的問題；處理完所有問題且各表單完成的病人，會出現在「待簽核」。":auditMode()?"稽核重摘時看不到原本的摘錄值，請獨立依病歷填寫；完成後到「資料」選單查看一致性報告。":"圓點依序代表核心補登、分期檢查、放化療細節的進度。")+'</p></div>';return;}
+  $("#dock").hidden=false;
+  var p=DB.pre[cur],s=STATE[cur]||recordState(cur),r=recOf(cur);
+  var facts=[["病歷號",p.mrn||"—"],["診斷年",p.dx_year],["性別／年齡",lbl("sex",p.sex)+"／"+p.age_dx],["部位",p.topography],["組織",p.morphology],["癌症發生順序",p.cancer_seq],
+    ["AJCC 版次",lbl("ajcc_edition",p.ajcc_edition)],["臨床 TNM",p.ctnm_text],["臨床期別",p.cstage_orig],["治療路徑",lbl("tx_pathway",p.tx_pathway)],
+    ["放療劑量",p.rt_dose_gy?p.rt_dose_gy+" Gy":"—"],["癌登化療碼",p.chemo_tcr],["生存",lbl("vital_status",p.vital_status)+"，"+p.os_months+" 個月"]];
+  var banner="";
+  if(auditMode())banner='<div class="banner aud">稽核重摘模式：原本的摘錄值已隱藏。請獨立查閱病歷填寫，不要參考其他人的紀錄。</div>';
+  else if(r.sign)banner='<div class="banner ok">已由 '+esc(r.sign.by)+' 於 '+esc(r.sign.at)+' 簽核。任何修改都會撤銷簽核，並要求註明理由。</div>';
+  var h='<section class="spine"><h2>'+esc(cur)+'<small>癌登帶入資料，唯讀；若疑似錯誤，按欄位旁的「提問」或寫在備註'+(r.time&&!auditMode()?"｜本筆累計 "+Math.round(r.time/60)+" 分鐘":"")+'</small></h2><dl class="facts">'+
+    facts.map(function(f){return '<div><dt>'+esc(f[0])+'</dt><dd>'+esc(f[1]==null||f[1]===""?"—":f[1])+'</dd></div>';}).join("")+'</dl></section>'+banner;
+  var forms=FORMS.filter(function(fm){return formShown(cur,fm)&&(!auditMode()||fm.audit);});
+  if(!forms.some(function(fm){return fm.id===tab;}))tab=forms[0].id;
+  h+='<nav class="tabs" role="tablist">'+forms.map(function(fm){
+    var st=auditMode()?(audOf(cur).data[fm.id]._s||0):(s[fm.id]||0),cnt=fm.rep?' <em>'+r[fm.id].length+'</em>':"";
+    var oq=auditMode()?0:openQs(cur,fm.id).length;
+    return '<button type="button" role="tab" data-t="'+fm.id+'" class="'+(fm.id===tab?"on":"")+'"><i class="s'+st+'"></i>'+fm.name+cnt+(oq?'<b class="qn">'+oq+'</b>':"")+'</button>';}).join("")+'</nav>';
+  h+='<div id="formArea"></div>';
+  m.innerHTML=h;
+  $$(".tabs button",m).forEach(function(b){b.onclick=function(){tab=b.dataset.t;touched={};renderMain();};});
+  renderForm();
+}
+function renderForm(){
+  var fm=FORM_BY[tab],area=$("#formArea"),r=recOf(cur);
+  if(!fm.rep){area.innerHTML='<div class="sheet">'+fieldsHtml(fm,null,"")+'</div>';bindFields($(".sheet",area),fm,null);}
+  else{
+    var arr=r[fm.id];arr.forEach(function(x){if(!x._uid)x._uid=uid("i");});
+    area.innerHTML=(arr.length?"":'<p class="empty">這位病人還沒有'+fm.name+'紀錄。病歷沒有就不用新增。</p>')+
+      arr.map(function(x,i){return '<div class="inst" data-i="'+i+'"><div class="ih"><b>第 '+(i+1)+' 筆</b><span>'+esc(summary(fm,x))+'</span>'+
+        '<button class="btn" type="button" data-done="'+i+'">'+(x._s===2?"已完成":"標記完成")+'</button><button class="btn warn" type="button" data-del="'+i+'">刪除</button></div>'+
+        '<div class="ib">'+fieldsHtml(fm,x,"i"+i+"_")+'</div></div>';}).join("")+
+      '<div class="addrow"><button class="btn" type="button" id="bAdd">＋ 新增一筆'+fm.name+'</button></div>';
+    arr.forEach(function(x,i){bindFields($('.inst[data-i="'+i+'"]',area),fm,x);});
+    $("#bAdd").onclick=function(){if(!needWho())return;guardEdit(fm,null,function(){arr.push({_s:0,_uid:uid("i")});logChange(fm.id,"新增第 "+arr.length+" 筆");persist();renderForm();refreshCur();});};
+    $$("[data-del]",area).forEach(function(b){b.onclick=function(){var i=+b.dataset.del,x=arr[i];
+      if(DB.q.some(function(q){return q.inst===x._uid&&(q.status==="open"||q.status==="returned");})){toast("這一筆有未結案的問題，請先結案或撤回");return;}
+      guardEdit(fm,x,function(){ask("刪除第 "+(i+1)+" 筆"+fm.name+"？").then(function(ok){if(!ok)return;arr.splice(i,1);logChange(fm.id,"刪除第 "+(i+1)+" 筆");persist();renderForm();refreshCur();});});};});
+    $$("[data-done]",area).forEach(function(b){b.onclick=function(){completeInst(fm,arr[+b.dataset.done]);};});
+  }
+  updateDock();
+}
+function summary(fm,x){
+  var keys=(BYFORM[fm.id]||[]).filter(function(f){return isData(f);}).slice(0,3);
+  return keys.map(function(f){var v=x[f.v];if(v==null||v===""||(Array.isArray(v)&&!v.length))return null;return valText(f,v);}).filter(Boolean).join("、")||"尚未填寫";
+}
+function srcOf(fm,inst){return formSrc(cur,fm.id,inst,MODE());}
+function fieldsHtml(fm,inst,pfx){
+  var h="",mode=MODE(),src=srcOf(fm,inst),srcs=src._srcs||{};
+  sectionsOf(fm.id).forEach(function(sec){
+    if(sec.title)h+='<h3>'+esc(sec.title)+'</h3>';
+    if(mode==="main"){
+      var s=srcs[sec.key]||{};
+      h+='<div class="srcrow f" data-f="src:'+sec.key+'" data-src="1"><div class="lab">資料來源<small>這一段依據哪份文件</small></div><div class="in"><div class="srcin">'+
+        '<select data-srct="1"><option value="">— 來源文件 —</option>'+SRC_TYPES.map(function(t){return '<option'+(s.t===t?" selected":"")+'>'+t+'</option>';}).join("")+'</select>'+
+        '<input type="text" data-srcd="1" value="'+esc(s.draw!=null?s.draw:(s.d||""))+'" placeholder="文件日期（民國或西元）" autocomplete="off"></div><div class="hint"></div><div class="msg"></div></div></div>';
+    }
+    sec.fields.forEach(function(f){
+      var vis=visible(cur,f,inst,mode);
+      if(f.t==="descriptive"){h+='<p class="desc">'+f.l.replace(/<(?!\/?b>)[^>]*>/g,"")+'</p>';return;}
+      var q=mode==="main"&&editable(f)?qFor(cur,fm.id,inst,f.v):null;
+      var qb=mode==="main"&&editable(f)?'<button type="button" class="qbtn'+(q&&q.status!=="closed"?" on":"")+'" data-qf="'+f.v+'" title="對這一欄提出疑問，送醫師確認">'+(q&&q.status!=="closed"?Q_STATUS[q.status]:"提問")+'</button>':"";
+      h+='<div class="f'+(q&&(q.status==="open"||q.status==="returned")?" hasq":"")+'" data-f="'+f.v+'" data-p="'+pfx+'"'+(vis?"":" hidden")+'><div class="lab">'+esc(f.l)+(f.req?"<i>*</i>":"")+(f.n?"<small>"+esc(f.n)+"</small>":"")+qb+'</div><div class="in">'+inputHtml(f,inst,pfx)+'<div class="hint"></div><div class="msg"></div>'+(q?qBoxHtml(q,f):"")+'</div></div>';
+    });
+  });
+  return h;
+}
+function inputHtml(f,inst,pfx){
+  var src=srcOf(FORM_BY[f.f],inst),v=src[f.v];
+  if(f.calc!==undefined||f.calctext!==undefined)return '<div class="calc" data-calc="'+f.v+'"></div>';
+  var id=pfx+"x_"+f.v;
+  if(f.t==="radio"||f.t==="yesno"||f.t==="checkbox"){
+    var arr=Array.isArray(v)?v:(v==null||v===""?[]:[String(v)]);
+    return '<div class="opts" role="group" aria-label="'+esc(f.l)+'" data-multi="'+(f.t==="checkbox"?1:0)+'">'+f.ch.map(function(c){
+      return '<button type="button" data-v="'+esc(c[0])+'" class="'+(arr.indexOf(c[0])>=0?"on":"")+'" aria-pressed="'+(arr.indexOf(c[0])>=0)+'">'+esc(c[1])+'</button>';}).join("")+'</div>';
+  }
+  if(f.t==="dropdown")return '<select id="'+id+'"><option value="">— 請選擇 —</option>'+f.ch.map(function(c){return '<option value="'+esc(c[0])+'"'+(String(v)===c[0]?" selected":"")+'>'+esc(c[1])+'</option>';}).join("")+'</select>';
+  if(f.t==="notes")return '<textarea id="'+id+'">'+esc(v||"")+'</textarea>';
+  var ph=f.val==="date_ymd"?"民國或西元皆可":"";
+  var raw=f.val==="date_ymd"?(src["_raw_"+f.v]!=null?src["_raw_"+f.v]:(v||"")):(v==null?"":v);
+  return '<input type="text" id="'+id+'" value="'+esc(raw)+'" placeholder="'+ph+'" autocomplete="off"'+(f.val==="number"||f.val==="integer"?' inputmode="decimal"':"")+'>';
+}
+function qBoxHtml(q,f){
+  var th=q.thread.map(function(t){return '<li><b>'+esc(t.by)+'</b> '+esc(Q_ACT[t.act]||t.act)+(t.value!==undefined?"："+esc(valText(f,t.value)):"")+(t.note?"｜"+esc(t.note):"")+'<small>'+esc(t.at)+'</small></li>';}).join("");
+  var acts="",r=role();
+  if(q.status==="open"&&r==="physician")acts='<div class="qacts"><button class="btn" type="button" data-qa="confirm">確認原值</button><button class="btn" type="button" data-qa="correct">已在上方更正</button><button class="btn" type="button" data-qa="unknown">病歷無法確認</button><button class="btn warn" type="button" data-qa="return">退回補查</button></div>';
+  else if(q.status==="returned"&&r==="abstractor")acts='<div class="qacts"><button class="btn" type="button" data-qa="resend">補查完成，再送醫師</button><button class="btn" type="button" data-qa="withdraw">撤回問題</button></div>';
+  else if(q.status==="open"&&r==="abstractor")acts='<div class="qacts"><button class="btn" type="button" data-qa="withdraw">撤回問題</button></div>';
+  var cls=q.status==="closed"?"closed":q.status==="returned"?"ret":"opn";
+  return '<div class="qbox '+cls+'" data-q="'+q.id+'"><div class="qh">'+esc(Q_STATUS[q.status])+'｜'+esc(q.type)+(q.to?"｜指派："+esc(q.to):"")+'</div><ul>'+th+'</ul>'+acts+'</div>';
+}
+function needWho(){if(who())return true;$("#who").classList.add("need");$("#who").focus();toast("請先在右上填寫姓名");return false;}
+function logChange(form,what){recOf(cur).log.push({t:stamp(),by:who(),role:role(),f:form,w:what});}
+
+/* 已完成或已簽核的資料，修改前要求理由 */
+function guardEdit(fm,inst,fn){
+  if(auditMode()){fn();return;}
+  var r=recOf(cur),src=fm.rep?inst:r[fm.id];
+  var key=fm.id+"|"+(inst?inst._uid:"");
+  var needSign=!!r.sign, needDone=src&&src._s===2&&!UNLOCK[key];
+  if(!needSign&&!needDone){fn();return;}
+  var msg=needSign?"這位病人已由 "+r.sign.by+" 醫師簽核。修改會撤銷簽核，請註明修改理由：":"這份表單已標記完成。請註明修改理由：";
+  dialog({title:"修改已完成的資料",msg:msg,fields:[{k:"why",label:"修改理由",type:"text",req:1}],ok:"確認修改"}).then(function(v){
+    if(!v){renderForm();return;}
+    if(needSign){logChange("record","撤銷簽核（原簽核者 "+r.sign.by+"）："+v.why);r.sign=null;}
+    UNLOCK[key]=1;if(src&&src._s===2){src._s=1;}
+    logChange(fm.id,"修改已完成表單的理由："+v.why);persist();fn();refreshCur();renderMain();
+  });
+}
+function setVal(fm,inst,f,val){
+  var src=srcOf(fm,inst),old=src[f.v];
+  var o=JSON.stringify(old==null?"":old),n=JSON.stringify(val);
+  if(o===n)return;
+  src[f.v]=val;if(!src._s)src._s=1;
+  if(!auditMode())logChange(fm.id,f.l+"："+(o==='""'?"（空）":o)+" → "+(n==='""'?"（空）":n));
+  touched[f.v]=1;persist();
+}
+function bindFields(box,fm,inst){
+  $$(".f",box).forEach(function(w){
+    if(w.dataset.src){bindSrc(w,fm,inst);return;}
+    var f=FIELD[w.dataset.f],opts=$(".opts",w),inp=$(".in > input, .in > select, .in > textarea",w);
+    if(opts){$$("button",opts).forEach(function(b){b.onclick=function(){
+      if(!needWho())return;
+      guardEdit(fm,inst,function(){
+        var multi=opts.dataset.multi==="1",cv=srcOf(fm,inst)[f.v],val;
+        if(multi){var arr=Array.isArray(cv)?cv.slice():[];var k=arr.indexOf(b.dataset.v);if(k>=0)arr.splice(k,1);else arr.push(b.dataset.v);arr.sort(function(a,c){return (+a)-(+c);});val=arr;}
+        else val=(String(cv)===b.dataset.v)?"":b.dataset.v;
+        setVal(fm,inst,f,val);
+        $$("button",opts).forEach(function(x){var on=Array.isArray(val)?val.indexOf(x.dataset.v)>=0:x.dataset.v===val;x.classList.toggle("on",on);x.setAttribute("aria-pressed",on);});
+        refreshForm(box,fm,inst);});};});}
+    else if(inp){
+      var restore=function(){var s=srcOf(fm,inst);inp.value=f.val==="date_ymd"?(s["_raw_"+f.v]||s[f.v]||""):(s[f.v]||"");};
+      var apply=function(){
+        var raw=inp.value.trim();
+        if(f.val==="date_ymd"){var p=parseDate(raw),s=srcOf(fm,inst);s["_raw_"+f.v]=raw;if(raw&&!p.iso)s["_bad_"+f.v]=1;else delete s["_bad_"+f.v];setVal(fm,inst,f,p.iso||"");}
+        else setVal(fm,inst,f,raw);
+        refreshForm(box,fm,inst);};
+      var first=true;
+      var h=function(){
+        if(!who()){restore();needWho();return;}
+        var r=recOf(cur),s=srcOf(fm,inst),key=fm.id+"|"+(inst?inst._uid:"");
+        if(!auditMode()&&(r.sign||(s._s===2&&!UNLOCK[key]))){var typed=inp.value;restore();guardEdit(fm,inst,function(){var el=document.getElementById(inp.id);if(el){el.value=typed;el.dispatchEvent(new Event(el.tagName==="SELECT"?"change":"input",{bubbles:true}));}});return;}
+        apply();};
+      inp.addEventListener(inp.tagName==="SELECT"?"change":"input",h);
+      inp.addEventListener("blur",function(){touched[f.v]=1;if(f.val==="date_ymd"){var iso=srcOf(fm,inst)[f.v];if(iso){inp.value=iso;srcOf(fm,inst)["_raw_"+f.v]=iso;}}refreshForm(box,fm,inst);});
+    }
+    var qb=$(".qbtn",w);if(qb)qb.onclick=function(){askQuestion(fm,inst,f);};
+    $$(".qacts button",w).forEach(function(b){b.onclick=function(){qAction(b.closest(".qbox").dataset.q,b.dataset.qa,fm,inst,f);};});
+  });
+  refreshForm(box,fm,inst);
+}
+function bindSrc(w,fm,inst){
+  var sel=$("[data-srct]",w),inp=$("[data-srcd]",w),key=w.dataset.f.slice(4);
+  var get=function(){var s=srcOf(fm,inst);s._srcs=s._srcs||{};s._srcs[key]=s._srcs[key]||{};return s._srcs[key];};
+  var upd=function(){if(!needWho()){sel.value=get().t||"";return;}
+    var o=get(),t=sel.value,raw=inp.value.trim(),p=parseDate(raw);
+    var changed=o.t!==t||(o.d||"")!==(p.iso||"");
+    o.t=t;o.draw=raw;o.d=p.iso||"";o.bad=!!(raw&&!p.iso);
+    if(changed){logChange(fm.id,"來源文件："+(t||"（空）")+(o.d?" "+o.d:""));lsSet(KEY_DOC,t);}
+    var s=srcOf(fm,inst);if(!s._s)s._s=1;persist();refreshForm(w.closest(".sheet,.inst"),fm,inst);};
+  sel.onchange=upd;inp.addEventListener("input",upd);
+  inp.addEventListener("blur",function(){var o=get();if(o.d){inp.value=o.d;o.draw=o.d;}});
+}
+function refreshForm(box,fm,inst){
+  if(!box)return;
+  var mode=MODE(),chk=checkForm(cur,fm,inst,!!box._showAll,mode),src=srcOf(fm,inst);
+  $$(".f",box).forEach(function(w){
+    w.classList.remove("e","w");var mg=$(".msg",w);if(mg)mg.textContent="";
+    if(w.dataset.src){var o=(src._srcs||{})[w.dataset.f.slice(4)]||{};$(".hint",w).textContent=o.d?"＝ "+o.d+"（"+rocOf(o.d)+"）":(o.bad?"日期無法辨識":"");return;}
+    var f=FIELD[w.dataset.f];
+    w.hidden=!visible(cur,f,inst,mode);
+    if(f.calc!==undefined||f.calctext!==undefined){var c=$("[data-calc]",w);c.textContent=computed(cur,f,inst,mode);}
+    var hint=$(".hint",w);
+    if(f.val==="date_ymd"){var iso=src[f.v];hint.textContent=iso?"＝ "+iso+"（"+rocOf(iso)+"）":"";}
+  });
+  var mark=function(list,cls){list.forEach(function(it){var w=$('.f[data-f="'+it.f+'"]',box);if(!w||w.hidden)return;
+    if(!box._showAll&&!touched[it.f]&&(it.m==="必填"||it.sec))return;
+    if(cls==="w"&&w.classList.contains("e"))return;w.classList.add(cls);var mg=$(".msg",w);if(mg&&!mg.textContent)mg.textContent=it.m;});};
+  mark(chk.E,"e");mark(chk.W,"w");
+  if(fm.rep){var ih=box.querySelector(".ih span");if(ih)ih.textContent=summary(fm,inst);}
+  refreshCur();
+}
+function refreshCur(){if(!cur)return;STATE[cur]=recordState(cur);updateDock();updateTabs();renderRailLight();}
+function updateTabs(){var s=STATE[cur];$$(".tabs button").forEach(function(b){var i=$("i",b);var fm=FORM_BY[b.dataset.t];
+  if(i)i.className="s"+(auditMode()?(audOf(cur).data[fm.id]._s||0):(s[b.dataset.t]||0));
+  if(fm.rep){var em=$("em",b);if(em)em.textContent=recOf(cur)[fm.id].length;}});}
+var railT=null;function renderRailLight(){clearTimeout(railT);railT=setTimeout(renderRail,250);}
+
+/* ---------- query workflow ---------- */
+function askQuestion(fm,inst,f){
+  if(!needWho())return;
+  if(role()!=="abstractor"){toast("問題由登錄人員提出；醫師請直接在問題框內裁定");return;}
+  var ex=qFor(cur,fm.id,inst,f.v);
+  if(ex&&(ex.status==="open"||ex.status==="returned")){toast("這一欄已有未結案的問題");return;}
+  var cv=srcOf(fm,inst)[f.v];
+  dialog({title:"送醫師確認："+f.l,msg:"目前值："+valText(f,cv),fields:[
+    {k:"type",label:"問題類型",type:"select",options:Q_TYPES,req:1},
+    {k:"note",label:"說明（看到了什麼、在哪份文件、哪一天）",type:"textarea",req:1},
+    {k:"to",label:"指派醫師（可空白＝任何醫師）",type:"text",value:lsGet("escc-abstraction-lastdoc-name")}],ok:"送出"}).then(function(v){
+    if(!v)return;lsSet("escc-abstraction-lastdoc-name",v.to||"");
+    var q={id:"Q"+(DB.q.length+1)+"-"+Date.now().toString(36).slice(-4),sid:cur,form:fm.id,inst:instKey(inst),f:f.v,cur:cv==null?"":cv,type:v.type,note:v.note,by:who(),at:stamp(),to:v.to||"",status:"open",
+      thread:[{by:who(),at:stamp(),act:"ask",note:v.type+"："+v.note,value:cv==null?"":cv}]};
+    DB.q.push(q);logChange(fm.id,"提問「"+f.l+"」："+v.note);persist(true);renderForm();refreshCur();toast("已送醫師確認");
+  });
+}
+function qAction(qid,act,fm,inst,f){
+  if(!needWho())return;
+  var q=DB.q.filter(function(x){return x.id===qid;})[0];if(!q)return;
+  var cv=formSrc(q.sid,q.form,inst,"main")[q.f];
+  var need=act==="return"||act==="unknown"||act==="resend";
+  var labels={confirm:"確認原值（"+valText(f,cv)+"）",correct:"確認更正後的值（"+valText(f,cv)+"）",unknown:"判定病歷無法確認",return:"退回登錄人員補查",resend:"補查完成，再送醫師",withdraw:"撤回這個問題"};
+  if(act==="correct"&&JSON.stringify(cv==null?"":cv)===JSON.stringify(q.cur)){toast("請先在上方欄位改成正確的值，再按「已在上方更正」");return;}
+  dialog({title:labels[act],fields:[{k:"note",label:need?"說明（必填）":"說明（選填）",type:"textarea",req:need?1:0}],ok:"確定"}).then(function(v){
+    if(!v)return;
+    var entry={by:who(),at:stamp(),act:act,note:v.note||""};
+    if(act==="confirm"||act==="correct"||act==="unknown"){entry.value=cv==null?"":cv;q.status="closed";q.decision=act;q.final=cv==null?"":cv;q.closedBy=who();q.closedAt=stamp();}
+    else if(act==="return")q.status="returned";
+    else if(act==="resend"){q.status="open";q.cur=cv==null?"":cv;entry.value=q.cur;}
+    else if(act==="withdraw")q.status="withdrawn";
+    q.thread.push(entry);
+    logChange(q.form,"問題「"+f.l+"」"+(Q_ACT[act]||act)+(v.note?"："+v.note:""));
+    persist(true);renderForm();refreshCur();renderMain();toast(Q_ACT[act]+"完成");
+  });
+}
+
+/* ---------- dock ---------- */
+function allChecks(){
+  var fm=FORM_BY[tab],E=[],W=[],mode=MODE();
+  if(fm.rep)recOf(cur)[fm.id].forEach(function(x,i){var c=checkForm(cur,fm,x,true,mode);
+    c.E.forEach(function(e){E.push({f:e.f,m:"第 "+(i+1)+" 筆："+e.m,i:i});});c.W.forEach(function(w){W.push({f:w.f,m:"第 "+(i+1)+" 筆："+w.m,i:i});});});
+  else{var c=checkForm(cur,fm,null,true,mode);E=c.E;W=c.W;}
+  return {E:E,W:W};
+}
+function fieldName(k){return (FIELD[k]||{}).l||"資料來源";}
+function updateDock(){
+  if(!cur)return;
+  var fm=FORM_BY[tab],c=allChecks(),s=fm.rep?null:srcOf(fm,null),r=role(),st=STATE[cur]||{};
+  $("#pE").textContent="待處理 "+c.E.length;$("#pE").className="pill "+(c.E.length?"e":"ok");
+  $("#pW").textContent="提醒 "+c.W.length;$("#pW").className="pill "+(c.W.length?"w":"ok");
+  $("#stTxt").innerHTML=fm.rep?("共 "+recOf(cur)[fm.id].length+" 筆"):(s._s===2?"<b>此表單已完成</b>":"此表單進行中");
+  $("#bDone").hidden=!!fm.rep||r==="physician";
+  $("#bDone").textContent=auditMode()?"完成稽核重摘":"標記此表單完成";
+  var bs=$("#bSign");bs.hidden=r!=="physician";
+  if(r==="physician"){var ok=st.allDone&&!st.open&&!st.returned;bs.disabled=!ok||st.signed;bs.textContent=st.signed?"已簽核":"簽核此病人";
+    bs.title=ok?"":"所有表單完成且問題全部結案後才能簽核";}
+  $("#issues").innerHTML=c.E.map(function(x){return '<button type="button" class="e" data-f="'+x.f+'"'+(x.i!=null?' data-i="'+x.i+'"':"")+'><b>待處理</b>'+esc(fieldName(x.f))+"："+esc(x.m)+'</button>';}).join("")+
+    c.W.map(function(x){return '<button type="button" class="w" data-f="'+x.f+'"'+(x.i!=null?' data-i="'+x.i+'"':"")+'><b>提醒</b>'+esc(fieldName(x.f))+"："+esc(x.m)+'</button>';}).join("");
+  $$("#issues button").forEach(function(b){b.onclick=function(){jump(b.dataset.f,b.dataset.i);};});
+}
+function jump(f,i){
+  var scope=i!=null?$('.inst[data-i="'+i+'"]'):$("#formArea");if(!scope)return;
+  var w=$('.f[data-f="'+f+'"]',scope);if(!w)return;
+  touched[f]=1;w.scrollIntoView({block:"center",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});
+  w.classList.remove("flash");void w.offsetWidth;w.classList.add("flash");
+  var el=$("input,select,textarea,.opts button",w);if(el)el.focus({preventScroll:true});
+}
+$("#pE").onclick=$("#pW").onclick=function(){$("#issues").classList.toggle("open");};
+function showAllMsgs(){var b=$(".sheet");if(b){b._showAll=true;refreshForm(b,FORM_BY[tab],null);}
+  $$(".inst").forEach(function(box){box._showAll=true;refreshForm(box,FORM_BY[tab],recOf(cur)[tab][+box.dataset.i]);});}
+function completeForm(){
+  if(!needWho())return;
+  var fm=FORM_BY[tab];if(fm.rep)return;
+  var mode=MODE(),c=checkForm(cur,fm,null,true,mode),src=srcOf(fm,null);
+  if(c.E.length){showAllMsgs();$("#issues").classList.add("open");toast("還有 "+c.E.length+" 項待處理，完成後才能標記");return;}
+  var fin=function(){
+    src._s=2;
+    if(mode==="audit"){var a=audOf(cur);a.by=who();a.at=stamp();a.done=FORMS.filter(function(f){return f.audit&&formShown(cur,f);}).every(function(f){return a.data[f.id]._s===2;})?1:0;}
+    else logChange(fm.id,"標記完成");
+    persist(true);refreshCur();renderMain();toast(fm.name+(mode==="audit"?"稽核重摘":"")+"已完成");};
+  if(mode==="audit"){var orig=(DB.rec[cur]&&DB.rec[cur].log||[]).filter(function(l){return l.f===fm.id;}).map(function(l){return l.by;});
+    if(orig.indexOf(who())>=0){ask("原始摘錄紀錄中有你的名字。稽核重摘應由另一位人員執行，仍要完成？").then(function(ok){if(ok)fin();});return;}}
+  if(c.W.length){ask("有 "+c.W.length+" 項提醒：\n"+c.W.map(function(w){return "・"+w.m;}).join("\n")+"\n\n已確認無誤，仍要標記完成？").then(function(ok){if(ok)fin();});return;}
+  fin();
+}
+function completeInst(fm,x){
+  if(!needWho())return;
+  var c=checkForm(cur,fm,x,true);
+  if(c.E.length){showAllMsgs();$("#issues").classList.add("open");toast("這一筆還有 "+c.E.length+" 項待處理");return;}
+  var fin=function(){x._s=2;logChange(fm.id,"標記一筆完成");persist(true);renderForm();refreshCur();};
+  if(c.W.length)ask("這一筆有提醒：\n"+c.W.map(function(w){return "・"+w.m;}).join("\n")+"\n\n仍要標記完成？").then(function(ok){if(ok)fin();});else fin();
+}
+$("#bDone").onclick=completeForm;
+$("#bSign").onclick=function(){
+  if(!needWho())return;var st=recordState(cur);
+  if(!(st.allDone&&!st.open&&!st.returned)){toast("所有表單完成且問題全部結案後才能簽核");return;}
+  ask("簽核 "+cur+"：確認此病人的摘錄內容已完成、所有疑問已裁定？").then(function(ok){if(!ok)return;
+    var r=recOf(cur);r.sign={by:who(),at:stamp()};logChange("record","醫師簽核");persist(true);refreshCur();renderMain();toast("已簽核");});
+};
+$("#bNext").onclick=function(){
+  var ids=queueIds(),i=ids.indexOf(cur),rest=ids.filter(function(id){return id!==cur;}),nx=rest[i>=0?Math.min(i,rest.length-1):0];
+  if(!nx){toast("這個清單已沒有下一位");return;}openPt(nx);
+};
+document.addEventListener("keydown",function(e){if((e.ctrlKey||e.metaKey)&&e.key==="Enter"&&cur){e.preventDefault();$("#bNext").click();}});
+
+/* ---------- audit (blind re-abstraction) ---------- */
+var AUD_FIELDS=[];FORMS.filter(function(f){return f.audit;}).forEach(function(fm){(BYFORM[fm.id]||[]).forEach(function(f){if(editable(f)&&f.t!=="notes"&&!/_verified$/.test(f.v))AUD_FIELDS.push(f);});});
+function drawSample(){
+  refreshStates();
+  var pool=DB.order.filter(function(id){return STATE[id]&&STATE[id].core_abstraction===2&&DB.audSample.indexOf(id)<0;});
+  if(!pool.length){toast("目前沒有已完成核心補登、且尚未抽過的病人");return;}
+  var n=Math.max(1,Math.round(pool.length*0.05));
+  for(var i=pool.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=pool[i];pool[i]=pool[j];pool[j]=t;}
+  pool.slice(0,n).forEach(function(id){DB.audSample.push(id);audOf(id);});
+  persist(true);refreshStates();renderRail();
+  ask("已從 "+(pool.length)+" 位已完成核心補登的病人中隨機抽出 "+n+" 位（5%）。請由另一位人員切換身分為「稽核員」重摘。",true);
+}
+function agree(f,a,b){
+  var ea=a==null||a===""||(Array.isArray(a)&&!a.length),eb=b==null||b===""||(Array.isArray(b)&&!b.length);
+  if(ea&&eb)return true;if(ea!==eb)return false;
+  if(Array.isArray(a)||Array.isArray(b))return JSON.stringify((a||[]).slice().sort())===JSON.stringify((b||[]).slice().sort());
+  if(f.val==="number"||f.val==="integer"){var tol=/_cm$/.test(f.v)?1:(/pct/.test(f.v)?2:0);return Math.abs(+a-+b)<=tol;}
+  return String(a)===String(b);
+}
+function kappa(pairs){
+  var n=pairs.length;if(n<2)return null;
+  var po=pairs.filter(function(p){return p[0]===p[1];}).length/n,ca={},cb={};
+  pairs.forEach(function(p){ca[p[0]]=(ca[p[0]]||0)+1;cb[p[1]]=(cb[p[1]]||0)+1;});
+  var pe=0;Object.keys(ca).forEach(function(k){pe+=(ca[k]/n)*((cb[k]||0)/n);});
+  return pe===1?null:(po-pe)/(1-pe);
+}
+function auditReport(){
+  var ids=DB.audSample.filter(function(id){return DB.aud[id]&&DB.aud[id].done;});
+  var rows=[],dis=[];
+  AUD_FIELDS.forEach(function(f){
+    var pairs=[],ag=0,n=0;
+    ids.forEach(function(id){
+      var fmId=f.f,orig=recOf(id)[fmId]||{},au=DB.aud[id].data[fmId]||{};
+      var vo=visible(id,f,null,"main"),va=visible(id,f,null,"audit");if(!vo&&!va)return;
+      var a=vo?orig[f.v]:"",b=va?au[f.v]:"";n++;
+      if(agree(f,a,b))ag++;else dis.push({id:id,f:f,a:a,b:b});
+      if(f.t==="radio"||f.t==="yesno"||f.t==="dropdown")pairs.push([String(a==null?"":a),String(b==null?"":b)]);
+    });
+    if(n)rows.push({f:f,n:n,pct:ag/n,k:kappa(pairs)});
+  });
+  return {ids:ids,rows:rows,dis:dis};
+}
+function showAuditReport(){
+  var R=auditReport(),m=$("#main");cur=null;$("#dock").hidden=true;
+  if(!R.ids.length){m.innerHTML='<div class="nodata"><h2>還沒有完成的稽核重摘</h2><p>先由「資料」選單抽樣 5%，再請另一位人員以「稽核員」身分重摘。</p></div>';return;}
+  var low=R.rows.filter(function(r){return r.k!=null&&r.k<0.8||r.pct<0.9;}).length;
+  m.innerHTML='<section class="sheet report"><h3>稽核一致性報告</h3><p class="desc">已完成重摘 '+R.ids.length+' 位。數值欄位容許誤差：距離 ±1 cm、體重減輕 ±2%。建議目標：一致率 ≥ 90%、kappa ≥ 0.80。低於目標的欄位 '+low+' 個，應檢討定義或加強訓練。</p>'+
+    '<div class="tw"><table><thead><tr><th>欄位</th><th>n</th><th>一致率</th><th>kappa</th></tr></thead><tbody>'+
+    R.rows.map(function(r){var bad=(r.k!=null&&r.k<0.8)||r.pct<0.9;return '<tr class="'+(bad?"lo":"")+'"><td>'+esc(r.f.l)+'</td><td>'+r.n+'</td><td>'+Math.round(r.pct*100)+'%</td><td>'+(r.k==null?"—":r.k.toFixed(2))+'</td></tr>';}).join("")+
+    '</tbody></table></div><h3>不一致的欄位（'+R.dis.length+'）</h3>'+
+    (R.dis.length?'<div class="tw"><table><thead><tr><th>病人</th><th>欄位</th><th>原摘錄</th><th>稽核</th></tr></thead><tbody>'+R.dis.map(function(d){return '<tr><td>'+esc(d.id)+'</td><td>'+esc(d.f.l)+'</td><td>'+esc(valText(d.f,d.a))+'</td><td>'+esc(valText(d.f,d.b))+'</td></tr>';}).join("")+'</tbody></table></div>'+
+      '<p><button class="btn go" type="button" id="bDisQ">把不一致處全部送醫師裁定</button> <button class="btn" type="button" id="bAudCsv">匯出報告（CSV）</button></p>':'<p class="desc">全部一致。</p>')+'</section>';
+  var b=$("#bDisQ");if(b)b.onclick=function(){
+    if(!needWho())return;var n=0;
+    R.dis.forEach(function(d){
+      if(DB.q.some(function(q){return q.sid===d.id&&q.f===d.f.v&&(q.status==="open"||q.status==="returned");}))return;
+      var note="原摘錄："+valText(d.f,d.a)+"；稽核重摘："+valText(d.f,d.b);
+      DB.q.push({id:"Q"+(DB.q.length+1)+"-"+Date.now().toString(36).slice(-4),sid:d.id,form:d.f.f,inst:"",f:d.f.v,cur:d.a==null?"":d.a,type:"稽核不一致",note:note,by:who(),at:stamp(),to:"",status:"open",
+        thread:[{by:who(),at:stamp(),act:"ask",note:"稽核不一致："+note,value:d.a==null?"":d.a}]});n++;});
+    persist(true);refreshStates();renderRail();toast("已送出 "+n+" 個問題給醫師裁定");};
+  var c=$("#bAudCsv");if(c)c.onclick=function(){
+    var L=["欄位,n,一致率,kappa"].concat(R.rows.map(function(r){return [csvCell(r.f.l),r.n,Math.round(r.pct*1000)/10,r.k==null?"":r.k.toFixed(3)].join(",");}));
+    L.push("");L.push("病人,欄位,原摘錄,稽核");R.dis.forEach(function(d){L.push([d.id,csvCell(d.f.l),csvCell(valText(d.f,d.a)),csvCell(valText(d.f,d.b))].join(","));});
+    offer("ESCC_audit_report_"+nameStamp()+".csv","\ufeff"+L.join("\r\n"));};
+}
+
+/* ---------- CSV ---------- */
+function parseCSV(t){
+  t=t.replace(/^\ufeff/,"");var rows=[],row=[],cell="",q=false;
+  for(var i=0;i<t.length;i++){var ch=t[i];
+    if(q){if(ch==='"'){if(t[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=ch;}
+    else if(ch==='"')q=true;else if(ch===","){row.push(cell);cell="";}
+    else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&t[i+1]==="\n")i++;row.push(cell);rows.push(row);row=[];cell="";}
+    else cell+=ch;}
+  if(cell||row.length){row.push(cell);rows.push(row);}
+  return rows.filter(function(r){return r.some(function(x){return x.trim();});});
+}
+function csvCell(v){v=v==null?"":String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+
+function csvCell(v){v=v==null?"":String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function loadCsv(text){
+  var rows=parseCSV(text);if(rows.length<2){toast("CSV 沒有資料列");return;}
+  var h=rows[0].map(function(x){return x.trim();});
+  if(h.indexOf("record_id")<0||h.indexOf("tx_pathway")<0){toast("不是預填檔：缺少 record_id 或 tx_pathway 欄");return;}
+  var add=0,upd=0;
+  rows.slice(1).forEach(function(r){var o={};h.forEach(function(k,i){if(PREFILL.indexOf(k)>=0||k==="mrn")o[k]=(r[i]||"").trim();});
+    if(!o.record_id)return;if(DB.pre[o.record_id])upd++;else{add++;DB.order.push(o.record_id);}DB.pre[o.record_id]=o;});
+  DB.order.sort(function(a,b){var ya=+DB.pre[a].dx_year,yb=+DB.pre[b].dx_year;return ya-yb||(a<b?-1:1);});
+  persist(true);refreshStates();renderRail();renderMain();
+  ask("已載入預填資料：新增 "+add+" 位"+(upd?"，更新 "+upd+" 位（已摘錄的內容保留）":"")+"。",true);
+}
+function redcapCsv(){
+  var cols=["record_id","redcap_repeat_instrument","redcap_repeat_instance"];
+  FORMS.forEach(function(fm){(BYFORM[fm.id]||[]).forEach(function(f){if(!isData(f))return;
+    if(f.t==="checkbox")f.ch.forEach(function(c){cols.push(f.v+"___"+c[0]);});else cols.push(f.v);});cols.push(fm.id+"_complete");});
+  var lines=[cols.join(",")];
+  DB.order.forEach(function(id){
+    var r=DB.rec[id];if(!r)return;
+    var base={record_id:id,redcap_repeat_instrument:"",redcap_repeat_instance:""},has=false;
+    FORMS.filter(function(fm){return !fm.rep;}).forEach(function(fm){var src=r[fm.id];if(!src||!src._s)return;has=true;fill(base,fm,src,null,id);base[fm.id+"_complete"]=src._s===2?2:0;});
+    if(has)lines.push(cols.map(function(c){return csvCell(base[c]);}).join(","));
+    FORMS.filter(function(fm){return fm.rep;}).forEach(function(fm){(r[fm.id]||[]).forEach(function(x,i){
+      var o={record_id:id,redcap_repeat_instrument:fm.id,redcap_repeat_instance:i+1};fill(o,fm,x,x,id);o[fm.id+"_complete"]=x._s===2?2:0;
+      lines.push(cols.map(function(c){return csvCell(o[c]);}).join(","));});});
+  });
+  return "\ufeff"+lines.join("\r\n");
+  function fill(o,fm,src,inst,id){(BYFORM[fm.id]||[]).forEach(function(f){if(!isData(f))return;
+    var v=visible(id,f,inst,"main")?src[f.v]:"";
+    if(f.t==="checkbox")f.ch.forEach(function(c){o[f.v+"___"+c[0]]=Array.isArray(v)&&v.indexOf(c[0])>=0?1:0;});else o[f.v]=v==null?"":v;});}
+}
+function redcapImportFiles(rowsPerFile){
+  rowsPerFile=rowsPerFile||400;
+  var SK={},seenF={};SCHEMA.forEach(function(f){if(f.f==="registry_prefill")return;if(f.sec||!seenF[f.f]){SK[f.f+"|"+f.v]=("src_"+f.v).slice(0,26);seenF[f.f]=1;}});
+  var cols=["record_id","redcap_repeat_instrument","redcap_repeat_instance"];
+  FORMS.forEach(function(fm){(BYFORM[fm.id]||[]).forEach(function(f){var k=SK[fm.id+"|"+f.v];if(k){cols.push(k+"_t");cols.push(k+"_d");}if(!isData(f))return;
+    if(f.t==="checkbox")f.ch.forEach(function(c){cols.push(f.v+"___"+c[0]);});else cols.push(f.v);});cols.push(fm.id+"_complete");});
+  function fill(o,fm,src,inst,id){(BYFORM[fm.id]||[]).forEach(function(f){if(!isData(f))return;var v=visible(id,f,inst,"main")?src[f.v]:"";
+    if(f.t==="checkbox")f.ch.forEach(function(c){o[f.v+"___"+c[0]]=Array.isArray(v)&&v.indexOf(c[0])>=0?1:0;});else o[f.v]=v==null?"":v;});
+    var ss=src._srcs||{};Object.keys(ss).forEach(function(k){var key=SK[fm.id+"|"+k];if(!key||!ss[k].t)return;o[key+"_t"]=SRC_TYPES.indexOf(ss[k].t)+1;o[key+"_d"]=ss[k].d||"";});}
+  var rows=[];
+  DB.order.forEach(function(id){var r=DB.rec[id];if(!r)return;var base={record_id:id,redcap_repeat_instrument:"",redcap_repeat_instance:""},has=false;
+    FORMS.filter(function(fm){return !fm.rep;}).forEach(function(fm){var src=r[fm.id];if(!src||!src._s)return;has=true;fill(base,fm,src,null,id);base[fm.id+"_complete"]=src._s===2?2:0;});
+    if(has)rows.push(base);
+    FORMS.filter(function(fm){return fm.rep;}).forEach(function(fm){(r[fm.id]||[]).forEach(function(x,i){var o={record_id:id,redcap_repeat_instrument:fm.id,redcap_repeat_instance:i+1};
+      fill(o,fm,x,x,id);o[fm.id+"_complete"]=x._s===2?2:0;rows.push(o);});});});
+  var out=[],n=Math.ceil(rows.length/rowsPerFile),stampS=nameStamp(),who0=(who()||"pc").replace(/[^A-Za-z0-9\u4e00-\u9fff]/g,"");
+  for(var i=0;i<n;i++){var part=rows.slice(i*rowsPerFile,(i+1)*rowsPerFile);
+    out.push({name:"ESCC_REDCap_import_"+who0+"_"+stampS+"_"+pad(i+1)+"of"+pad(n)+".csv",
+      data:[cols.join(",")].concat(part.map(function(o){return cols.map(function(c){return csvCell(o[c]);}).join(",");})).join("\r\n")});}
+  return out;
+}
+function sourcesCsv(){
+  var L=["record_id,form,instance,section,source_document,document_date"];
+  DB.order.forEach(function(id){var r=DB.rec[id];if(!r)return;
+    FORMS.forEach(function(fm){var list=fm.rep?r[fm.id]:[r[fm.id]];list.forEach(function(src,i){var s=src&&src._srcs||{};
+      Object.keys(s).forEach(function(k){if(s[k].t)L.push([id,fm.id,fm.rep?i+1:"",csvCell((sectionsOf(fm.id).filter(function(x){return x.key===k;})[0]||{}).title||k),csvCell(s[k].t),s[k].d||""].join(","));});});});});
+  return "\ufeff"+L.join("\r\n");
+}
+function queriesCsv(){
+  var H=["問題編號","研究編號","表單","欄位代碼","欄位名稱","狀態","問題類型","登錄人員說明","提問者","提問時間","指派醫師","目前值","可用代碼","醫師裁定（確認／更正／無法確認／退回）","裁定值（更正時填代碼）","醫師說明","醫師姓名"];
+  var L=[H.join(",")];
+  DB.q.filter(function(q){return q.status==="open";}).forEach(function(q){var f=FIELD[q.f]||{},inst=q.inst?findInst(q):null;
+    var cv=formSrc(q.sid,q.form,inst,"main")[q.f];
+    L.push([q.id,q.sid,FORM_BY[q.form].name,q.f,f.l,Q_STATUS[q.status],q.type,q.note,q.by,q.at,q.to,valText(f,cv),(f.ch||[]).map(function(c){return c[0]+"="+c[1];}).join("; "),"","","",""].map(csvCell).join(","));});
+  return "\ufeff"+L.join("\r\n");
+}
+function findInst(q){var arr=recOf(q.sid)[q.form]||[];for(var i=0;i<arr.length;i++)if(arr[i]._uid===q.inst)return arr[i];return null;}
+function importAnswers(text){
+  var rows=parseCSV(text);if(rows.length<2){toast("CSV 沒有資料列");return;}
+  var h=rows[0].map(function(x){return x.trim();}),ix=function(name){return h.indexOf(name);};
+  var iQ=ix("問題編號"),iD=h.findIndex(function(x){return x.indexOf("醫師裁定")===0;}),iV=h.findIndex(function(x){return x.indexOf("裁定值")===0;}),iN=ix("醫師說明"),iW=ix("醫師姓名");
+  if(iQ<0||iD<0){toast("不是本工作台匯出的問題清單");return;}
+  var MAP={"確認":"confirm","確認原值":"confirm","更正":"correct","無法確認":"unknown","退回":"return","退回補查":"return"};
+  var done=0,skip=[];
+  rows.slice(1).forEach(function(r){
+    var qid=(r[iQ]||"").trim(),dec=MAP[(r[iD]||"").trim()],q=DB.q.filter(function(x){return x.id===qid;})[0];
+    if(!q||!dec){if(qid&&(r[iD]||"").trim())skip.push(qid+"（裁定欄無法辨識）");return;}
+    if(q.status!=="open"){skip.push(qid+"（已不是待確認狀態）");return;}
+    var docName=(iW>=0?r[iW]:"").trim()||"（未署名）",note=(iN>=0?r[iN]:"").trim(),f=FIELD[q.f],inst=q.inst?findInst(q):null,src=formSrc(q.sid,q.form,inst,"main");
+    if(dec==="return"&&!note){skip.push(qid+"（退回需寫說明）");return;}
+    if(dec==="correct"){
+      var raw=(iV>=0?r[iV]:"").trim(),val;
+      if(!raw){skip.push(qid+"（更正但沒填裁定值）");return;}
+      if(f.t==="checkbox")val=raw.split(/[;；,，]/).map(function(s){return codeOf(f,s.trim());});
+      else if(f.ch)val=codeOf(f,raw);
+      else if(f.val==="date_ymd")val=parseDate(raw).iso;
+      else val=raw;
+      if(val===null||val===""||(Array.isArray(val)&&val.indexOf(null)>=0)){skip.push(qid+"（裁定值「"+raw+"」不是有效代碼）");return;}
+      var old=src[q.f];src[q.f]=val;if(src._s===2)src._s=1;
+      recOf(q.sid).log.push({t:stamp(),by:docName,role:"physician",f:q.form,w:f.l+"：醫師更正 "+JSON.stringify(old==null?"":old)+" → "+JSON.stringify(val)});
+      if(recOf(q.sid).sign){recOf(q.sid).sign=null;}
+    }
+    var cv=src[q.f];
+    q.thread.push({by:docName,at:stamp(),act:dec,note:note,value:cv==null?"":cv});
+    if(dec==="return")q.status="returned";else{q.status="closed";q.decision=dec;q.final=cv==null?"":cv;q.closedBy=docName;q.closedAt=stamp();}
+    done++;
+  });
+  persist(true);refreshStates();renderRail();if(cur)renderMain();
+  ask("已套用醫師回覆 "+done+" 筆。"+(skip.length?"\n未套用 "+skip.length+" 筆：\n"+skip.slice(0,12).join("\n"):""),true);
+}
+function codeOf(f,s){if(!s)return null;for(var i=0;i<f.ch.length;i++){if(f.ch[i][0]===s||f.ch[i][1]===s)return f.ch[i][0];}return null;}
+
+/* ---------- downloads / files ---------- */
+var DL=null;
+if(window.claude&&typeof window.claude.use==="function")window.claude.use("downloads").then(function(ns){DL=ns;}).catch(function(){DL=null;});
+function nameStamp(){var d=new Date();return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"_"+pad(d.getHours())+pad(d.getMinutes());}
+function offer(name,data,after){
+  if(!DL){ /* 2026-09-28 local-file fallback: outside the Claude artifact viewer, save via a Blob download link */
+    try{var blob=new Blob([data],{type:/\.json$/i.test(name)?"application/json":"text/csv;charset=utf-8"});
+      var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500);
+      toast("已匯出 "+name+"（瀏覽器的下載資料夾）");if(after)after();}
+    catch(e){toast("無法匯出："+(e&&e.message||"瀏覽器封鎖下載"));}
+    return;}
+  DL.save({filename:name,data:data}).then(function(){toast("已匯出 "+name);if(after)after();})
+    .catch(function(e){var c=e&&e.code;toast(c==="declined"?"已取消匯出":c==="rate_limited"?"請稍候再試":"無法匯出："+(c||"未知原因"));});
+}
+function pickFile(inp,fn){inp.onchange=function(){var f=inp.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){fn(String(rd.result));inp.value="";};rd.readAsText(f,"utf-8");};inp.click();}
+$("#bMenu").onclick=function(e){e.stopPropagation();$("#menu").classList.toggle("open");};
+document.addEventListener("click",function(e){if(!e.target.closest("#menu"))$("#menu").classList.remove("open");});
+$$("#menu .dd button").forEach(function(b){b.onclick=function(){
+  $("#menu").classList.remove("open");var a=b.dataset.act;
+  if(!SEC.can(a)){toast("你的身分沒有這個權限");return;}
+  if(["qout","redcap","redcapx","srcs","load","qin","restore","sample"].indexOf(a)>=0)SEC.secLog("資料選單："+b.textContent.trim());
+  if(a==="load")pickFile($("#fCsv"),loadCsv);
+  else if(a==="qout"){var n=DB.q.filter(function(q){return q.status==="open";}).length;if(!n){toast("目前沒有待醫師確認的問題");return;}offer("ESCC_待確認問題_"+nameStamp()+".csv",queriesCsv());}
+  else if(a==="qin")pickFile($("#fCsv"),importAnswers);
+  else if(a==="sample")drawSample();
+  else if(a==="report")showAuditReport();
+  else if(a==="redcapx"){var fx=redcapImportFiles(400);if(!fx.length){toast("還沒有任何已填資料");return;}
+    var ix=0;(function nx(){if(ix>=fx.length){toast("已匯出 "+fx.length+" 個 REDCap 匯入檔");return;}offer(fx[ix].name,fx[ix].data,function(){ix++;setTimeout(nx,900);});})();}
+  else if(a==="redcap")offer("ESCC_abstraction_REDCap_"+nameStamp()+".csv",redcapCsv());
+  else if(a==="srcs")offer("ESCC_來源文件_"+nameStamp()+".csv",sourcesCsv());
+  else if(a==="backup")SEC.backupString().then(function(t){offer("ESCC_abstraction_backup_ENCRYPTED_"+nameStamp()+".json",t,function(){lsSet(KEY_BK,String(Date.now()));});});
+  else if(a==="restore")pickFile($("#fJson"),function(t){SEC.restoreText(t);});
+};});
+
+/* ---------- toast / modal ---------- */
+var tt;function toast(m){var t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(tt);tt=setTimeout(function(){t.classList.remove("show");},3400);}
+function ask(msg,info){return dialog({msg:msg,ok:"確定",info:info}).then(function(v){return !!v;});}
+function dialog(o){return new Promise(function(res){
+  var box=$("#mBody");
+  box.innerHTML=(o.title?'<h3>'+esc(o.title)+'</h3>':"")+(o.msg?'<p>'+esc(o.msg)+'</p>':"")+(o.fields||[]).map(function(f){
+    var inp=f.type==="select"?'<select data-k="'+f.k+'"><option value="">— 請選擇 —</option>'+f.options.map(function(x){return '<option>'+esc(x)+'</option>';}).join("")+'</select>':
+      f.type==="textarea"?'<textarea data-k="'+f.k+'">'+esc(f.value||"")+'</textarea>':'<input type="'+(f.type==="password"?"password":"text")+'" data-k="'+f.k+'" value="'+esc(f.value||"")+'"'+(f.type==="password"?' autocomplete="new-password"':'')+'>';
+    return '<label class="mf"><span>'+esc(f.label)+(f.req?' <i>*</i>':"")+'</span>'+inp+'</label>';}).join("")+'<p class="merr" id="mErr"></p>';
+  $("#mNo").hidden=!!o.info;$("#mYes").textContent=o.ok||"確定";$("#modal").classList.add("open");
+  var first=$("[data-k]",box);(first||$("#mYes")).focus();
+  function close(v){$("#modal").classList.remove("open");$("#mYes").onclick=$("#mNo").onclick=null;res(v);}
+  $("#mYes").onclick=function(){var v={},miss=[];(o.fields||[]).forEach(function(f){var el=$('[data-k="'+f.k+'"]',box);v[f.k]=el.value.trim();if(f.req&&!v[f.k])miss.push(f.label);});
+    if(miss.length){$("#mErr").textContent="請填寫："+miss.join("、");return;}close(v);};
+  $("#mNo").onclick=function(){close(null);};
+});}
+
+/* ---------- security: accounts, encryption at rest, auto-lock (2026-09-28) ----------
+   One random 256-bit data key encrypts the whole database (AES-GCM) in IndexedDB.
+   Each account wraps that key with its own password (PBKDF2-SHA256, 600k iterations, per-user salt).
+   A one-time recovery code (shown once at setup) also wraps it, for a forgotten manager password.
+   Role checks are enforced by this page's code only; encryption at rest is the real protection. */
+var RN={manager:"資料管理",abstractor:"登錄人員",physician:"醫師",auditor:"稽核員"};
+var SEC=(function(){
+  var IDBN="escc-secure",ST="kv",ITER=600000,IDLE_MS=15*60*1000;
+  var enc=new TextEncoder(),dec=new TextDecoder();
+  var META=null,DKraw=null,SESSION=null,lastAct=Date.now(),secChain=Promise.resolve();
+  window.__errs=[];window.addEventListener("error",function(e){window.__errs.push(String(e.message));});
+  window.addEventListener("unhandledrejection",function(e){window.__errs.push("rejection: "+String(e.reason&&e.reason.message||e.reason));});
+  function b64(u){var s="";u=new Uint8Array(u);for(var i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s);}
+  function ub64(s){var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
+  function rnd(n){return crypto.getRandomValues(new Uint8Array(n));}
+  var dbp=null;
+  function idb(){if(!dbp)dbp=new Promise(function(res,rej){var r=indexedDB.open(IDBN,1);r.onupgradeneeded=function(){r.result.createObjectStore(ST);};r.onsuccess=function(){res(r.result);};r.onerror=function(){rej(r.error);};});return dbp;}
+  function get(k){return idb().then(function(db){return new Promise(function(res,rej){var g=db.transaction(ST).objectStore(ST).get(k);g.onsuccess=function(){res(g.result);};g.onerror=function(){rej(g.error);};});});}
+  function put(k,v){return idb().then(function(db){return new Promise(function(res,rej){var tx=db.transaction(ST,"readwrite");tx.objectStore(ST).put(v,k);tx.oncomplete=function(){res();};tx.onerror=function(){rej(tx.error);};});});}
+  function kek(secret,salt,iter){return crypto.subtle.importKey("raw",enc.encode(secret),"PBKDF2",false,["deriveKey"]).then(function(b){
+    return crypto.subtle.deriveKey({name:"PBKDF2",salt:salt,iterations:iter||ITER,hash:"SHA-256"},b,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);});}
+  function aesEnc(key,bytes){var iv=rnd(12);return crypto.subtle.encrypt({name:"AES-GCM",iv:iv},key,bytes).then(function(ct){return {iv:b64(iv),ct:b64(ct)};});}
+  function aesDec(key,o){return crypto.subtle.decrypt({name:"AES-GCM",iv:ub64(o.iv)},key,ub64(o.ct)).then(function(pt){return new Uint8Array(pt);});}
+  function wrap(raw,secret){var salt=rnd(16);return kek(secret,salt).then(function(k){return aesEnc(k,raw);}).then(function(w){return {salt:b64(salt),iter:ITER,wrap:w};});}
+  function unwrap(entry,secret){return kek(secret,ub64(entry.salt),entry.iter).then(function(k){return aesDec(k,entry.wrap);});}
+  function dkKey(raw){return crypto.subtle.importKey("raw",raw,{name:"AES-GCM"},false,["encrypt","decrypt"]);}
+  var B32="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  function recoveryCode(){var u=rnd(20),bits="",s="";u.forEach(function(x){bits+=("00000000"+x.toString(2)).slice(-8);});
+    for(var i=0;i+5<=bits.length;i+=5)s+=B32[parseInt(bits.slice(i,i+5),2)];return s.match(/.{1,4}/g).join("-");}
+  function normRec(c){return String(c||"").toUpperCase().replace(/[^A-Z2-7]/g,"");}
+  function emptyDB(){return {v:2,pre:{},rec:{},order:[],q:[],aud:{},audSample:[]};}
+  function saveMeta(){return put("meta",META);}
+  function saveVault(str,key){return aesEnc(key,enc.encode(str)).then(function(v){return put("vault",v);});}
+  function readVault(){return get("vault").then(function(v){if(!v)return null;return aesDec(DK,v).then(function(u){return JSON.parse(dec.decode(u));});});}
+  function user(name){return ((META&&META.users)||[]).filter(function(x){return x.name===name;})[0];}
+  function secLog(act){
+    if(!DK)return;DB.sec=DB.sec||{log:[]};
+    var e={t:stamp(),by:SESSION?SESSION.name:"",role:SESSION?SESSION.role:"",act:act};DB.sec.log.push(e);
+    secChain=secChain.then(function(){var L=DB.sec.log,i=L.indexOf(e),prev=i>0?(L[i-1].h||""):"";
+      return crypto.subtle.digest("SHA-256",enc.encode(prev+JSON.stringify({t:e.t,by:e.by,role:e.role,act:e.act}))).then(function(h){e.h=b64(h);persist();});});
+  }
+  var PERM={load:["manager"],qout:["abstractor","manager"],qin:["physician","manager"],sample:["manager"],report:["manager"],
+            redcap:["manager"],redcapx:["manager"],srcs:["manager"],backup:["manager","abstractor","physician","auditor"],restore:["manager"]};
+  function can(a){return !!SESSION&&(PERM[a]||[]).indexOf(SESSION.role)>=0;}
+  function pwOk(pw){return String(pw||"").length>=8;}
+
+  function setup(name,pw){
+    if(META)return Promise.reject(new Error("此電腦已建立帳號"));
+    DKraw=rnd(32);var rec=recoveryCode();
+    return Promise.all([wrap(DKraw,pw),wrap(DKraw,normRec(rec)),dkKey(DKraw)]).then(function(r){
+      META={v:1,created:stamp(),users:[Object.assign({name:name,role:"manager",created:stamp(),by:name},r[0])],rec:r[1],fails:[]};
+      DK=r[2];var old=null;try{old=JSON.parse(localStorage.getItem(KEY)||"null");}catch(e){}
+      DB=(old&&old.pre)?migrate(old):emptyDB();SESSION={name:name,role:"manager"};
+      return saveMeta().then(function(){return flush();}).then(function(){
+        if(old){try{localStorage.removeItem(KEY);}catch(e){}}
+        secLog("建立資料管理帳號"+(old&&old.pre?"；已匯入並刪除舊版未加密資料":""));
+        return {recovery:rec,migrated:!!(old&&old.pre)};});
+    });
+  }
+  function login(name,pw){
+    var u=user(name);
+    var fail=function(){if(!META)return Promise.resolve(false);META.fails=(META.fails||[]).concat([{name:name,t:stamp()}]).slice(-100);
+      return saveMeta().then(function(){return new Promise(function(r){setTimeout(function(){r(false);},600);});});};
+    if(!u)return fail();
+    return unwrap(u,pw).then(function(raw){DKraw=raw;return dkKey(raw);},function(){return null;}).then(function(k){
+      if(!k)return fail();DK=k;SESSION={name:u.name,role:u.role};
+      return readVault().then(function(x){DB=x?migrate(x):emptyDB();secLog("登入");lastAct=Date.now();return true;});
+    });
+  }
+  function lock(reason){
+    if(!SESSION){showAuth();return Promise.resolve();}
+    try{tick();}catch(e){}
+    secLog("登出："+(reason||"手動鎖定"));
+    return secChain.then(function(){return flush();}).then(function(){
+      DB=emptyDB();DK=null;DKraw=null;SESSION=null;cur=null;STATE={};
+      $("#who").value="";$("#main").innerHTML="";$("#dock").hidden=true;$("#list").innerHTML="";showAuth();
+    });
+  }
+  function addUser(name,role,pw){
+    if(!SESSION||SESSION.role!=="manager")return Promise.reject(new Error("只有資料管理可以新增帳號"));
+    if(user(name))return Promise.reject(new Error("帳號已存在"));
+    if(!pwOk(pw))return Promise.reject(new Error("密碼至少 8 字元"));
+    return wrap(DKraw,pw).then(function(w){META.users.push(Object.assign({name:name,role:role,created:stamp(),by:SESSION.name},w));
+      return saveMeta();}).then(function(){secLog("新增帳號 "+name+"（"+RN[role]+"）");});
+  }
+  function resetPw(name,pw){
+    if(!SESSION||SESSION.role!=="manager")return Promise.reject(new Error("只有資料管理可以重設密碼"));
+    var u=user(name);if(!u)return Promise.reject(new Error("無此帳號"));if(!pwOk(pw))return Promise.reject(new Error("密碼至少 8 字元"));
+    return wrap(DKraw,pw).then(function(w){Object.assign(u,w);return saveMeta();}).then(function(){secLog("重設 "+name+" 的密碼");});
+  }
+  function removeUser(name){
+    if(!SESSION||SESSION.role!=="manager")return Promise.reject(new Error("只有資料管理可以移除帳號"));
+    if(name===SESSION.name)return Promise.reject(new Error("不能移除自己"));
+    META.users=META.users.filter(function(x){return x.name!==name;});
+    return saveMeta().then(function(){secLog("移除帳號 "+name);});
+  }
+  function changeOwn(oldPw,newPw){
+    var u=user(SESSION.name);if(!pwOk(newPw))return Promise.reject(new Error("新密碼至少 8 字元"));
+    return unwrap(u,oldPw).then(function(){return wrap(DKraw,newPw);},function(){throw new Error("舊密碼錯誤");})
+      .then(function(w){Object.assign(u,w);return saveMeta();}).then(function(){secLog("變更自己的密碼");});
+  }
+  function recover(code,name,newPw){
+    var u=user(name);if(!u||u.role!=="manager")return Promise.resolve(false);if(!pwOk(newPw))return Promise.resolve(false);
+    return unwrap(META.rec,normRec(code)).then(function(raw){return wrap(raw,newPw);},function(){return null;}).then(function(w){
+      if(!w)return false;Object.assign(u,w);return saveMeta().then(function(){return login(name,newPw);}).then(function(ok){if(ok)secLog("以復原碼重設資料管理密碼");return ok;});});
+  }
+  function backupString(){return secChain.then(function(){return flush();}).then(function(){return get("vault");}).then(function(v){
+    secLog("匯出加密備份");return JSON.stringify({kind:"escc-secure-backup",v:1,at:stamp(),by:SESSION?SESSION.name:"",meta:META,vault:v});});}
+  function restoreText(t,skipConfirm){
+    var x;try{x=JSON.parse(t);}catch(e){toast("不是有效的備份檔");return Promise.resolve(false);}
+    if(!x||x.kind!=="escc-secure-backup"||!x.meta||!x.vault){toast("不是本工作台的加密備份檔");return Promise.resolve(false);}
+    var go=function(){return put("meta",x.meta).then(function(){return put("vault",x.vault);}).then(function(){
+      var wasIn=!!SESSION;META=x.meta;if(wasIn){DB=emptyDB();DK=null;DKraw=null;SESSION=null;cur=null;STATE={};}showAuth();
+      toast("已還原備份（"+(x.at||"")+"），請以備份中的帳號登入");return true;});};
+    if(skipConfirm||!META)return go();
+    return ask("以這份備份（"+(x.at||"")+"，"+(x.by||"")+" 匯出）取代此電腦全部資料與帳號？\n目前資料會被覆蓋。").then(function(ok){return ok?go():false;});
+  }
+
+  /* ---------- UI ---------- */
+  function applySession(){
+    var r=SESSION.role,ui=r==="manager"?"abstractor":r;
+    $("#who").value=SESSION.name;$("#role").value=ui;document.body.dataset.role=ui;
+    $("#chip").innerHTML="<b>"+esc(SESSION.name)+"</b>・"+RN[r];$("#bUsers").hidden=r!=="manager";$("#bAssign").hidden=r!=="manager";
+    $$("#menu .dd button").forEach(function(b){b.hidden=!can(b.dataset.act);});
+    $$("#menu .dd hr").forEach(function(h){h.hidden=r!=="manager";});
+    $("#auth").hidden=true;queue=curQueues()[0].id;tab="core_abstraction";refreshStates();renderRail();renderMain();
+  }
+  function err(m){$("#aErr").textContent=m||"";}
+  function showAuth(){$("#auth").hidden=false;err("");if(META)showLogin();else showSetup();}
+  function form(html,onSubmit){$("#aBody").innerHTML=html;var f=$("#aBody form");f.onsubmit=function(e){e.preventDefault();err("");onSubmit(f);};var i=$("input",f);if(i)i.focus();}
+  function val(f,n){return f.elements[n].value.trim();}
+  function links(){return '<p class="alinks"><button type="button" class="lk" id="lkRestore">從加密備份還原</button>'+(META?' <button type="button" class="lk" id="lkRec">忘記資料管理密碼</button>':'')+'</p>';}
+  function bindLinks(){var a=$("#lkRestore");if(a)a.onclick=function(){pickFile($("#fJson"),function(t){restoreText(t);});};var b=$("#lkRec");if(b)b.onclick=showRecover;}
+  function showSetup(){
+    $("#aSub").textContent="第一次在這台電腦使用：建立資料管理帳號";
+    form('<form><label class="mf"><span>帳號名稱</span><input name="n" autocomplete="username" required></label>'+
+      '<label class="mf"><span>密碼（至少 8 字元）</span><input name="p" type="password" autocomplete="new-password" required></label>'+
+      '<label class="mf"><span>再輸入一次密碼</span><input name="p2" type="password" autocomplete="new-password" required></label>'+
+      '<button class="btn go" type="submit">建立並進入</button></form>'+links(),function(f){
+      var n=val(f,"n"),p=f.elements.p.value,p2=f.elements.p2.value;
+      if(!n)return err("請填帳號名稱");if(!pwOk(p))return err("密碼至少 8 字元");if(p!==p2)return err("兩次密碼不同");
+      setup(n,p).then(function(r){showRecovery(r);}).catch(function(e){err(e.message);});});bindLinks();
+  }
+  function showRecovery(r){
+    $("#aSub").textContent="請立即保存復原碼（只顯示這一次）";
+    form('<form><p class="adesc">忘記資料管理密碼時，只能用這組復原碼救回本機資料。請存入 KeePass，不要存在這台電腦上。</p>'+
+      '<p class="rcode">'+esc(r.recovery)+'</p>'+(r.migrated?'<p class="adesc">已把這台電腦上舊版未加密的資料匯入加密資料庫，並刪除舊資料。</p>':'')+
+      '<label class="ck"><input type="checkbox" name="ok"> 我已把復原碼存入 KeePass</label>'+
+      '<button class="btn go" type="submit">進入工作台</button></form>',function(f){if(!f.elements.ok.checked)return err("請先確認已保存復原碼");applySession();});
+  }
+  function showLogin(){
+    $("#aSub").textContent="請登入";
+    form('<form><label class="mf"><span>帳號</span><input name="n" autocomplete="username" required></label>'+
+      '<label class="mf"><span>密碼</span><input name="p" type="password" autocomplete="current-password" required></label>'+
+      '<button class="btn go" type="submit" id="aGo">登入</button></form>'+links(),function(f){
+      var b=$("#aGo");b.disabled=true;b.textContent="驗證中…";
+      login(val(f,"n"),f.elements.p.value).then(function(ok){b.disabled=false;b.textContent="登入";
+        if(ok)applySession();else{err("帳號或密碼錯誤");f.elements.p.value="";f.elements.p.focus();}});});bindLinks();
+  }
+  function showRecover(){
+    $("#aSub").textContent="以復原碼重設資料管理密碼";
+    form('<form><label class="mf"><span>資料管理帳號</span><input name="n" required></label>'+
+      '<label class="mf"><span>復原碼</span><input name="c" autocomplete="off" required></label>'+
+      '<label class="mf"><span>新密碼（至少 8 字元）</span><input name="p" type="password" autocomplete="new-password" required></label>'+
+      '<button class="btn go" type="submit">重設並登入</button> <button class="btn" type="button" id="aBack">返回</button></form>',function(f){
+      recover(val(f,"c"),val(f,"n"),f.elements.p.value).then(function(ok){if(ok)applySession();else err("帳號、復原碼或新密碼不正確");});});
+    $("#aBack").onclick=showLogin;
+  }
+  function renderUsers(){
+    cur=null;$("#dock").hidden=true;var m=$("#main"),me=SESSION.name;
+    var rows=META.users.map(function(u){return '<tr><td>'+esc(u.name)+'</td><td>'+RN[u.role]+'</td><td>'+esc(u.created||"")+'</td><td><button class="btn" type="button" data-rp="'+esc(u.name)+'">重設密碼</button> '+
+      (u.name===me?'':'<button class="btn warn" type="button" data-rm="'+esc(u.name)+'">移除</button>')+'</td></tr>';}).join("");
+    var fails=(META.fails||[]).slice(-20).reverse().map(function(f){return '<tr><td>'+esc(f.t)+'</td><td>'+esc(f.name)+'</td></tr>';}).join("");
+    var log=((DB.sec&&DB.sec.log)||[]).slice(-50).reverse().map(function(e){return '<tr><td>'+esc(e.t)+'</td><td>'+esc(e.by)+'</td><td>'+esc(RN[e.role]||e.role)+'</td><td>'+esc(e.act)+'</td></tr>';}).join("");
+    m.innerHTML='<section class="sheet report"><h3>帳號管理</h3><p class="desc">每個帳號用自己的密碼開啟這台電腦上同一份加密資料。移除帳號後，該密碼就不能再開啟。</p>'+
+      '<p><button class="btn go" type="button" id="bAddU">＋ 新增帳號</button></p><div class="tw"><table><thead><tr><th>帳號</th><th>身分</th><th>建立</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      '<h3>登入失敗紀錄（最近 20 筆）</h3>'+(fails?'<div class="tw"><table><thead><tr><th>時間</th><th>帳號</th></tr></thead><tbody>'+fails+'</tbody></table></div>':'<p class="desc">無</p>')+
+      '<h3>安全紀錄（最近 50 筆）</h3><div class="tw"><table><thead><tr><th>時間</th><th>帳號</th><th>身分</th><th>事件</th></tr></thead><tbody>'+log+'</tbody></table></div></section>';
+    var ROLE_OF={"登錄人員":"abstractor","醫師":"physician","稽核員":"auditor","資料管理":"manager"};
+    $("#bAddU").onclick=function(){dialog({title:"新增帳號",fields:[{k:"n",label:"帳號名稱",req:1},{k:"r",label:"身分",type:"select",options:["登錄人員","醫師","稽核員","資料管理"],req:1},{k:"p",label:"初始密碼（至少 8 字元）",type:"password",req:1}],ok:"新增"})
+      .then(function(v){if(!v)return;addUser(v.n,ROLE_OF[v.r],v.p).then(function(){toast("已新增 "+v.n);renderUsers();}).catch(function(e){toast(e.message);});});};
+    $$("[data-rp]",m).forEach(function(b){b.onclick=function(){dialog({title:"重設 "+b.dataset.rp+" 的密碼",fields:[{k:"p",label:"新密碼（至少 8 字元）",type:"password",req:1}],ok:"重設"})
+      .then(function(v){if(!v)return;resetPw(b.dataset.rp,v.p).then(function(){toast("已重設");renderUsers();}).catch(function(e){toast(e.message);});});};});
+    $$("[data-rm]",m).forEach(function(b){b.onclick=function(){ask("移除帳號 "+b.dataset.rm+"？").then(function(ok){if(!ok)return;removeUser(b.dataset.rm).then(function(){toast("已移除");renderUsers();}).catch(function(e){toast(e.message);});});};});
+  }
+  /* ---------- patient assignment and encrypted prefill packages (manager only) ---------- */
+  function abstractors(){return META.users.filter(function(u){return u.role==="abstractor";}).map(function(u){return u.name;});}
+  function isMgr(){return !!SESSION&&SESSION.role==="manager";}
+  function assignEven(names){
+    if(!isMgr())throw new Error("只有資料管理可以分派");if(!names.length)throw new Error("請勾選登錄人員");
+    DB.assign=DB.assign||{};var un=DB.order.filter(function(id){return !DB.assign[id];});
+    un.forEach(function(id,i){DB.assign[id]=names[i%names.length];});
+    secLog("分派 "+un.length+" 位病人給 "+names.join("、"));persist(true);return un.length;}
+  function unassign(names){
+    if(!isMgr())throw new Error("只有資料管理可以收回");var n=0;
+    Object.keys(DB.assign||{}).forEach(function(id){if(names.indexOf(DB.assign[id])>=0){delete DB.assign[id];n++;}});
+    secLog("收回 "+names.join("、")+" 的 "+n+" 位病人");persist(true);return n;}
+  function prefillCsv(ids){var cols=["record_id","mrn"].concat(PREFILL.filter(function(k){return k!=="record_id";}));
+    return [cols.join(",")].concat(ids.map(function(id){var p=DB.pre[id]||{};return cols.map(function(c){return csvCell(p[c]);}).join(",");})).join("\r\n");}
+  function exportPackage(forName,pw){
+    if(!isMgr())return Promise.reject(new Error("只有資料管理可以匯出分包"));
+    var A=DB.assign||{},ids=forName==="*"?DB.order.slice():DB.order.filter(function(id){return A[id]===forName;});
+    if(!ids.length)return Promise.reject(new Error("沒有可匯出的病人"));
+    if(String(pw||"").length<10)return Promise.reject(new Error("分包密碼至少 10 字元"));
+    var salt=rnd(16);return kek(pw,salt).then(function(k){return aesEnc(k,enc.encode(prefillCsv(ids)));}).then(function(o){
+      secLog("匯出加密分包："+(forName==="*"?"全部病人":forName)+" "+ids.length+" 位");
+      return {name:"ESCC_prefill_package_"+(forName==="*"?"ALL":forName)+"_"+ids.length+"_"+nameStamp()+".escpkg.json",
+        data:JSON.stringify({kind:"escc-prefill-package",v:1,created:stamp(),by:SESSION.name,for:forName,n:ids.length,kdf:"PBKDF2-SHA256",iter:ITER,salt:b64(salt),iv:o.iv,ct:o.ct})};});}
+  function importPackage(text,pw){
+    if(!isMgr())return Promise.reject(new Error("只有資料管理可以匯入分包"));
+    var p;try{p=JSON.parse(text);}catch(e){return Promise.reject(new Error("不是有效的分包檔"));}
+    if(!p||p.kind!=="escc-prefill-package"||!p.salt||!p.ct)return Promise.reject(new Error("不是本工作台的加密分包"));
+    return kek(pw,ub64(p.salt),p.iter||ITER).then(function(k){return aesDec(k,{iv:p.iv,ct:p.ct});})
+      .then(function(u){return dec.decode(u);},function(){throw new Error("分包密碼錯誤");})
+      .then(function(csv){var rows=parseCSV(csv),ix=rows[0].map(function(x){return x.trim();}).indexOf("record_id");
+        var ids=rows.slice(1).map(function(r){return (r[ix]||"").trim();}).filter(Boolean);
+        loadCsv(csv);
+        var u=p.for&&p.for!=="*"?user(p.for):null,target=u&&u.role==="abstractor"?u.name:"";
+        if(target){DB.assign=DB.assign||{};ids.forEach(function(id){DB.assign[id]=target;});}
+        secLog("匯入加密分包 "+ids.length+" 位（"+(p.created||"")+"，"+(p.by||"")+" 製作）"+(target?"，分派給 "+target:""));
+        return persist(true).then(function(){return {n:ids.length,assigned:target,forName:p.for||""};});});}
+  function renderAssign(){
+    if(!isMgr())return;cur=null;$("#dock").hidden=true;var m=$("#main"),A=DB.assign||{},abs=abstractors(),cnt={};
+    DB.order.forEach(function(id){var a=A[id]||"";cnt[a]=(cnt[a]||0)+1;});
+    m.innerHTML='<section class="sheet report"><h3>分派病人</h3><p class="desc">共 '+DB.order.length+' 位，尚未分派 '+(cnt[""]||0)+' 位。登錄人員登入後只看得到分派給自己的病人；醫師與稽核員看得到全部。</p>'+
+      (abs.length?'<div class="tw"><table><thead><tr><th>登錄人員</th><th>已分派</th></tr></thead><tbody>'+abs.map(function(n){return '<tr><td><label class="ck"><input type="checkbox" data-an="'+esc(n)+'"> '+esc(n)+'</label></td><td>'+(cnt[n]||0)+'</td></tr>';}).join("")+'</tbody></table></div>'+
+        '<p><button class="btn go" type="button" id="bEven">把尚未分派的病人平均分給勾選的人</button> <button class="btn warn" type="button" id="bUn">收回勾選者的病人</button></p>'
+        :'<p class="desc">這台電腦還沒有登錄人員帳號，請先到「帳號管理」新增。</p>')+
+      '<h3>加密分包（在電腦之間傳遞預填資料）</h3><p class="desc">分包檔以另設的分包密碼加密（至少 10 字元）。分包密碼請當面或電話告知接收的資料管理，不要和檔案放在一起。接收端在這一頁按「匯入加密分包」。</p>'+
+      '<p><select id="pkgFor"><option value="*">全部病人（'+DB.order.length+' 位）</option>'+abs.map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'（'+(cnt[n]||0)+' 位）</option>';}).join("")+'</select> '+
+      '<button class="btn" type="button" id="bPkgOut">匯出加密分包</button> <button class="btn" type="button" id="bPkgIn">匯入加密分包</button></p></section>';
+    var picked=function(){return $$("[data-an]",m).filter(function(c){return c.checked;}).map(function(c){return c.dataset.an;});};
+    var be=$("#bEven");if(be)be.onclick=function(){try{var n=assignEven(picked());toast("已分派 "+n+" 位");refreshStates();renderRail();renderAssign();}catch(e){toast(e.message);}};
+    var bu=$("#bUn");if(bu)bu.onclick=function(){var ns=picked();if(!ns.length){toast("請勾選登錄人員");return;}ask("收回 "+ns.join("、")+" 的病人？已填的內容不會刪除。").then(function(ok){if(!ok)return;var n=unassign(ns);toast("已收回 "+n+" 位");refreshStates();renderRail();renderAssign();});};
+    $("#bPkgOut").onclick=function(){var f=$("#pkgFor").value;dialog({title:"匯出加密分包",msg:"對象："+(f==="*"?"全部病人":f),fields:[{k:"p",label:"分包密碼（至少 10 字元）",type:"password",req:1},{k:"p2",label:"再輸入一次",type:"password",req:1}],ok:"匯出"})
+      .then(function(v){if(!v)return;if(v.p!==v.p2){toast("兩次分包密碼不同");return;}exportPackage(f,v.p).then(function(x){offer(x.name,x.data);}).catch(function(e){toast(e.message);});});};
+    $("#bPkgIn").onclick=function(){pickFile($("#fJson"),function(t){dialog({title:"匯入加密分包",fields:[{k:"p",label:"分包密碼",type:"password",req:1}],ok:"匯入"})
+      .then(function(v){if(!v)return;importPackage(t,v.p).then(function(r){toast("已匯入 "+r.n+" 位"+(r.assigned?"，分派給 "+r.assigned:(r.forName&&r.forName!=="*"?"（這台電腦沒有 "+r.forName+" 帳號，尚未分派）":"")));refreshStates();renderRail();renderAssign();}).catch(function(e){toast(e.message);});});});};
+  }
+  function idleCheck(){if(SESSION&&Date.now()-lastAct>IDLE_MS)lock("閒置 "+Math.round(IDLE_MS/60000)+" 分鐘自動鎖定");}
+  function init(){
+    ["mousemove","keydown","click","scroll","touchstart"].forEach(function(ev){document.addEventListener(ev,function(){lastAct=Date.now();},{passive:true});});
+    setInterval(idleCheck,30000);
+    document.addEventListener("visibilitychange",function(){if(document.hidden&&DK)flush();});
+    window.addEventListener("beforeunload",function(){if(DK)flush();});
+    $("#bLock").onclick=function(){lock("手動鎖定");};
+    $("#bUsers").onclick=function(){if(SESSION&&SESSION.role==="manager")renderUsers();};
+    $("#bAssign").onclick=function(){if(SESSION&&SESSION.role==="manager")renderAssign();};
+    $("#bPw").onclick=function(){if(!SESSION)return;dialog({title:"變更密碼",fields:[{k:"o",label:"目前密碼",type:"password",req:1},{k:"n",label:"新密碼（至少 8 字元）",type:"password",req:1},{k:"n2",label:"再輸入一次新密碼",type:"password",req:1}],ok:"變更"})
+      .then(function(v){if(!v)return;if(v.n!==v.n2){toast("兩次新密碼不同");return;}changeOwn(v.o,v.n).then(function(){toast("密碼已變更");}).catch(function(e){toast(e.message);});});};
+    return get("meta").then(function(m){META=m||null;showAuth();});
+  }
+  return {session:function(){return SESSION;},init:init,can:can,backupString:backupString,restoreText:restoreText,saveVault:saveVault,secLog:secLog};
+})();
+
+/* ---------- init ---------- */
+refreshStates();renderRail();renderMain();SEC.init();
+
+})();
+
+</script>
+</body>
+</html>
