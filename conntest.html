@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESCC 連線測試</title>
+<style>
+:root{--bg:#EEF2F1;--sheet:#fff;--ink:#1B2A30;--soft:#5A6B72;--rule:#D5DEDB;--accent:#0D6468;--ok:#1E7355;--okbg:#DDF0E7;--bad:#B3261E;--badbg:#F9E1DE;--warn:#A0660F;--warnbg:#F7EAD2}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Noto Sans TC","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;padding:16px}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:14px 16px}
+h1{font-size:1.2rem;margin:0}
+h2{font-size:.95rem;margin:0 0 8px}
+.banner{background:var(--warnbg);color:var(--warn);border-radius:6px;padding:8px 12px;font-size:.9rem}
+label{display:block;font-size:.85rem;color:var(--soft);margin-top:8px}
+input{width:100%;font:inherit;padding:8px 10px;border:1px solid var(--rule);border-radius:6px}
+button{font:inherit;border:1px solid var(--rule);background:var(--sheet);border-radius:6px;padding:8px 14px;cursor:pointer;margin:8px 8px 0 0}
+button.go{background:var(--accent);border-color:var(--accent);color:#fff}
+button:disabled{opacity:.5;cursor:not-allowed}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+td{border-bottom:1px solid var(--rule);padding:6px 4px;vertical-align:top}
+td.r{text-align:right;white-space:nowrap;font-family:ui-monospace,Consolas,monospace}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}.wait{color:var(--soft)}
+.pill{display:inline-block;border-radius:10px;padding:0 10px;font-size:.85rem;font-weight:600}
+.pill.ok{background:var(--okbg)}.pill.bad{background:var(--badbg)}
+pre{white-space:pre-wrap;word-break:break-all;background:#F4F7F6;border-radius:6px;padding:8px;font-size:.8rem}
+ol{padding-left:20px;margin:6px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card"><h1>ESCC 連線測試</h1>
+    <p class="banner">只存測試用的假資料。用來確認這台電腦或平板能否連到 Firebase、加密存檔與讀回是否正常。</p>
+    <table id="env"></table>
+  </div>
+
+  <div class="card"><h2>1 · 登入測試帳號</h2>
+    <label for="em">電子郵件</label><input id="em" type="email" autocomplete="username" placeholder="test1@escc-test.tw">
+    <label for="pw">密碼</label><input id="pw" type="password" autocomplete="current-password">
+    <button class="go" id="bLogin" type="button">登入</button><button id="bOut" type="button" disabled>登出</button>
+    <p id="loginMsg" class="wait"></p>
+  </div>
+
+  <div class="card"><h2>2 · 加密存檔與讀回(連線時)</h2>
+    <button class="go" id="bRun" type="button" disabled>開始測試</button>
+    <table id="res"></table>
+  </div>
+
+  <div class="card"><h2>3 · 斷線測試(平板建議做)</h2>
+    <ol><li>關閉 Wi-Fi(或開飛航模式)</li><li>按「斷線時存檔」</li><li>重新開 Wi-Fi,等「已同步到雲端」出現</li></ol>
+    <button id="bOff" type="button" disabled>斷線時存檔</button>
+    <p id="offMsg" class="wait"></p>
+  </div>
+
+  <div class="card"><h2>4 · 回傳結果</h2>
+    <button id="bCopy" type="button">複製測試結果</button><span id="copyMsg" class="wait"></span>
+    <pre id="summary">尚未測試</pre>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { initializeFirestore, persistentLocalCache, doc, setDoc, getDocFromServer, onSnapshot, collection, getCountFromServer, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBxVKcQaI-_avwbACXrp6UjR7BfAZSZeYA",
+  authDomain: "escc-115.firebaseapp.com",
+  projectId: "escc-115",
+  storageBucket: "escc-115.firebasestorage.app",
+  messagingSenderId: "274287182090",
+  appId: "1:274287182090:web:f701125d8cc183337dbaf3"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+let db, cacheMode = "IndexedDB 離線暫存";
+try { db = initializeFirestore(app, { localCache: persistentLocalCache() }); }
+catch (e) { db = initializeFirestore(app, {}); cacheMode = "記憶體(不支援離線暫存:" + e.message + ")"; }
+
+const $ = (id) => document.getElementById(id);
+const R = { env: {}, steps: [] };
+function row(t, label, val, cls) { t.insertAdjacentHTML("beforeend", `<tr><td>${label}</td><td class="r ${cls || ""}">${val}</td></tr>`); }
+function env() {
+  R.env = { 裝置: navigator.userAgent.slice(0, 120), 網路: navigator.onLine ? "連線中" : "離線", 安全環境: String(isSecureContext),
+            加密功能: String(!!(crypto && crypto.subtle)), 本機暫存: cacheMode, 專案: firebaseConfig.projectId };
+  $("env").innerHTML = ""; for (const [k, v] of Object.entries(R.env)) row($("env"), k, v);
+}
+env(); addEventListener("online", env); addEventListener("offline", env);
+
+const enc = new TextEncoder(), dec = new TextDecoder();
+const b64 = (u) => btoa(String.fromCharCode(...new Uint8Array(u))), ub64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+let key = null;
+async function encrypt(obj) { key = key || await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  const iv = crypto.getRandomValues(new Uint8Array(12)); const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(JSON.stringify(obj)));
+  return { iv: b64(iv), ct: b64(ct) }; }
+async function decrypt(o) { return JSON.parse(dec.decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: ub64(o.iv) }, key, ub64(o.ct)))); }
+
+function summary() {
+  const lines = ["ESCC 連線測試 " + new Date().toLocaleString("zh-TW")];
+  for (const [k, v] of Object.entries(R.env)) lines.push(`${k}: ${v}`);
+  for (const s of R.steps) lines.push(`${s.ok ? "✅" : "❌"} ${s.name}: ${s.detail}`);
+  $("summary").textContent = lines.join("\n");
+}
+function step(name, ok, detail) { R.steps.push({ name, ok, detail }); row($("res"), name, (ok ? "✅ " : "❌ ") + detail, ok ? "ok" : "bad"); summary(); }
+
+$("bLogin").onclick = async () => {
+  $("loginMsg").textContent = "登入中…"; const t0 = performance.now();
+  try { await signInWithEmailAndPassword(auth, $("em").value.trim(), $("pw").value);
+        step("登入", true, Math.round(performance.now() - t0) + " ms"); $("loginMsg").textContent = ""; }
+  catch (e) { step("登入", false, e.code || e.message); $("loginMsg").textContent = "登入失敗:" + (e.code || e.message); }
+};
+$("bOut").onclick = () => signOut(auth);
+onAuthStateChanged(auth, (u) => { const on = !!u; $("bRun").disabled = !on; $("bOff").disabled = !on; $("bOut").disabled = !on; $("bLogin").disabled = on;
+  if (u) $("loginMsg").textContent = "已登入:" + u.email; });
+
+$("bRun").onclick = async () => {
+  const u = auth.currentUser; if (!u) return; $("bRun").disabled = true;
+  try {
+    const sample = { 病人: "DEMO-假資料", 測試: "中文與符號 ✓ μm mg/m²", 時間: new Date().toISOString() };
+    const w = [], r = []; let same = true;
+    for (let i = 0; i < 5; i++) {
+      const id = "t" + Date.now() + "_" + i, ref = doc(db, "conntest", u.uid, "items", id), payload = await encrypt(sample);
+      let t0 = performance.now(); await setDoc(ref, { ...payload, at: serverTimestamp() }); w.push(performance.now() - t0);
+      t0 = performance.now(); const snap = await getDocFromServer(ref); r.push(performance.now() - t0);
+      const back = await decrypt(snap.data()); same = same && JSON.stringify(back) === JSON.stringify(sample);
+      if (i === 0) step("伺服器上只有密文", !JSON.stringify(snap.data()).includes("DEMO"), "伺服器資料不含明文");
+    }
+    const avg = (a) => Math.round(a.reduce((x, y) => x + y, 0) / a.length);
+    step("加密存檔 ×5", true, "平均 " + avg(w) + " ms");
+    step("從伺服器讀回 ×5", true, "平均 " + avg(r) + " ms");
+    step("解密後內容一致", same, same ? "一致" : "不一致");
+    const n = await getCountFromServer(collection(db, "conntest", u.uid, "items"));
+    step("讀取筆數", true, n.data().count + " 筆");
+    try { await getDocFromServer(doc(db, "conntest", "someone-else", "items", "x")); step("讀不到別人的資料(規則)", false, "竟然讀得到"); }
+    catch (e) { step("讀不到別人的資料(規則)", e.code === "permission-denied", e.code || e.message); }
+  } catch (e) { step("測試中斷", false, e.code || e.message); }
+  $("bRun").disabled = false;
+};
+
+$("bOff").onclick = async () => {
+  const u = auth.currentUser; if (!u) return;
+  const ref = doc(db, "conntest", u.uid, "items", "offline_" + Date.now());
+  const payload = await encrypt({ 病人: "DEMO-斷線測試", 時間: new Date().toISOString() });
+  setDoc(ref, { ...payload, at: serverTimestamp() }).catch((e) => step("斷線存檔", false, e.code || e.message));
+  $("offMsg").textContent = navigator.onLine ? "目前仍在線上;請先關閉 Wi-Fi 再測一次" : "已暫存在本機,等待網路恢復…";
+  const off = navigator.onLine === false;
+  const unsub = onSnapshot(ref, { includeMetadataChanges: true }, (s) => {
+    if (s.exists() && !s.metadata.hasPendingWrites) { $("offMsg").textContent = "✅ 已同步到雲端"; step("斷線存檔後自動同步", true, off ? "斷線時存檔,恢復後已同步" : "線上存檔(未實際斷線)"); unsub(); }
+  });
+};
+
+$("bCopy").onclick = async () => {
+  try { await navigator.clipboard.writeText($("summary").textContent); $("copyMsg").textContent = " 已複製,貼到 Telegram 給我"; }
+  catch { const r = document.createRange(); r.selectNodeContents($("summary")); getSelection().removeAllRanges(); getSelection().addRange(r); $("copyMsg").textContent = " 已選取文字,請手動複製"; }
+};
+summary();
+</script>
+</body>
+</html>
