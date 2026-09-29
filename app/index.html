@@ -1132,7 +1132,7 @@ $$("#menu .dd button").forEach(function(b){b.onclick=function(){
     var ix=0;(function nx(){if(ix>=fx.length){toast("已匯出 "+fx.length+" 個 REDCap 匯入檔");return;}offer(fx[ix].name,fx[ix].data,function(){ix++;setTimeout(nx,900);});})();}
   else if(a==="redcap")offer("ESCC_abstraction_REDCap_"+nameStamp()+".csv",redcapCsv());
   else if(a==="srcs")offer("ESCC_來源文件_"+nameStamp()+".csv",sourcesCsv());
-  else if(a==="backup")SEC.backupString().then(function(t){offer("ESCC_cloud_backup_ENCRYPTED_"+nameStamp()+".json",t,function(){lsSet(KEY_BK,String(Date.now()));});}).catch(function(e){toast(e.message);});
+  else if(a==="backup")SEC.backupString().then(function(t){offer(SEC.backupName(),t,function(){lsSet(KEY_BK,String(Date.now()));});}).catch(function(e){toast(e.message);});
   else if(a==="restore")SEC.restoreText();
 };});
 
@@ -1159,14 +1159,16 @@ function dialog(o){return new Promise(function(res){
    Each user's private key is wrapped with their own password (PBKDF2-SHA256, 600k); the investigator's is also
    wrapped with a one-time recovery code. Plaintext exists only in this page's memory while signed in.
    Server-side access control: firestore.rules (tested in the emulator). */
-var RN={admin:"主持人",manager:"主持人",abstractor:"登錄人員",physician:"醫師",auditor:"稽核員",pending:"待核准",disabled:"已停用"};
+var RN={user:"登錄人員",admin:"主持人",manager:"主持人",abstractor:"登錄人員",physician:"醫師",auditor:"稽核員",pending:"待核准",disabled:"已停用"};
 var SEC=(function(){
   var ITER=600000,IDLE_MS=15*60*1000,DEBOUNCE=3000;
+  /* this page's disease module; each study (research space) under /studies/{sid} belongs to one module */
+  var MODULE="escc",DEFAULT_SID="ESCC",DEFAULT_NAME="食道鱗狀細胞癌(ESCC)";
   var enc=new TextEncoder(),dec=new TextDecoder();
   var FBCFG={apiKey:"AIzaSyBxVKcQaI-_avwbACXrp6UjR7BfAZSZeYA",authDomain:"escc-115.firebaseapp.com",projectId:"escc-115",storageBucket:"escc-115.firebasestorage.app",messagingSenderId:"274287182090",appId:"1:274287182090:web:f701125d8cc183337dbaf3"};
   var EMU=/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&/[?&]emu=1/.test(location.search);
   var AUTH=null,FS=null,SESSION=null,PROFILE=null,PRIV=null,PUBK=null,PW=null;
-  var DEKS={},DOCS={},USERS={},GLOBAL=null,pendingW=0,conflicts={},saveT=null,lastAct=Date.now(),loading=false;
+  var DEKS={},DOCS={},USERS={},MEMBERS={},GLOBAL=null,pendingW=0,conflicts={},saveT=null,lastAct=Date.now(),loading=false;
   window.__errs=[];window.addEventListener("error",function(e){window.__errs.push(String(e.message));});
   window.addEventListener("unhandledrejection",function(e){window.__errs.push("rejection: "+String(e.reason&&e.reason.message||e.reason));});
   function b64(u){var s="";u=new Uint8Array(u);for(var i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s);}
@@ -1207,7 +1209,8 @@ var SEC=(function(){
     FS.enablePersistence({synchronizeTabs:true}).catch(function(e){console.warn("offline cache unavailable",e&&e.code);});
     AUTH.setPersistence(firebase.auth.Auth.Persistence.NONE);
   }
-  function col(n){return FS.collection(n);}
+  function col(n){if(n==="users"||n==="studies")return FS.collection(n);return FS.collection("studies").doc(SESSION.sid).collection(n);}
+  function fpOf(pub){return crypto.subtle.digest("SHA-256",enc.encode(pub||"")).then(function(h){return b64(h).slice(0,16);});}
   function secLog(act){if(!SESSION||SESSION.offline)return;col("seclog").add({uid:SESSION.uid,at:TS(),act:String(act).slice(0,200)}).catch(function(){});}
 
   /* ---------- patient bundles ---------- */
@@ -1218,7 +1221,7 @@ var SEC=(function(){
   function sortOrder(){DB.order.sort(function(a,b){var ya=+(DB.pre[a]||{}).dx_year||0,yb=+(DB.pre[b]||{}).dx_year||0;return ya-yb||(a<b?-1:1);});}
   function openDoc(d){var x=d.data(),w=x.keys&&x.keys[SESSION.uid];if(!w)return Promise.resolve(null);
     return rsaUnwrap(w).then(function(raw){return aesKey(raw).then(function(k){DEKS[d.id]={raw:raw,key:k};return aesDec(k,{iv:x.iv,ct:x.ct});});})
-      .then(function(u){var s=dec.decode(u);DOCS[d.id]={ver:x.ver,assignee:x.assignee||"",keys:x.keys,snap:null};return {id:d.id,b:JSON.parse(s),s:s};});}
+      .then(function(u){var s=dec.decode(u);DOCS[d.id]={ver:x.ver,assignee:x.assignee||"",keys:x.keys,kfp:x.kfp||{},snap:null};return {id:d.id,b:JSON.parse(s),s:s};});}
   function loadAll(progress){
     DB=emptyDB();DEKS={};DOCS={};conflicts={};
     var q=isAdmin()?col("patients"):col("patients").where("assignee","==",SESSION.uid);
@@ -1227,10 +1230,10 @@ var SEC=(function(){
         return openDoc(d).then(function(r){if(r)out.push(r);else miss++;},function(){miss++;});})).then(function(){done=Math.min(docs.length,i+50);if(progress)progress(done,docs.length);return next(i+50);});};
       return next(0).then(function(){out.forEach(function(r){absorb(r.id,r.b);DB.assign[r.id]=DOCS[r.id].assignee;});
         out.forEach(function(r){DOCS[r.id].snap=bundle(r.id);});sortOrder();return {n:out.length,miss:miss,fromCache:qs.metadata.fromCache};});})
-    .then(function(r){if(!isAdmin())return r;return Promise.all([col("users").get().then(function(us){USERS={};us.forEach(function(u){USERS[u.id]=u.data();});}),
+    .then(function(r){if(!isAdmin())return r;return Promise.all([refreshUsers(),
       col("meta").doc("backup").get().then(function(b){lastBackup=b.exists&&b.data().at&&b.data().at.toDate?b.data().at.toDate():null;}),
       col("meta").doc("global").get().then(function(g){if(!g.exists)return;var x=g.data();return rsaUnwrap(x.keys[SESSION.uid]).then(aesKey).then(function(k){GLOBAL={key:k,snap:null};return aesDec(k,x);})
-        .then(function(u){var o=JSON.parse(dec.decode(u));DB.audSample=o.audSample||[];GLOBAL.snap=JSON.stringify({audSample:DB.audSample});});})]).then(function(){return r;});});
+        .then(function(u){var o=JSON.parse(dec.decode(u));DB.audSample=o.audSample||[];GLOBAL.snap=JSON.stringify({audSample:DB.audSample});});})]).then(function(){return staleRegrant().then(function(n){r.regranted=n;return r;});});});
   }
 
   /* ---------- saving: only changed patients, debounced; writes queue offline and sync later ---------- */
@@ -1267,11 +1270,22 @@ var SEC=(function(){
     return Promise.all([wrap(kp.pkcs8,pw),rec?wrap(kp.pkcs8,normRec(rec)):null]).then(function(w){var doc={email:u.email,name:name,role:"pending",pub:kp.pub,priv:w[0],created:TS()};
       if(w[1])doc.recPriv=w[1];return col("users").doc(u.uid).set(doc).then(function(){return rec;});});});}
   function openKeys(p,pw){return unwrap(p.priv,pw).then(importPriv).then(function(k){PRIV=k;return true;},function(){return false;});}
-  function start(u,p){PROFILE=p;SESSION={uid:u.uid,email:u.email,name:p.name||u.email,role:p.role==="admin"?"manager":"abstractor",fbRole:p.role};
+  function myStudies(p){
+    if(p.role==="admin")return col("studies").get().then(function(qs){var L=[];qs.forEach(function(d){var x=d.data();if(x.module===MODULE)L.push({sid:d.id,name:x.name||d.id});});
+      if(L.length)return L;return col("studies").doc(DEFAULT_SID).set({name:DEFAULT_NAME,module:MODULE,created:TS()}).then(function(){return [{sid:DEFAULT_SID,name:DEFAULT_NAME}];});});
+    return Promise.all(Object.keys(p.studies||{}).map(function(sid){return col("studies").doc(sid).get().then(function(d){var x=d.exists?d.data():null;return x&&x.module===MODULE?{sid:sid,name:x.name||sid}:null;},function(){return null;});}))
+      .then(function(a){return a.filter(Boolean);});}
+  function start(u,p){PROFILE=p;
+    return myStudies(p).then(function(L){
+      if(!L.length){AUTH.signOut();$("#aSub").textContent="尚未加入研究";$("#aBody").innerHTML='<p class="adesc">你的帳號已核准，但還沒被加入這個癌別的研究，請聯絡主持人。</p><p><button class="btn" type="button" id="aBack">回到登入畫面</button></p>';$("#aBack").onclick=showLogin;return;}
+      if(L.length===1)return enter(u,p,L[0]);
+      $("#aSub").textContent="選擇研究";$("#aBody").innerHTML=L.map(function(x,i){return '<p><button class="btn go" type="button" data-st="'+i+'">'+esc(x.name)+'</button></p>';}).join("");
+      $$("[data-st]",$("#aBody")).forEach(function(b){b.onclick=function(){enter(u,p,L[+b.dataset.st]);};});});}
+  function enter(u,p,st){SESSION={uid:u.uid,email:u.email,name:p.name||u.email,role:p.role==="admin"?"manager":"abstractor",fbRole:p.role,sid:st.sid,studyName:st.name};
     lastAct=Date.now();loading=true;$("#aSub").textContent="解密資料中…";$("#aBody").innerHTML='<p class="adesc" id="aProg"></p>';
     return loadAll(function(d,n){var e=$("#aProg");if(e)e.textContent=d+" / "+n;}).then(function(r){loading=false;secLog("登入");applySession();
-      if(r.miss)toast(r.miss+" 位病人尚未授權給你的金鑰，請通知主持人");if(r.fromCache)toast("目前離線：顯示的是這台電腦上次同步的資料");});}
-  function wipe(){DB=emptyDB();DEKS={};DOCS={};USERS={};GLOBAL=null;PRIV=null;PW=null;SESSION=null;PROFILE=null;cur=null;STATE={};
+      if(r.miss)toast(r.miss+" 位病人尚未授權給你的金鑰，請通知主持人");if(r.regranted)toast("已自動把 "+r.regranted+" 位病人重新授權給更新過金鑰的助理");if(r.fromCache)toast("目前離線：顯示的是這台電腦上次同步的資料");});}
+  function wipe(){DB=emptyDB();DEKS={};DOCS={};USERS={};MEMBERS={};GLOBAL=null;PRIV=null;PW=null;SESSION=null;PROFILE=null;cur=null;STATE={};
     $("#who").value="";$("#main").innerHTML="";$("#dock").hidden=true;$("#list").innerHTML="";var bb=$("#bkbar");if(bb)bb.hidden=true;showAuth();}
   function lock(reason){if(!SESSION){showAuth();return Promise.resolve();}
     if(SESSION.offline){wipe();return Promise.resolve();}
@@ -1287,16 +1301,23 @@ var SEC=(function(){
   function recoverPI(u,p,code,pw){return unwrap(p.recPriv,normRec(code)).then(function(raw){return wrap(raw,pw);},function(){throw new Error("復原碼不正確");})
     .then(function(w){return col("users").doc(u.uid).update({priv:w}).then(function(){p.priv=w;return p;});});}
   /* admin: approve / disable; approving re-grants the user's assigned patients to their (possibly new) key */
+  /* global account role (user/disabled) + membership in the current study; approving also re-grants this study's assigned patients */
   function setRole(uid,role,name){if(!isAdmin())return Promise.reject(new Error("只有主持人可以核准"));
-    var upd={role:role,approvedAt:TS(),approvedBy:SESSION.uid};if(name)upd.name=name;
-    return col("users").doc(uid).update(upd).then(refreshUsers).then(function(){secLog((role==="abstractor"?"核准 ":"設定 "+role+" ")+USERS[uid].email);
-      if(role==="abstractor")return regrant(uid);});}
+    var sid=SESSION.sid,upd={approvedAt:TS(),approvedBy:SESSION.uid},join=role==="abstractor";upd.role=join||role==="user"?"user":role;if(name)upd.name=name;
+    if(join)upd["studies."+sid]=true;
+    return col("users").doc(uid).update(upd).then(function(){if(join)return col("members").doc(uid).set({role:"abstractor",name:name||USERS[uid].name||"",at:TS()});})
+      .then(refreshUsers).then(function(){secLog((join?"核准並加入本研究 ":"設定帳號 "+upd.role+" ")+USERS[uid].email);if(join)return regrant(uid);});}
+  function leaveStudy(uid){if(!isAdmin())return Promise.reject(new Error("只有主持人可以設定"));
+    return col("members").doc(uid).set({role:"disabled",at:TS()},{merge:true}).then(refreshUsers).then(function(){secLog("移出本研究 "+USERS[uid].email);});}
+  function staleRegrant(){var jobs=[];DB.order.forEach(function(id){var d=DOCS[id],u=d&&d.assignee;if(!u||!USERS[u]||!d.kfp||!d.kfp[u])return;
+      jobs.push(fpOf(USERS[u].pub).then(function(f){if(f!==d.kfp[u]&&USERS[u].role==="user"&&MEMBERS[u]&&MEMBERS[u].role==="abstractor")return setAssignee(id,u).then(function(){return 1;});return 0;}));});
+    return Promise.all(jobs).then(function(a){return a.reduce(function(x,y){return x+y;},0);});}
   function regrant(uid){var ids=DB.order.filter(function(id){return DB.assign[id]===uid;});return Promise.all(ids.map(function(id){return setAssignee(id,uid);}));}
-  function setAssignee(id,uid){var d=DOCS[id];if(!d)return Promise.resolve();var keys={};keys[SESSION.uid]=d.keys[SESSION.uid];
-    var p=uid?rsaWrap(USERS[uid].pub,DEKS[id].raw).then(function(w){keys[uid]=w;}):Promise.resolve();
-    return p.then(function(){d.ver+=1;d.keys=keys;d.assignee=uid||"";DB.assign[id]=uid||"";track(col("patients").doc(id).update({assignee:uid||"",keys:keys,ver:d.ver,updatedAt:TS(),updatedBy:SESSION.uid}),id);});}
-  function refreshUsers(){return col("users").get().then(function(us){USERS={};us.forEach(function(u){USERS[u.id]=u.data();});});}
-  function abstractors(){return Object.keys(USERS).filter(function(k){return USERS[k].role==="abstractor";});}
+  function setAssignee(id,uid){var d=DOCS[id];if(!d)return Promise.resolve();var keys={},kfp={};keys[SESSION.uid]=d.keys[SESSION.uid];
+    var p=uid?Promise.all([rsaWrap(USERS[uid].pub,DEKS[id].raw),fpOf(USERS[uid].pub)]).then(function(x){keys[uid]=x[0];kfp[uid]=x[1];}):Promise.resolve();
+    return p.then(function(){d.ver+=1;d.keys=keys;d.kfp=kfp;d.assignee=uid||"";DB.assign[id]=uid||"";track(col("patients").doc(id).update({assignee:uid||"",keys:keys,kfp:kfp,ver:d.ver,updatedAt:TS(),updatedBy:SESSION.uid}),id);});}
+  function refreshUsers(){return Promise.all([col("users").get(),col("members").get()]).then(function(r){USERS={};r[0].forEach(function(u){USERS[u.id]=u.data();});MEMBERS={};r[1].forEach(function(m){MEMBERS[m.id]=m.data();});});}
+  function abstractors(){return Object.keys(MEMBERS).filter(function(k){return MEMBERS[k].role==="abstractor"&&USERS[k]&&USERS[k].role==="user";});}
   function uname(uid){var u=USERS[uid];return u?(u.name||u.email):uid;}
   function assignEven(uids){if(!isAdmin())throw new Error("只有主持人可以分派");if(!uids.length)throw new Error("請勾選登錄人員");
     var un=DB.order.filter(function(id){return !DB.assign[id];});
@@ -1319,7 +1340,7 @@ var SEC=(function(){
       var pts={};r[0].forEach(function(d){pts[d.id]=d.data();});var us={};r[1].forEach(function(d){var x=d.data();us[d.id]={email:x.email,name:x.name,role:x.role,pub:x.pub};
         if(d.id===SESSION.uid){us[d.id].priv=x.priv;if(x.recPriv)us[d.id].recPriv=x.recPriv;}});
       var mt={};r[2].forEach(function(d){mt[d.id]=d.data();});
-      var b={kind:"escc-cloud-backup",v:2,at:stamp(),by:SESSION.email,pi:SESSION.uid,n:Object.keys(pts).length,
+      var b={kind:"escc-cloud-backup",v:2,at:stamp(),by:SESSION.email,pi:SESSION.uid,study:SESSION.sid,studyName:SESSION.studyName,module:MODULE,n:Object.keys(pts).length,
         note:"病人資料為密文。解密需要：這個檔＋主持人的登入密碼(或復原碼)。",patients:pts,users:us,meta:mt};
       var ids=Object.keys(pts).filter(function(id){return pts[id].keys&&pts[id].keys[SESSION.uid];});
       if(!ids.length)return b;var x=pts[ids[0]];
@@ -1333,7 +1354,8 @@ var SEC=(function(){
     var days=lastBackup?Math.floor((Date.now()-lastBackup.getTime())/86400000):null;
     if(days!==null&&days<BACKUP_DAYS){bb.hidden=true;return;}
     $("#bkmsg").textContent=days===null?"雲端資料還沒有任何加密備份。":"已經 "+days+" 天沒有下載加密備份(建議每 "+BACKUP_DAYS+" 天一次)。";bb.hidden=false;}
-  function doBackup(){return backupString().then(function(t){offer("ESCC_cloud_backup_ENCRYPTED_"+nameStamp()+".json",t);
+  function backupName(){return (SESSION&&SESSION.sid||DEFAULT_SID)+"_cloud_backup_ENCRYPTED_"+nameStamp()+".json";}
+  function doBackup(){return backupString().then(function(t){offer(backupName(),t);
     toast("請把備份檔存到 J:\\escc_cmuh\\cloud_backups\\(NAS),不要只留在下載資料夾");}).catch(function(e){toast(cErr(e));});}
   /* open an encrypted backup file without Firebase (read-only): password or recovery code -> investigator key -> every patient */
   function openBackupText(text,pw,code){
@@ -1341,7 +1363,7 @@ var SEC=(function(){
     if(!B||B.kind!=="escc-cloud-backup"||!B.pi||!B.users||!B.users[B.pi]||!B.users[B.pi].priv)return Promise.reject(new Error("不是可離線解開的雲端備份檔(需 2026-09-29 之後的版本)"));
     var me=B.users[B.pi],w=code?me.recPriv:me.priv;if(!w)return Promise.reject(new Error("這份備份沒有復原碼包裝的金鑰"));
     return unwrap(w,code?normRec(code):pw).then(importPriv,function(){throw new Error(code?"復原碼不正確":"密碼不正確");}).then(function(k){
-      PRIV=k;SESSION={uid:B.pi,email:B.by||"",name:"主持人(離線備份 "+(B.at||"")+")",role:"manager",fbRole:"admin",offline:true};PROFILE={role:"admin",pub:me.pub};
+      PRIV=k;SESSION={uid:B.pi,email:B.by||"",name:"主持人(離線備份 "+(B.at||"")+")",role:"manager",fbRole:"admin",offline:true,sid:B.study||DEFAULT_SID,studyName:B.studyName||B.study||DEFAULT_NAME};PROFILE={role:"admin",pub:me.pub};
       DB=emptyDB();DEKS={};DOCS={};USERS={};Object.keys(B.users).forEach(function(u){USERS[u]=B.users[u];});
       var ids=Object.keys(B.patients||{}),miss=0;
       return Promise.all(ids.map(function(id){var x=B.patients[id];return openDoc({id:id,data:function(){return x;}}).then(function(r){if(r){absorb(r.id,r.b);DB.assign[r.id]=x.assignee||"";}else miss++;},function(){miss++;});}))
@@ -1364,7 +1386,7 @@ var SEC=(function(){
   function applySession(){
     var r=SESSION.role,ui=r==="manager"?"abstractor":r;
     $("#who").value=SESSION.name;$("#role").value=ui;document.body.dataset.role=ui;
-    $("#chip").innerHTML="<b>"+esc(SESSION.name)+"</b>・"+RN[SESSION.fbRole];$("#bUsers").hidden=r!=="manager";$("#bAssign").hidden=r!=="manager";
+    $("#chip").innerHTML="<b>"+esc(SESSION.name)+"</b>・"+RN[SESSION.fbRole]+"・"+esc(SESSION.studyName||"");$("#bUsers").hidden=r!=="manager";$("#bAssign").hidden=r!=="manager";
     $$("#menu .dd button").forEach(function(b){b.hidden=!can(b.dataset.act);});$$("#menu .dd hr").forEach(function(h){h.hidden=r!=="manager";});
     $("#bUsers").hidden=$("#bUsers").hidden||!!SESSION.offline;$("#bAssign").hidden=$("#bAssign").hidden||!!SESSION.offline;$("#bPw").hidden=!!SESSION.offline;$("#bLock").textContent=SESSION.offline?"關閉備份":"登出";
     if(SESSION.offline)$$("#menu .dd button").forEach(function(b){if(["load","chemoin","backup","restore","qin","sample"].indexOf(b.dataset.act)>=0)b.hidden=true;});
@@ -1433,18 +1455,24 @@ var SEC=(function(){
   function renderUsers(){cur=null;$("#dock").hidden=true;$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取帳號中…</p></section>';
     return refreshUsers().then(drawUsers,function(e){toast(cErr(e));});}
   function drawUsers(){
-    var m=$("#main");
-    var rows=Object.keys(USERS).sort(function(a,b){return (USERS[a].role==="pending"?0:1)-(USERS[b].role==="pending"?0:1);}).map(function(uid){var u=USERS[uid],me=uid===SESSION.uid;
-      var n=DB.order.filter(function(id){return DB.assign[id]===uid;}).length;
-      return '<tr><td>'+esc(u.name||"")+'<br><span class="desc">'+esc(u.email||"")+'</span></td><td>'+esc(RN[u.role]||u.role)+'</td><td>'+(u.role==="abstractor"?n:"")+'</td><td>'+(me?'(你)':
-        (u.role==="pending"?'<button class="btn go" type="button" data-ok="'+uid+'">核准為登錄人員</button> ':'')+
-        (u.role==="disabled"?'<button class="btn" type="button" data-ok="'+uid+'">恢復</button>':(u.role!=="admin"?'<button class="btn warn" type="button" data-off="'+uid+'">停用</button>':'')))+'</td></tr>';}).join("");
-    m.innerHTML='<section class="sheet report"><h3>帳號管理</h3><p class="desc">新帳號請先在 Firebase 主控台 → Authentication 建立(電子郵件＋初始密碼),告訴對方後，對方第一次登入會出現在這裡等你核准。停用的帳號立即讀不到任何病人。</p>'+
-      '<div class="tw"><table><thead><tr><th>帳號</th><th>身分</th><th>分派人數</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
-      '<h3>安全紀錄(最近 50 筆)</h3><div class="tw" id="seclog"><p class="desc">讀取中…</p></div></section>';
-    $$("[data-ok]",m).forEach(function(b){b.onclick=function(){var uid=b.dataset.ok;dialog({title:"核准 "+(USERS[uid].email||""),fields:[{k:"n",label:"顯示名稱",value:USERS[uid].name||"",req:1}],ok:"核准"})
-      .then(function(v){if(!v)return;setRole(uid,"abstractor",v.n).then(function(){toast("已核准");renderUsers();}).catch(function(e){toast(cErr(e));});});};});
-    $$("[data-off]",m).forEach(function(b){b.onclick=function(){var uid=b.dataset.off;ask("停用 "+(USERS[uid].email||"")+"？停用後對方立即讀不到任何病人；分派紀錄保留，可再恢復。").then(function(ok){if(!ok)return;
+    var m=$("#main"),sn=esc(SESSION.studyName||SESSION.sid);
+    var rank=function(uid){var u=USERS[uid];return u.role==="pending"||u.role==="abstractor"?0:u.role==="admin"?3:1;};
+    var rows=Object.keys(USERS).sort(function(a,b){return rank(a)-rank(b);}).map(function(uid){var u=USERS[uid],me=uid===SESSION.uid,mb=MEMBERS[uid],inS=mb&&mb.role==="abstractor";
+      var n=DB.order.filter(function(id){return DB.assign[id]===uid;}).length,act="";
+      if(me)act="(你)";
+      else if(u.role==="pending"||u.role==="abstractor")act='<button class="btn go" type="button" data-ok="'+uid+'">核准並加入本研究</button>';  /* "abstractor" = approved under v1 rules */
+      else if(u.role==="disabled")act='<button class="btn" type="button" data-on="'+uid+'">恢復帳號</button>';
+      else if(u.role==="user")act=(inS?'<button class="btn" type="button" data-leave="'+uid+'">移出本研究</button> ':'<button class="btn go" type="button" data-ok="'+uid+'">加入本研究</button> ')+'<button class="btn warn" type="button" data-off="'+uid+'">停用帳號</button>';
+      return '<tr><td>'+esc(u.name||"")+'<br><span class="desc">'+esc(u.email||"")+'</span></td><td>'+esc(RN[u.role]||u.role)+'</td><td>'+(u.role==="admin"?"全部":inS?"✓":"—")+'</td><td>'+(inS||n?n:"")+'</td><td>'+act+'</td></tr>';}).join("");
+    m.innerHTML='<section class="sheet report"><h3>帳號管理・'+sn+'</h3><p class="desc">新帳號請先在 Firebase 主控台 → Authentication 建立(電子郵件＋初始密碼)。對方第一次登入後會出現在這裡，按「核准並加入本研究」。同一個帳號可以加入多個研究；「移出本研究」只影響這個研究，「停用帳號」會讓他在所有研究都讀不到任何病人。</p>'+
+      '<div class="tw"><table><thead><tr><th>帳號</th><th>帳號狀態</th><th>本研究成員</th><th>分派人數</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      '<h3>安全紀錄(本研究最近 50 筆)</h3><div class="tw" id="seclog"><p class="desc">讀取中…</p></div></section>';
+    $$("[data-ok]",m).forEach(function(b){b.onclick=function(){var uid=b.dataset.ok;dialog({title:"加入「"+(SESSION.studyName||SESSION.sid)+"」:"+(USERS[uid].email||""),fields:[{k:"n",label:"顯示名稱",value:USERS[uid].name||"",req:1}],ok:"加入"})
+      .then(function(v){if(!v)return;setRole(uid,"abstractor",v.n).then(function(){toast("已加入本研究");renderUsers();}).catch(function(e){toast(cErr(e));});});};});
+    $$("[data-leave]",m).forEach(function(b){b.onclick=function(){var uid=b.dataset.leave;ask("把 "+(USERS[uid].email||"")+" 移出本研究？他在本研究的病人立即讀不到；分派紀錄保留，可以再加入。").then(function(ok){if(!ok)return;
+      leaveStudy(uid).then(function(){toast("已移出本研究");renderUsers();}).catch(function(e){toast(cErr(e));});});};});
+    $$("[data-on]",m).forEach(function(b){b.onclick=function(){setRole(b.dataset.on,"user").then(function(){toast("已恢復");renderUsers();}).catch(function(e){toast(cErr(e));});};});
+    $$("[data-off]",m).forEach(function(b){b.onclick=function(){var uid=b.dataset.off;ask("停用 "+(USERS[uid].email||"")+" 的帳號？停用後他在所有研究都立即讀不到任何病人；分派紀錄保留，可再恢復。").then(function(ok){if(!ok)return;
       setRole(uid,"disabled").then(function(){toast("已停用");renderUsers();}).catch(function(e){toast(cErr(e));});});};});
     col("seclog").orderBy("at","desc").limit(50).get().then(function(qs){var h=[];qs.forEach(function(d){var x=d.data(),t=x.at&&x.at.toDate?x.at.toDate():null;
       h.push('<tr><td>'+(t?esc(t.toLocaleString("zh-TW")):"")+'</td><td>'+esc(uname(x.uid))+'</td><td>'+esc(x.act)+'</td></tr>');});
@@ -1487,7 +1515,7 @@ var SEC=(function(){
       .then(function(v){if(!v)return;if(v.n!==v.n2){toast("兩次新密碼不同");return;}changeOwn(v.o,v.n).then(function(){toast("密碼已變更");}).catch(function(e){toast(cErr(e));});});};
     showAuth();return Promise.resolve();
   }
-  return {session:function(){return SESSION;},init:init,can:can,backupString:backupString,restoreText:restoreText,secLog:secLog,persist:persist,flush:flush,uname:uname};
+  return {backupName:backupName,session:function(){return SESSION;},init:init,can:can,backupString:backupString,restoreText:restoreText,secLog:secLog,persist:persist,flush:flush,uname:uname};
 })();
 
 /* ---------- 化療明細表匯入 + 治療線草稿 + 影子模式(2026-09-28,phase 3) ----------
