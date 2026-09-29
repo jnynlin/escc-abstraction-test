@@ -1233,7 +1233,7 @@ var SEC=(function(){
     .then(function(r){if(!isAdmin())return r;return Promise.all([refreshUsers(),
       col("meta").doc("backup").get().then(function(b){lastBackup=b.exists&&b.data().at&&b.data().at.toDate?b.data().at.toDate():null;}),
       col("meta").doc("global").get().then(function(g){if(!g.exists)return;var x=g.data();return rsaUnwrap(x.keys[SESSION.uid]).then(aesKey).then(function(k){GLOBAL={key:k,snap:null};return aesDec(k,x);})
-        .then(function(u){var o=JSON.parse(dec.decode(u));DB.audSample=o.audSample||[];GLOBAL.snap=JSON.stringify({audSample:DB.audSample});});})]).then(function(){return staleRegrant().then(function(n){r.regranted=n;return r;});});});
+        .then(function(u){var o=JSON.parse(dec.decode(u));DB.audSample=o.audSample||[];GLOBAL.snap=JSON.stringify({audSample:DB.audSample});});}).catch(function(){GLOBAL=null;r.globalFail=true;})]).then(function(){return staleRegrant().then(function(n){r.regranted=n;return r;});});});
   }
 
   /* ---------- saving: only changed patients, debounced; writes queue offline and sync later ---------- */
@@ -1283,8 +1283,10 @@ var SEC=(function(){
       $$("[data-st]",$("#aBody")).forEach(function(b){b.onclick=function(){enter(u,p,L[+b.dataset.st]);};});});}
   function enter(u,p,st){SESSION={uid:u.uid,email:u.email,name:p.name||u.email,role:p.role==="admin"?"manager":"abstractor",fbRole:p.role,sid:st.sid,studyName:st.name};
     lastAct=Date.now();loading=true;$("#aSub").textContent="解密資料中…";$("#aBody").innerHTML='<p class="adesc" id="aProg"></p>';
-    return loadAll(function(d,n){var e=$("#aProg");if(e)e.textContent=d+" / "+n;}).then(function(r){loading=false;secLog("登入");applySession();
-      if(r.miss)toast(r.miss+" 位病人尚未授權給你的金鑰，請通知主持人");if(r.regranted)toast("已自動把 "+r.regranted+" 位病人重新授權給更新過金鑰的助理");if(r.fromCache)toast("目前離線：顯示的是這台電腦上次同步的資料");});}
+    return loadAll(function(d,n){var e=$("#aProg");if(e)e.textContent=d+" / "+n;}).catch(function(e){loading=false;SESSION=null;
+      $("#aSub").textContent="讀取資料失敗";$("#aBody").innerHTML='<p class="adesc">'+esc(cErr(e))+'</p><p><button class="btn" type="button" id="aBack">回到登入畫面</button></p>';
+      $("#aBack").onclick=function(){AUTH.signOut().then(showLogin);};throw e;}).then(function(r){loading=false;secLog("登入");applySession();
+      if(r.miss)toast(isAdmin()?r.miss+" 位病人無法用你目前的金鑰解開(可能曾經重建金鑰)。這些是用舊金鑰加密的資料，請聯絡系統維護者":r.miss+" 位病人尚未授權給你的金鑰，請通知主持人");if(r.regranted)toast("已自動把 "+r.regranted+" 位病人重新授權給更新過金鑰的助理");if(r.fromCache)toast("目前離線：顯示的是這台電腦上次同步的資料");});}
   function wipe(){DB=emptyDB();DEKS={};DOCS={};USERS={};MEMBERS={};GLOBAL=null;PRIV=null;PW=null;SESSION=null;PROFILE=null;cur=null;STATE={};
     $("#who").value="";$("#main").innerHTML="";$("#dock").hidden=true;$("#list").innerHTML="";var bb=$("#bkbar");if(bb)bb.hidden=true;showAuth();}
   function lock(reason){if(!SESSION){showAuth();return Promise.resolve();}
