@@ -1231,7 +1231,7 @@ var SEC=(function(){
 
   /* ---------- saving: only changed patients, debounced; writes queue offline and sync later ---------- */
   function track(p,id){pendingW++;syncChip();p.then(function(){pendingW--;syncChip();},function(e){pendingW--;
-    if(id){conflicts[id]=1;toast("「"+id+"」沒有存到雲端："+(e&&e.code==="permission-denied"?"資料已在別處更新或已改派，請重新整理後再編輯":cErr(e)));}
+    if(id){conflicts[id]=1;toast("「"+id+"」沒有存到雲端："+(e&&e.code==="permission-denied"?"資料已在別處更新或已改派，請先登出再重新登入後編輯":cErr(e)));}
     else toast("雲端寫入失敗："+cErr(e));syncChip();});}
   function writePatient(id,s){
     var d=DOCS[id],isNew=!d,ref=col("patients").doc(id);if(conflicts[id])return Promise.resolve();
@@ -1284,12 +1284,13 @@ var SEC=(function(){
   /* admin: approve / disable; approving re-grants the user's assigned patients to their (possibly new) key */
   function setRole(uid,role,name){if(!isAdmin())return Promise.reject(new Error("只有主持人可以核准"));
     var upd={role:role,approvedAt:TS(),approvedBy:SESSION.uid};if(name)upd.name=name;
-    return col("users").doc(uid).update(upd).then(function(){USERS[uid].role=role;if(name)USERS[uid].name=name;secLog((role==="abstractor"?"核准 ":"設定 "+role+" ")+USERS[uid].email);
+    return col("users").doc(uid).update(upd).then(refreshUsers).then(function(){secLog((role==="abstractor"?"核准 ":"設定 "+role+" ")+USERS[uid].email);
       if(role==="abstractor")return regrant(uid);});}
   function regrant(uid){var ids=DB.order.filter(function(id){return DB.assign[id]===uid;});return Promise.all(ids.map(function(id){return setAssignee(id,uid);}));}
   function setAssignee(id,uid){var d=DOCS[id];if(!d)return Promise.resolve();var keys={};keys[SESSION.uid]=d.keys[SESSION.uid];
     var p=uid?rsaWrap(USERS[uid].pub,DEKS[id].raw).then(function(w){keys[uid]=w;}):Promise.resolve();
     return p.then(function(){d.ver+=1;d.keys=keys;d.assignee=uid||"";DB.assign[id]=uid||"";track(col("patients").doc(id).update({assignee:uid||"",keys:keys,ver:d.ver,updatedAt:TS(),updatedBy:SESSION.uid}),id);});}
+  function refreshUsers(){return col("users").get().then(function(us){USERS={};us.forEach(function(u){USERS[u.id]=u.data();});});}
   function abstractors(){return Object.keys(USERS).filter(function(k){return USERS[k].role==="abstractor";});}
   function uname(uid){var u=USERS[uid];return u?(u.name||u.email):uid;}
   function assignEven(uids){if(!isAdmin())throw new Error("只有主持人可以分派");if(!uids.length)throw new Error("請勾選登錄人員");
@@ -1381,8 +1382,10 @@ var SEC=(function(){
       recoverPI(u,p,val(f,"c"),pw).then(function(p2){return openKeys(p2,pw).then(function(){secLog("以復原碼救回主持人金鑰");return start(u,p2);});}).catch(function(e){busy(f,false,"救回並登入");err(cErr(e));});});
     $("#aBack").onclick=function(){AUTH.signOut().then(showLogin);};
   }
-  function renderUsers(){
-    cur=null;$("#dock").hidden=true;var m=$("#main");
+  function renderUsers(){cur=null;$("#dock").hidden=true;$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取帳號中…</p></section>';
+    return refreshUsers().then(drawUsers,function(e){toast(cErr(e));});}
+  function drawUsers(){
+    var m=$("#main");
     var rows=Object.keys(USERS).sort(function(a,b){return (USERS[a].role==="pending"?0:1)-(USERS[b].role==="pending"?0:1);}).map(function(uid){var u=USERS[uid],me=uid===SESSION.uid;
       var n=DB.order.filter(function(id){return DB.assign[id]===uid;}).length;
       return '<tr><td>'+esc(u.name||"")+'<br><span class="desc">'+esc(u.email||"")+'</span></td><td>'+esc(RN[u.role]||u.role)+'</td><td>'+(u.role==="abstractor"?n:"")+'</td><td>'+(me?'(你)':
@@ -1399,8 +1402,10 @@ var SEC=(function(){
       h.push('<tr><td>'+(t?esc(t.toLocaleString("zh-TW")):"")+'</td><td>'+esc(uname(x.uid))+'</td><td>'+esc(x.act)+'</td></tr>');});
       var e=$("#seclog");if(e)e.innerHTML=h.length?'<table><thead><tr><th>時間</th><th>帳號</th><th>事件</th></tr></thead><tbody>'+h.join("")+'</tbody></table>':'<p class="desc">無</p>';},function(e){var x=$("#seclog");if(x)x.innerHTML='<p class="desc">'+esc(cErr(e))+'</p>';});
   }
-  function renderAssign(){
-    if(!isAdmin())return;cur=null;$("#dock").hidden=true;var m=$("#main"),abs=abstractors(),cnt={};
+  function renderAssign(){if(!isAdmin())return;cur=null;$("#dock").hidden=true;
+    return refreshUsers().then(drawAssign,function(e){toast(cErr(e));});}
+  function drawAssign(){
+    var m=$("#main"),abs=abstractors(),cnt={};
     DB.order.forEach(function(id){var a=DB.assign[id]||"";cnt[a]=(cnt[a]||0)+1;});
     m.innerHTML='<section class="sheet report"><h3>分派病人</h3><p class="desc">共 '+DB.order.length+' 位，尚未分派 '+(cnt[""]||0)+' 位。登錄人員只看得到、也只解得開分派給自己的病人。</p>'+
       (abs.length?'<div class="tw"><table><thead><tr><th>登錄人員</th><th>已分派</th></tr></thead><tbody>'+abs.map(function(u){return '<tr><td><label class="ck"><input type="checkbox" data-an="'+u+'"> '+esc(uname(u))+'</label></td><td>'+(cnt[u]||0)+'</td></tr>';}).join("")+'</tbody></table></div>'+
