@@ -1307,11 +1307,21 @@ var SEC=(function(){
     if(!p||p.kind!=="escc-prefill-package"||!p.salt||!p.ct)return Promise.reject(new Error("不是本工作台的加密分包"));
     return kek(pw,ub64(p.salt),p.iter||ITER).then(function(k){return aesDec(k,{iv:p.iv,ct:p.ct});}).then(function(u){return dec.decode(u);},function(){throw new Error("分包密碼錯誤");})
       .then(function(csv){loadCsv(csv);secLog("匯入加密分包（"+(p.created||"")+"）");return flush();});}
+  /* encrypted full backup: patient ciphertext + wrapped patient keys + the investigator's password- and recovery-wrapped private key,
+     so the file alone (plus the password or recovery code) can be decrypted even if Firebase is gone. Self-checked before download. */
   function backupString(){if(!isAdmin())return Promise.reject(new Error("只有主持人可以備份"));
     return flush().then(function(){return Promise.all([col("patients").get(),col("users").get(),col("meta").get()]);}).then(function(r){
-      var pts={};r[0].forEach(function(d){pts[d.id]=d.data();});var us={};r[1].forEach(function(d){var x=d.data();us[d.id]={email:x.email,name:x.name,role:x.role,pub:x.pub};});
-      var mt={};r[2].forEach(function(d){mt[d.id]=d.data();});secLog("下載加密備份");
-      return JSON.stringify({kind:"escc-cloud-backup",v:1,at:stamp(),by:SESSION.email,note:"病人資料為密文，只有主持人的金鑰能解開",patients:pts,users:us,meta:mt});});}
+      var pts={};r[0].forEach(function(d){pts[d.id]=d.data();});var us={};r[1].forEach(function(d){var x=d.data();us[d.id]={email:x.email,name:x.name,role:x.role,pub:x.pub};
+        if(d.id===SESSION.uid){us[d.id].priv=x.priv;if(x.recPriv)us[d.id].recPriv=x.recPriv;}});
+      var mt={};r[2].forEach(function(d){mt[d.id]=d.data();});
+      var b={kind:"escc-cloud-backup",v:2,at:stamp(),by:SESSION.email,pi:SESSION.uid,n:Object.keys(pts).length,
+        note:"病人資料為密文。解密需要：這個檔＋主持人的登入密碼(或復原碼)。",patients:pts,users:us,meta:mt};
+      var ids=Object.keys(pts).filter(function(id){return pts[id].keys&&pts[id].keys[SESSION.uid];});
+      if(!ids.length)return b;var x=pts[ids[0]];
+      return unwrap(us[SESSION.uid].priv,PW).then(importPriv).then(function(k){return crypto.subtle.decrypt({name:"RSA-OAEP"},k,ub64(x.keys[SESSION.uid]));})
+        .then(function(raw){return aesKey(new Uint8Array(raw));}).then(function(k){return aesDec(k,x);}).then(function(){b.selfcheck="ok";return b;},
+          function(){throw new Error("備份自我檢查失敗，請勿依賴這份備份，並通知維護者");});})
+    .then(function(b){secLog("下載加密備份("+b.n+" 位)");return JSON.stringify(b);});}
   function restoreText(){toast("雲端版不在網頁上還原；需要還原時請聯絡系統維護者");return Promise.resolve(false);}
   var PERM={load:["manager"],qout:["manager"],qin:["manager"],sample:["manager"],report:["manager"],redcap:["manager"],redcapx:["manager"],srcs:["manager"],
             chemoin:["manager","abstractor"],shadow:["manager"],backup:["manager"],restore:[]};
