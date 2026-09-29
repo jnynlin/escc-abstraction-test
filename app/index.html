@@ -211,6 +211,7 @@ input[type=file]{display:none;}
 body[data-role="physician"] .bar{border-bottom:3px solid var(--done);}
 body[data-role="auditor"] .bar{border-bottom:3px solid var(--iodine);}
 .chip{font-size:.84rem;color:var(--soft);} .chip b{color:var(--ink);font-weight:600;}
+.bkbar{position:sticky;top:0;z-index:40;background:#FBF1DE;color:#6d4205;border-bottom:1px solid #E8CC95;padding:8px 16px;font-size:.9rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;} .bkbar[hidden]{display:none!important;} .bkhint{font-size:.8rem;opacity:.85;}
 .sync{font-size:.8rem;color:var(--ok,#1E7355);white-space:nowrap;} .sync.busy{color:var(--soft);} .sync.off{color:var(--warn,#A0660F);} .sync.bad{color:var(--err);font-weight:600;}
 #auth{position:fixed;inset:0;z-index:90;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto;}
 #auth[hidden]{display:none!important;}
@@ -228,6 +229,7 @@ body[data-role="auditor"] .bar{border-bottom:3px solid var(--iodine);}
 </head>
 <body>
 <div style="background:#F7EAD2;color:#7a4b06;padding:6px 16px;font-size:.85rem;text-align:center">測試版：只能輸入假資料，請勿輸入真實病人資料</div>
+<div id="bkbar" class="bkbar" hidden><span id="bkmsg"></span> <button class="btn go" type="button" id="bkgo">立即下載加密備份</button> <span class="bkhint">存到 J:\escc_cmuh\cloud_backups\</span></div>
 <div class="bar">
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
@@ -1198,14 +1200,15 @@ var SEC=(function(){
     "permission-denied":"沒有權限","unavailable":"目前離線"}[c]||(e&&e.message)||String(e);}
 
   /* ---------- Firebase ---------- */
+  function fbOK(){return typeof firebase!=="undefined";}
   function fb(){
-    if(FS)return;firebase.initializeApp(EMU?Object.assign({},FBCFG,{projectId:"demo-escc"}):FBCFG);AUTH=firebase.auth();FS=firebase.firestore();
+    if(FS||!fbOK())return;firebase.initializeApp(EMU?Object.assign({},FBCFG,{projectId:"demo-escc"}):FBCFG);AUTH=firebase.auth();FS=firebase.firestore();
     if(EMU){AUTH.useEmulator("http://"+location.hostname+":9199");FS.useEmulator(location.hostname,8181);}
     FS.enablePersistence({synchronizeTabs:true}).catch(function(e){console.warn("offline cache unavailable",e&&e.code);});
     AUTH.setPersistence(firebase.auth.Auth.Persistence.NONE);
   }
   function col(n){return FS.collection(n);}
-  function secLog(act){if(!SESSION)return;col("seclog").add({uid:SESSION.uid,at:TS(),act:String(act).slice(0,200)}).catch(function(){});}
+  function secLog(act){if(!SESSION||SESSION.offline)return;col("seclog").add({uid:SESSION.uid,at:TS(),act:String(act).slice(0,200)}).catch(function(){});}
 
   /* ---------- patient bundles ---------- */
   function bundle(id){return JSON.stringify({pre:DB.pre[id]||null,rec:DB.rec[id]||null,q:DB.q.filter(function(q){return q.sid===id;}),
@@ -1225,6 +1228,7 @@ var SEC=(function(){
       return next(0).then(function(){out.forEach(function(r){absorb(r.id,r.b);DB.assign[r.id]=DOCS[r.id].assignee;});
         out.forEach(function(r){DOCS[r.id].snap=bundle(r.id);});sortOrder();return {n:out.length,miss:miss,fromCache:qs.metadata.fromCache};});})
     .then(function(r){if(!isAdmin())return r;return Promise.all([col("users").get().then(function(us){USERS={};us.forEach(function(u){USERS[u.id]=u.data();});}),
+      col("meta").doc("backup").get().then(function(b){lastBackup=b.exists&&b.data().at&&b.data().at.toDate?b.data().at.toDate():null;}),
       col("meta").doc("global").get().then(function(g){if(!g.exists)return;var x=g.data();return rsaUnwrap(x.keys[SESSION.uid]).then(aesKey).then(function(k){GLOBAL={key:k,snap:null};return aesDec(k,x);})
         .then(function(u){var o=JSON.parse(dec.decode(u));DB.audSample=o.audSample||[];GLOBAL.snap=JSON.stringify({audSample:DB.audSample});});})]).then(function(){return r;});});
   }
@@ -1248,11 +1252,11 @@ var SEC=(function(){
     return prep.then(function(){return aesEnc(GLOBAL.key,enc.encode(s));}).then(function(o){GLOBAL.snap=s;var data={iv:o.iv,ct:o.ct,at:TS()};
       if(GLOBAL.w){data.keys={};data.keys[SESSION.uid]=GLOBAL.w;delete GLOBAL.w;track(col("meta").doc("global").set(data));}else track(col("meta").doc("global").update(data));});}
   var chain=Promise.resolve();
-  function flush(){clearTimeout(saveT);saveT=null;if(!SESSION||loading)return chain;
+  function flush(){clearTimeout(saveT);saveT=null;if(!SESSION||loading||SESSION.offline)return chain;
     chain=chain.then(function(){var jobs=[];DB.order.forEach(function(id){var d=DOCS[id],s=bundle(id);if(d&&d.snap===s)return;jobs.push(writePatient(id,s));});
       jobs.push(writeGlobal());return Promise.all(jobs);}).catch(function(e){toast("儲存失敗："+cErr(e));});return chain;}
-  function persist(now){if(!SESSION)return Promise.resolve();if(now)return flush();clearTimeout(saveT);saveT=setTimeout(flush,DEBOUNCE);syncChip(true);return chain;}
-  function syncChip(dirty){var c=$("#sync");if(!c)return;var off=!navigator.onLine,nc=Object.keys(conflicts).length;
+  function persist(now){if(!SESSION||SESSION.offline)return Promise.resolve();if(now)return flush();clearTimeout(saveT);saveT=setTimeout(flush,DEBOUNCE);syncChip(true);return chain;}
+  function syncChip(dirty){var c=$("#sync");if(!c)return;if(SESSION&&SESSION.offline){c.className="sync off";c.textContent="離線備份檢視・唯讀，不會存檔";return;}var off=!navigator.onLine,nc=Object.keys(conflicts).length;
     c.className="sync"+(nc?" bad":off?" off":(pendingW||dirty||saveT)?" busy":"");
     c.textContent=nc?"⚠ "+nc+" 位未存到雲端":off?"離線中・已暫存 "+pendingW+" 筆":(pendingW||dirty||saveT)?"同步中…":"☁ 已同步";}
 
@@ -1267,12 +1271,13 @@ var SEC=(function(){
     lastAct=Date.now();loading=true;$("#aSub").textContent="解密資料中…";$("#aBody").innerHTML='<p class="adesc" id="aProg"></p>';
     return loadAll(function(d,n){var e=$("#aProg");if(e)e.textContent=d+" / "+n;}).then(function(r){loading=false;secLog("登入");applySession();
       if(r.miss)toast(r.miss+" 位病人尚未授權給你的金鑰，請通知主持人");if(r.fromCache)toast("目前離線：顯示的是這台電腦上次同步的資料");});}
+  function wipe(){DB=emptyDB();DEKS={};DOCS={};USERS={};GLOBAL=null;PRIV=null;PW=null;SESSION=null;PROFILE=null;cur=null;STATE={};
+    $("#who").value="";$("#main").innerHTML="";$("#dock").hidden=true;$("#list").innerHTML="";var bb=$("#bkbar");if(bb)bb.hidden=true;showAuth();}
   function lock(reason){if(!SESSION){showAuth();return Promise.resolve();}
+    if(SESSION.offline){wipe();return Promise.resolve();}
     try{tick();}catch(e){}secLog("登出："+(reason||"手動"));
     return flush().then(function(){return Promise.race([FS.waitForPendingWrites(),new Promise(function(r){setTimeout(r,10000);})]);}).then(function(){
-      if(pendingW)toast("還有 "+pendingW+" 筆沒上傳到雲端(目前離線)。下次在這台電腦用同一個帳號登入時會自動上傳。");return AUTH.signOut();}).catch(function(){}).then(function(){
-      DB=emptyDB();DEKS={};DOCS={};USERS={};GLOBAL=null;PRIV=null;PW=null;SESSION=null;PROFILE=null;cur=null;STATE={};
-      $("#who").value="";$("#main").innerHTML="";$("#dock").hidden=true;$("#list").innerHTML="";showAuth();});}
+      if(pendingW)toast("還有 "+pendingW+" 筆沒上傳到雲端(目前離線)。下次在這台電腦用同一個帳號登入時會自動上傳。");return AUTH.signOut();}).catch(function(){}).then(wipe);}
   function changeOwn(oldPw,newPw){if(!pwOk(newPw))return Promise.reject(new Error("新密碼至少 8 字元"));
     var u=AUTH.currentUser;return u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,oldPw)).catch(function(){throw new Error("目前密碼錯誤");})
       .then(function(){return unwrap(PROFILE.priv,oldPw);}).then(function(raw){return wrap(raw,newPw);})
@@ -1321,7 +1326,35 @@ var SEC=(function(){
       return unwrap(us[SESSION.uid].priv,PW).then(importPriv).then(function(k){return crypto.subtle.decrypt({name:"RSA-OAEP"},k,ub64(x.keys[SESSION.uid]));})
         .then(function(raw){return aesKey(new Uint8Array(raw));}).then(function(k){return aesDec(k,x);}).then(function(){b.selfcheck="ok";return b;},
           function(){throw new Error("備份自我檢查失敗，請勿依賴這份備份，並通知維護者");});})
-    .then(function(b){secLog("下載加密備份("+b.n+" 位)");return JSON.stringify(b);});}
+    .then(function(b){secLog("下載加密備份("+b.n+" 位)");
+      col("meta").doc("backup").set({at:TS(),by:SESSION.uid,n:b.n}).then(function(){lastBackup=new Date();backupBar();}).catch(function(){});return JSON.stringify(b);});}
+  var lastBackup=null,BACKUP_DAYS=7;
+  function backupBar(){var bb=$("#bkbar");if(!bb)return;if(!isAdmin()||SESSION.offline||!DB.order.length){bb.hidden=true;return;}
+    var days=lastBackup?Math.floor((Date.now()-lastBackup.getTime())/86400000):null;
+    if(days!==null&&days<BACKUP_DAYS){bb.hidden=true;return;}
+    $("#bkmsg").textContent=days===null?"雲端資料還沒有任何加密備份。":"已經 "+days+" 天沒有下載加密備份(建議每 "+BACKUP_DAYS+" 天一次)。";bb.hidden=false;}
+  function doBackup(){return backupString().then(function(t){offer("ESCC_cloud_backup_ENCRYPTED_"+nameStamp()+".json",t);
+    toast("請把備份檔存到 J:\\escc_cmuh\\cloud_backups\\(NAS),不要只留在下載資料夾");}).catch(function(e){toast(cErr(e));});}
+  /* open an encrypted backup file without Firebase (read-only): password or recovery code -> investigator key -> every patient */
+  function openBackupText(text,pw,code){
+    var B;try{B=JSON.parse(text);}catch(e){return Promise.reject(new Error("不是有效的備份檔"));}
+    if(!B||B.kind!=="escc-cloud-backup"||!B.pi||!B.users||!B.users[B.pi]||!B.users[B.pi].priv)return Promise.reject(new Error("不是可離線解開的雲端備份檔(需 2026-09-29 之後的版本)"));
+    var me=B.users[B.pi],w=code?me.recPriv:me.priv;if(!w)return Promise.reject(new Error("這份備份沒有復原碼包裝的金鑰"));
+    return unwrap(w,code?normRec(code):pw).then(importPriv,function(){throw new Error(code?"復原碼不正確":"密碼不正確");}).then(function(k){
+      PRIV=k;SESSION={uid:B.pi,email:B.by||"",name:"主持人(離線備份 "+(B.at||"")+")",role:"manager",fbRole:"admin",offline:true};PROFILE={role:"admin",pub:me.pub};
+      DB=emptyDB();DEKS={};DOCS={};USERS={};Object.keys(B.users).forEach(function(u){USERS[u]=B.users[u];});
+      var ids=Object.keys(B.patients||{}),miss=0;
+      return Promise.all(ids.map(function(id){var x=B.patients[id];return openDoc({id:id,data:function(){return x;}}).then(function(r){if(r){absorb(r.id,r.b);DB.assign[r.id]=x.assignee||"";}else miss++;},function(){miss++;});}))
+        .then(function(){sortOrder();var g=(B.meta||{}).global;if(!g||!g.keys||!g.keys[B.pi])return;
+          return rsaUnwrap(g.keys[B.pi]).then(aesKey).then(function(k){return aesDec(k,g);}).then(function(u){DB.audSample=JSON.parse(dec.decode(u)).audSample||[];}).catch(function(){});})
+        .then(function(){applySession();toast("已開啟備份("+(B.at||"")+"):"+DB.order.length+" 位"+(miss?",另有 "+miss+" 位無法解開":"")+"。這是唯讀檢視，修改不會存檔。");return {n:DB.order.length,miss:miss};});});}
+  function showOpenBackup(){pickFile($("#fJson"),function(t){$("#aSub").textContent="開啟加密備份檔(不需網路)";
+    form('<form><p class="adesc">輸入主持人的登入密碼；忘記密碼時改填復原碼(二擇一)。解開後可以匯出 REDCap 匯入檔；這是唯讀檢視，不會寫回雲端。</p>'+
+      '<label class="mf"><span>主持人密碼</span><input name="p" type="password" autocomplete="off"></label>'+
+      '<label class="mf"><span>或 復原碼</span><input name="c" autocomplete="off"></label>'+
+      '<button class="btn go" type="submit">解開備份</button> <button class="btn" type="button" id="aBack">返回</button></form>',function(f){
+      var pw=f.elements.p.value,c=val(f,"c");if(!pw&&!c)return err("請輸入密碼或復原碼");busy(f,true,"解密中…");
+      openBackupText(t,pw,c).catch(function(e){busy(f,false,"解開備份");err(e.message);});});$("#aBack").onclick=showLogin;});}
   function restoreText(){toast("雲端版不在網頁上還原；需要還原時請聯絡系統維護者");return Promise.resolve(false);}
   var PERM={load:["manager"],qout:["manager"],qin:["manager"],sample:["manager"],report:["manager"],redcap:["manager"],redcapx:["manager"],srcs:["manager"],
             chemoin:["manager","abstractor"],shadow:["manager"],backup:["manager"],restore:[]};
@@ -1333,7 +1366,9 @@ var SEC=(function(){
     $("#who").value=SESSION.name;$("#role").value=ui;document.body.dataset.role=ui;
     $("#chip").innerHTML="<b>"+esc(SESSION.name)+"</b>・"+RN[SESSION.fbRole];$("#bUsers").hidden=r!=="manager";$("#bAssign").hidden=r!=="manager";
     $$("#menu .dd button").forEach(function(b){b.hidden=!can(b.dataset.act);});$$("#menu .dd hr").forEach(function(h){h.hidden=r!=="manager";});
-    $("#auth").hidden=true;syncChip();queue=curQueues()[0].id;tab="core_abstraction";refreshStates();renderRail();renderMain();
+    $("#bUsers").hidden=$("#bUsers").hidden||!!SESSION.offline;$("#bAssign").hidden=$("#bAssign").hidden||!!SESSION.offline;$("#bPw").hidden=!!SESSION.offline;$("#bLock").textContent=SESSION.offline?"關閉備份":"登出";
+    if(SESSION.offline)$$("#menu .dd button").forEach(function(b){if(["load","chemoin","backup","restore","qin","sample"].indexOf(b.dataset.act)>=0)b.hidden=true;});
+    $("#auth").hidden=true;syncChip();backupBar();queue=curQueues()[0].id;tab="core_abstraction";refreshStates();renderRail();renderMain();
   }
   function err(m){$("#aErr").textContent=m||"";}
   function showAuth(){$("#auth").hidden=false;err("");showLogin();}
@@ -1344,10 +1379,13 @@ var SEC=(function(){
     $("#aSub").textContent="請用主持人給你的帳號登入";
     form('<form><label class="mf"><span>電子郵件</span><input name="e" type="text" inputmode="email" autocapitalize="off" spellcheck="false" autocomplete="username" required></label>'+
       '<label class="mf"><span>密碼</span><input name="p" type="password" autocomplete="current-password" required></label>'+
-      '<button class="btn go" type="submit" id="aGo">登入</button></form><p class="alinks"><button type="button" class="lk" id="lkForgot">忘記密碼</button></p>',function(f){
+      '<button class="btn go" type="submit" id="aGo">登入</button></form><p class="alinks"><button type="button" class="lk" id="lkForgot">忘記密碼</button><button type="button" class="lk" id="lkBackup">開啟加密備份檔(不需網路)</button></p>'+
+      (fbOK()?'':'<p class="adesc" style="color:var(--err)">目前連不到雲端服務，只能開啟加密備份檔。</p>'),function(f){
+      if(!fbOK()){err("目前連不到雲端服務，請改用「開啟加密備份檔」");return;}
       var em=val(f,"e").replace(/\s+/g,""),pw=f.elements.p.value;busy(f,true,"驗證中…");
       signIn(em,pw).then(function(r){return route(r.user,r.profile,pw);}).catch(function(e){busy(f,false,"登入");err(cErr(e));f.elements.p.value="";});});
-    $("#lkForgot").onclick=function(){var em=($("#aBody input[name=e]").value||"").normalize("NFKC").replace(/\s+/g,"");if(!em){err("請先在上面輸入你的電子郵件");return;}
+    $("#lkBackup").onclick=showOpenBackup;
+    $("#lkForgot").onclick=function(){if(!fbOK())return;var em=($("#aBody input[name=e]").value||"").normalize("NFKC").replace(/\s+/g,"");if(!em){err("請先在上面輸入你的電子郵件");return;}
       fb();AUTH.sendPasswordResetEmail(em).then(function(){err("");toast("已寄出重設密碼的信到 "+em+"。重設後再回來登入。");},function(e){err(cErr(e));});};
   }
   function route(u,p,pw){
@@ -1442,7 +1480,7 @@ var SEC=(function(){
     setInterval(idleCheck,30000);addEventListener("online",function(){syncChip();});addEventListener("offline",function(){syncChip();});
     document.addEventListener("visibilitychange",function(){if(document.hidden&&SESSION)flush();});
     window.addEventListener("beforeunload",function(e){if(SESSION){flush();if(pendingW||saveT){e.preventDefault();e.returnValue="";}}});
-    $("#bLock").onclick=function(){lock("手動登出");};
+    $("#bLock").onclick=function(){lock("手動登出");};var bk=$("#bkgo");if(bk)bk.onclick=doBackup;
     $("#bUsers").onclick=function(){if(isAdmin())renderUsers();};
     $("#bAssign").onclick=function(){if(isAdmin())renderAssign();};
     $("#bPw").onclick=function(){if(!SESSION)return;dialog({title:"變更密碼",fields:[{k:"o",label:"目前密碼",type:"password",req:1},{k:"n",label:"新密碼(至少 8 字元)",type:"password",req:1},{k:"n2",label:"再輸入一次新密碼",type:"password",req:1}],ok:"變更"})
