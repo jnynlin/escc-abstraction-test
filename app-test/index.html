@@ -211,6 +211,26 @@ input[type=file]{display:none;}
 .report tr.lo td{color:var(--err);}
 body[data-role="physician"] .bar{border-bottom:3px solid var(--done);}
 body[data-role="auditor"] .bar{border-bottom:3px solid var(--iodine);}
+/* v3.1 contrast overrides */
+:root{--soft:#3F4C53;--rule:#C3CCC8;--well:#EAEFEC;}
+@media (prefers-color-scheme: dark){:root{--soft:#B7C4CA;--rule:#4A5860;--well:#1C262B;}}
+html{font-size:17px;}
+.desc,.hint,.lab small,.pt small,.tag,.chip,.afoot{font-size:.84rem;}
+.lab{font-size:.94rem;font-weight:500;}
+.lab small{color:var(--soft);}
+.opts button{border-color:#9AA8A3;background:#FFFFFF;color:var(--ink);font-size:.9rem;}
+.opts button.on{background:#0D6468;border-color:#0D6468;color:#FFFFFF;box-shadow:inset 0 0 0 2px #FFFFFF,0 0 0 2px #0D6468;}
+input[type=text],select,textarea{border-color:#9AA8A3;color:var(--ink);font-size:.95rem;}
+input[type=text]:focus,select:focus,textarea:focus{outline:2px solid #2F6FA3;outline-offset:1px;}
+.pill{border:1px solid rgba(0,0,0,.12);}
+.tabs button{color:#3F4C53;font-size:.92rem;} .tabs button.on{color:#0D6468;border-bottom:3px solid #0D6468;}
+#queues button.on,.qb.on{background:#0D6468;color:#fff;border-color:#0D6468;}
+.pt.on{outline:2px solid #0D6468;}
+.btn{font-weight:600;border-color:#9AA8A3;} .btn.go{background:#0D6468;border-color:#0D6468;color:#fff;}
+h3{font-size:1rem;color:var(--ink);}
+.spine{border-left:5px solid #0D6468;}
+.msg{font-weight:600;}
+@media (prefers-color-scheme: dark){.opts button{background:#1C262B;border-color:#5A6A72;color:var(--ink);} input[type=text],select,textarea{background:#151D21;border-color:#5A6A72;}}
 .chip{font-size:.84rem;color:var(--soft);} .chip b{color:var(--ink);font-weight:600;}
 .bkbar{position:sticky;top:0;z-index:40;background:#FBF1DE;color:#6d4205;border-bottom:1px solid #E8CC95;padding:8px 16px;font-size:.9rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;} .bkbar[hidden]{display:none!important;} .bkhint{font-size:.8rem;opacity:.85;}
 .asgbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 10px;font-size:.88rem;} .asgbar label{display:flex;gap:4px;align-items:center;} .pill.ok{background:var(--okbg,#DDF0E7);color:var(--ok,#1E7355);} .mono{font-family:ui-monospace,Consolas,monospace;}
