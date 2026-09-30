@@ -2135,17 +2135,25 @@ var DOCP=(function(){
     if((m=t.match(/(?:報告日期|檢驗日期|採檢日期|Date)\s*[:：]\s*'?(\d{7}|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/))){var d=toISO(m[1]);if(d)F.push(V("hep_date",d,m[0]));}
     return {kind:"serology",ok:F.some(function(f){return /^hep_(hbsag|antihbc|hcv)$/.test(f.f);}),fields:F,meta:{}};}
   /* cumulative laboratory table (HIS 檢驗報告 QRP): fixed-width columns under header lines; rows start with a 7-digit ROC date */
+  var LAB_KNOWN=/^(WBC|Neu\.?|Lym\.?|Mono\.?|Eos\.?|Baso\.?|RBC|Hb|Hct|RDW|PLT|MCV|MCH|MCHC|NRBC|MPV|MDW|PT|PTCON|INR|APTT|APTTCON|D-Dimer|Glu-AC|Glucose|BUN|CRE|GFR|eGFR|UA|CHOL|TG|LDL|LDL-C|HDL-C|Ca|P|Na|K|Cl|T-Bil\.?|D-Bil\.?|AST|ALT|ALP|LDH|CPK|CK|hsCRP|CRP|Alb\.BCG|Albumin|Alb|Amylase|Lipase|CO2|r-GT|GGT|Mg|Creatinine|Protein|pH|pCO2|pO2|HCO3|BE|SaO2|TP|Fe|TIBC|Ferritin|HbA1c|TSH|Free-T4|CEA|SCC|AFP|CA19-9|Lactate|NH3)$/i;
+  function labHeader(l){var re=/\S+/g,m,h=[],known=0;while((m=re.exec(l))){h.push({name:m[0],at:m.index});if(LAB_KNOWN.test(m[0]))known++;}
+    if(h.length<2||known<1||/^\d{7}/.test(l))return null;h.shift();while(h.length&&/中|檢體|編號|備註/.test(h[h.length-1].name))h.pop();
+    if(!h.length||!h.every(function(x){return /^[A-Za-z][\w.\-\/%]*$/.test(x.name);}))return null;if(h.length>2&&known<2)return null;return h;}
   var LAB_MAP={"WBC":"wbc","Neu.":"neu_pct","Lym.":"lym_pct","Hb":"hb","PLT":"plt","CRE":"cre","GFR":"egfr","Alb.BCG":"alb","Albumin":"alb","hsCRP":"crp","CRP":"crp","Na":"na","K":"k","T-Bil.":"tbil","AST":"ast","ALT":"alt","BUN":"bun"};
   function wide(l){return l.replace(/[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]/g,function(c){return c+c;});}
   function parseLabs(text){var t=norm(text),lines=t.split("\n"),rows=[],hdr=null,i,m;
     for(i=0;i<lines.length;i++){var l=wide(lines[i]);
-      if(/^\S{1,8}\s{2,}[A-Za-z][\w.\-\/]*(\s{2,}[A-Za-z0-9][\w.\-\/%]*)+/.test(l)&&!/^\d{7}/.test(l)){hdr=[];var re=/\S+/g;while((m=re.exec(l)))hdr.push({name:m[0],at:m.index});hdr.shift();if(hdr.length&&/中中中中|檢體|編號|備註/.test(hdr[hdr.length-1].name))hdr.pop();continue;}
+      var hh=labHeader(l);if(hh){hdr=hh;continue;}
       if(hdr&&(m=l.match(/^(\d{7})\s/))){var d=toISO(m[1]);if(!d)continue;
-        for(var c=0;c<hdr.length;c++){var a=hdr[c].at,b=c+1<hdr.length?hdr[c+1].at:l.length,v=l.slice(a,b).trim().replace(/\*+$/,"");if(!v||v==="-")continue;var num=parseFloat(v);if(isNaN(num))continue;rows.push({date:d,test:hdr[c].name,value:num,flag:/\*/.test(l.slice(a,b))});}}}
+        /* assign each value token to the nearest header column by start position (tolerates a few columns of drift) */
+        var re2=/\S+/g,tok;while((tok=re2.exec(l))){if(tok.index===0)continue;var v=tok[0],best=-1,bd=1e9;
+          for(var c=0;c<hdr.length;c++){var dd=Math.abs(hdr[c].at-tok.index);if(dd<bd){bd=dd;best=c;}}
+          if(best<0||bd>4)continue;var vv=v.replace(/[*HL]+$/,"");if(vv==="-"||/^[<>]/.test(vv))continue;var num=parseFloat(vv);if(isNaN(num)||!/^-?\d/.test(vv))continue;
+          rows.push({date:d,test:hdr[best].name,value:num,flag:/[*HL]$/.test(v)});}}}
     if(!rows.length)return {kind:"labs",ok:false,fields:[],note:"找不到檢驗值表格(需有檢驗項目表頭與 7 碼日期列)"};
     var F=[],dates=rows.map(function(r){return r.date;}).sort(),base=dates[0];
     Object.keys(LAB_MAP).forEach(function(k){var f=LAB_MAP[k];if(F.some(function(x){return x.f==="lab_"+f;}))return;var r=rows.filter(function(x){return x.test===k;}).sort(function(a,b){return a.date<b.date?-1:1;})[0];if(r)F.push(V("lab_"+f,String(r.value),k+" "+r.value+" ("+r.date+")",r.date===base));});
-    if(F.length)F.push(V("lab_date",base,"最早一次檢驗日 "+base+"（共 "+dates.length+" 筆、"+rows.length+" 個值）",false));
+    if(rows.length)F.push(V("lab_date",base,"最早一次檢驗日 "+base+"（共 "+dates.length+" 筆、"+rows.length+" 個值）",false));
     return {kind:"labs",ok:F.length>1,fields:F,meta:{rows:rows,dates:Array.from(new Set(dates)),n:rows.length}};}
   /* biomarker (PD-L1 IHC) report */
   function parseBiomarker(text){var t=norm(text),F=[],meta={},m;
@@ -2171,7 +2179,7 @@ var DOCP=(function(){
     if(/Report Form for Esophageal Carcinoma|FDG PET|EUS findings|Invasion layer|CT scan of (?:chest|neck)|MRI of Brain|Imaging stage/i.test(t)&&!/MICROSCOPIC|Histologic/i.test(t))return "imaging";
     if(/HBsAg|Anti-?HBc|HCV\s*Ab|Anti-?HCV/i.test(t)&&!/carcinoma|biopsy/i.test(t))return "serology";
     if(/Esophagogastroduodenoscopy|\[Report of EGD\]/i.test(t)&&!/EUS findings|endosonograph|Invasion layer/i.test(t))return "egd";
-    if(/\bWBC\b|\bHb\b|\bCRE\b|Alb\.BCG|\bPLT\b/.test(t)&&/^\d{7}\s/m.test(t)&&!/carcinoma|biopsy|Gy/i.test(t))return "labs";
+    if(/^\d{7}\s/m.test(t)&&!/carcinoma|biopsy|Gy\b/i.test(t)&&t.split("\n").some(function(l){return !!labHeader(l);}))return "labs";
     if((t.match(/C[A-Z]-[A-Z]\d{3}-\d{4,}/g)||[]).length>=2&&!/MACROSCOPIC SUMMARY/i.test(t)&&!/^\s*(?:中中中中|Diagnosis)\s*:/m.test(t.split("\n").slice(0,3).join("\n")))return "pathlist";if(/pathology|carcinoma|biopsy|specimen/i.test(t))return "path";return "";}
   function parse(text){var k=detect(text);return k==="rt"?parseRT(text):k==="biomarker"?parseBiomarker(text):k==="imaging"?parseImaging(text):k==="serology"?parseSerology(text):k==="egd"?parseEGD(text):k==="labs"?parseLabs(text):k==="pathlist"?parsePathList(text):k==="path"?parsePath(text):{kind:"",ok:false,fields:[],note:"無法辨識文件類型"};}
   out={parse:parse,parseRT:parseRT,parsePath:parsePath,parseBiomarker:parseBiomarker,parseImaging:parseImaging,parseSerology:parseSerology,parseEGD:parseEGD,parseLabs:parseLabs,endoDistances:endoDistances,parsePathList:parsePathList,detect:detect,toISO:toISO,norm:norm};return out;
