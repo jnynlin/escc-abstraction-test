@@ -213,6 +213,7 @@ body[data-role="physician"] .bar{border-bottom:3px solid var(--done);}
 body[data-role="auditor"] .bar{border-bottom:3px solid var(--iodine);}
 .chip{font-size:.84rem;color:var(--soft);} .chip b{color:var(--ink);font-weight:600;}
 .bkbar{position:sticky;top:0;z-index:40;background:#FBF1DE;color:#6d4205;border-bottom:1px solid #E8CC95;padding:8px 16px;font-size:.9rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;} .bkbar[hidden]{display:none!important;} .bkhint{font-size:.8rem;opacity:.85;}
+.asgbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 10px;font-size:.88rem;} .asgbar label{display:flex;gap:4px;align-items:center;} .pill.ok{background:var(--okbg,#DDF0E7);color:var(--ok,#1E7355);} .mono{font-family:ui-monospace,Consolas,monospace;}
 .sync{font-size:.8rem;color:var(--ok,#1E7355);white-space:nowrap;} .sync.busy{color:var(--soft);} .sync.off{color:var(--warn,#A0660F);} .sync.bad{color:var(--err);font-weight:600;}
 #auth{position:fixed;inset:0;z-index:90;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto;}
 #auth[hidden]{display:none!important;}
@@ -581,6 +582,7 @@ var QUEUES={
     {id:"g_nonop",name:"無根除手術組",test:function(id){return cohortOf(id)==="nonop";}},
     {id:"g_esd",name:"內視鏡切除組",test:function(id){return cohortOf(id)==="esd";}},
     {id:"g_unk",name:"路徑未推導",test:function(id){return cohortOf(id)==="unk";}},
+    {id:"tagged",name:"有標籤",test:function(id){var r=DB.rec[id];return !!(r&&r.tags&&r.tags.length);}},
     {id:"ret",name:"醫師退回補查",test:function(id,s){return s.returned>0;}},
     {id:"wait",name:"等待醫師確認",test:function(id,s){return s.open>0;}},
     {id:"bad",name:"有錯誤",test:function(id,s){return s.bad;}},
@@ -1536,29 +1538,69 @@ var SEC=(function(){
       h.push('<tr><td>'+(t?esc(t.toLocaleString("zh-TW")):"")+'</td><td>'+esc(uname(x.uid))+'</td><td>'+esc(x.act)+'</td></tr>');});
       var e=$("#seclog");if(e)e.innerHTML=h.length?'<table><thead><tr><th>時間</th><th>帳號</th><th>事件</th></tr></thead><tbody>'+h.join("")+'</tbody></table>':'<p class="desc">無</p>';},function(e){var x=$("#seclog");if(x)x.innerHTML='<p class="desc">'+esc(cErr(e))+'</p>';});
   }
+  /* ---- assignment page v4 (2026-09-30): patient table with filters, multi-select, assign / recall / tags / delete ---- */
+  var ASG={g:"",y:"",who:"",tag:"",q:"",sel:{}};
+  function tagsOf(id){var r=DB.rec[id];return (r&&r.tags)||[];}
+  function allTags(){var s={};DB.order.forEach(function(id){tagsOf(id).forEach(function(t){s[t]=1;});});return Object.keys(s).sort();}
+  function setTags(ids,add,remove){if(!isAdmin())return Promise.reject(new Error("只有主持人可以設定標籤"));
+    ids.forEach(function(id){var r=recOf(id),t=r.tags||[];add.forEach(function(x){if(t.indexOf(x)<0)t.push(x);});t=t.filter(function(x){return remove.indexOf(x)<0;});r.tags=t;});
+    secLog((add.length?"加標籤 "+add.join("、"):"移除標籤 "+remove.join("、"))+"："+ids.length+" 位");return persist(true).then(function(){return ids.length;});}
+  function hasData(id){var r=DB.rec[id];if(!r)return false;return FORMS.some(function(f){var x=r[f.id];return f.rep?(x&&x.length>0):(x&&x._s>0);});}
+  function deletePatients(ids){if(!isAdmin())return Promise.reject(new Error("只有主持人可以刪除"));
+    return flush().then(function(){return Promise.all(ids.map(function(id){return col("patients").doc(id).delete().then(function(){
+      secLog("刪除病人 "+id+(hasData(id)?"(含摘錄內容)":"(無摘錄內容)"));
+      DB.order=DB.order.filter(function(x){return x!==id;});delete DB.pre[id];delete DB.rec[id];delete DB.aud[id];delete DB.assign[id];DB.q=DB.q.filter(function(q){return q.sid!==id;});
+      DB.shadow=(DB.shadow||[]).filter(function(s){return s.sid!==id;});DB.audSample=(DB.audSample||[]).filter(function(x){return x!==id;});delete DOCS[id];delete DEKS[id];delete conflicts[id];delete STATE[id];});}));})
+      .then(function(){if(cur&&ids.indexOf(cur)>=0)cur=null;return writeGlobal();}).then(function(){return ids.length;});}
+  function asgRows(){var g=ASG.g,y=ASG.y,w=ASG.who,t=ASG.tag,q=ASG.q.trim().toUpperCase();
+    return DB.order.filter(function(id){var p=DB.pre[id]||{},a=DB.assign[id]||"";
+      return (!g||cohortOf(id)===g)&&(!y||String(p.dx_year)===y)&&(!w||(w==="_none"?!a:a===w))&&(!t||tagsOf(id).indexOf(t)>=0)&&(!q||id.toUpperCase().indexOf(q)>=0);});}
   function renderAssign(){if(!isAdmin())return;cur=null;$("#dock").hidden=true;
     return refreshUsers().then(drawAssign,function(e){toast(cErr(e));});}
   function drawAssign(){
-    var m=$("#main"),abs=abstractors(),cnt={};
-    DB.order.forEach(function(id){var a=DB.assign[id]||"";cnt[a]=(cnt[a]||0)+1;});
+    var m=$("#main"),abs=abstractors(),cnt={};DB.order.forEach(function(id){var a=DB.assign[id]||"";cnt[a]=(cnt[a]||0)+1;});
     var co={};DB.order.forEach(function(id){var k=cohortOf(id);co[k]=(co[k]||0)+1;});var years={};DB.order.forEach(function(id){var y=(DB.pre[id]||{}).dx_year||"";if(y)years[y]=1;});
-    m.innerHTML='<section class="sheet report"><h3>分派病人</h3><p class="desc">共 '+DB.order.length+' 位，尚未分派 '+(cnt[""]||0)+' 位。組別：'+Object.keys(COHORT_NAME).map(function(k){return COHORT_NAME[k]+" "+(co[k]||0);}).join("／")+'。登錄人員只看得到、也只解得開分派給自己的病人。</p>'+
-      '<p>分派範圍：<select id="asgGroup"><option value="">全部組別</option>'+Object.keys(COHORT_NAME).map(function(k){return '<option value="'+k+'">'+COHORT_NAME[k]+'</option>';}).join("")+'</select> '+
-      '<select id="asgYear"><option value="">全部診斷年</option>'+Object.keys(years).sort().map(function(y){return '<option value="'+esc(y)+'">'+esc(y)+' 年</option>';}).join("")+'</select></p>'+
-      (abs.length?'<div class="tw"><table><thead><tr><th>登錄人員</th><th>已分派</th></tr></thead><tbody>'+abs.map(function(u){return '<tr><td><label class="ck"><input type="checkbox" data-an="'+u+'"> '+esc(uname(u))+'</label></td><td>'+(cnt[u]||0)+'</td></tr>';}).join("")+'</tbody></table></div>'+
-        '<p><button class="btn go" type="button" id="bEven">把尚未分派的病人平均分給勾選的人</button> <button class="btn warn" type="button" id="bUn">收回勾選者的病人</button></p>'+
-        '<p class="desc">指定特定病人:貼上研究編號(一行一個或用逗號分隔),分給勾選的第一位。</p><textarea id="idsTo" rows="3" style="width:100%"></textarea><p><button class="btn" type="button" id="bIds">指定這些病人</button></p>'
-        :'<p class="desc">還沒有核准的登錄人員，請先到「帳號管理」核准。</p>')+
+    Object.keys(ASG.sel).forEach(function(id){if(!DOCS[id])delete ASG.sel[id];});
+    var rows=asgRows(),tags=allTags(),nsel=Object.keys(ASG.sel).length;
+    var opt=function(v,l,cur){return '<option value="'+esc(v)+'"'+(String(cur)===String(v)?" selected":"")+'>'+esc(l)+'</option>';};
+    var prog=function(id){var s=STATE[id]||{};return s.allDone?'<span class="pill ok">完成</span>':s.core_abstraction===2?'核心✓':s.core_abstraction===1?'進行中':'—';};
+    var trs=rows.map(function(id){var p=DB.pre[id]||{},a=DB.assign[id]||"";
+      return '<tr><td><input type="checkbox" data-sel="'+esc(id)+'"'+(ASG.sel[id]?" checked":"")+'></td><td class="mono">'+esc(id)+'</td><td>'+esc(p.dx_year||"")+'</td><td>'+esc(COHORT_NAME[cohortOf(id)])+'</td><td>'+esc(lbl("tx_pathway",p.tx_pathway)||"")+'</td>'+
+        '<td>'+(a?esc(uname(a)):'<span class="desc">未分派</span>')+'</td><td>'+prog(id)+'</td><td>'+tagsOf(id).map(function(t){return '<span class="pill">'+esc(t)+'</span>';}).join(" ")+(hasData(id)?'':'')+'</td></tr>';}).join("");
+    m.innerHTML='<section class="sheet report"><h3>病人清單與分派</h3><p class="desc">共 '+DB.order.length+' 位，尚未分派 '+(cnt[""]||0)+' 位。組別：'+Object.keys(COHORT_NAME).map(function(k){return COHORT_NAME[k]+" "+(co[k]||0);}).join("／")+'。登錄人員只看得到、也只解得開分派給自己的病人。</p>'+
+      '<div class="asgbar"><label>組別 <select id="fG">'+opt("","全部",ASG.g)+Object.keys(COHORT_NAME).map(function(k){return opt(k,COHORT_NAME[k],ASG.g);}).join("")+'</select></label>'+
+      '<label>診斷年 <select id="fY">'+opt("","全部",ASG.y)+Object.keys(years).sort().map(function(y){return opt(y,y,ASG.y);}).join("")+'</select></label>'+
+      '<label>分派 <select id="fW">'+opt("","全部",ASG.who)+opt("_none","未分派",ASG.who)+abs.map(function(u){return opt(u,uname(u),ASG.who);}).join("")+
+        Object.keys(cnt).filter(function(u){return u&&abs.indexOf(u)<0;}).map(function(u){return opt(u,uname(u)+"（已停用或未加入）",ASG.who);}).join("")+'</select></label>'+
+      '<label>標籤 <select id="fT">'+opt("","全部",ASG.tag)+tags.map(function(t){return opt(t,t,ASG.tag);}).join("")+'</select></label>'+
+      '<label>研究編號 <input type="text" id="fQ" value="'+esc(ASG.q)+'" placeholder="搜尋" autocomplete="off" style="width:110px"></label>'+
+      '<span class="desc">符合 '+rows.length+' 位・已勾選 '+nsel+' 位</span></div>'+
+      '<div class="tw" style="max-height:52vh;overflow:auto"><table><thead><tr><th><input type="checkbox" id="selAll" title="全選符合的病人"></th><th>研究編號</th><th>診斷年</th><th>組別</th><th>治療路徑(癌登)</th><th>分派給</th><th>進度</th><th>標籤</th></tr></thead><tbody>'+(trs||'<tr><td colspan="8" class="desc">沒有符合的病人</td></tr>')+'</tbody></table></div>'+
+      '<h3>對勾選的病人</h3>'+(abs.length?
+      '<div class="asgbar"><select id="toWho">'+abs.map(function(u){return '<option value="'+u+'">'+esc(uname(u))+'（目前 '+(cnt[u]||0)+' 位）</option>';}).join("")+'</select> <button class="btn go" type="button" id="bTo">分派給這位</button> '+
+      '<button class="btn" type="button" id="bEvenSel">平均分給所有登錄人員</button> <button class="btn" type="button" id="bRecall">收回分派</button></div>':'<p class="desc">還沒有核准的登錄人員，請先到「帳號管理」核准。</p>')+
+      '<div class="asgbar"><input type="text" id="tagNew" placeholder="新標籤，例如 論文1、先做" list="tagList" autocomplete="off" style="width:160px"><datalist id="tagList">'+tags.map(function(t){return '<option value="'+esc(t)+'">';}).join("")+'</datalist> <button class="btn" type="button" id="bTagAdd">加標籤</button> '+
+      (tags.length?'<select id="tagRm">'+tags.map(function(t){return '<option value="'+esc(t)+'">'+esc(t)+'</option>';}).join("")+'</select> <button class="btn" type="button" id="bTagRm">移除標籤</button> ':'')+
+      '<button class="btn warn" type="button" id="bDel">刪除病人</button></div>'+
       '<h3>載入預填資料</h3><p class="desc">預填檔含病歷號，只能在醫院電腦載入；載入後在這台瀏覽器內加密才上傳。</p>'+
       '<p><button class="btn" type="button" id="bPkgIn">匯入加密分包</button> <button class="btn" type="button" id="bCsvIn">載入預填檔(CSV)</button></p></section>';
-    var picked=function(){return $$("[data-an]",m).filter(function(c){return c.checked;}).map(function(c){return c.dataset.an;});};
-    var done=function(p,msg){p.then(function(n){toast(msg.replace("#",n));refreshStates();renderRail();renderAssign();}).catch(function(e){toast(cErr(e));});};
-    var pickFn=function(){var g=$("#asgGroup").value,y=$("#asgYear").value;return function(id){return (!g||cohortOf(id)===g)&&(!y||String((DB.pre[id]||{}).dx_year)===y);};};
-    var be=$("#bEven");if(be)be.onclick=function(){try{done(assignEven(picked(),pickFn()),"已分派 # 位");}catch(e){toast(e.message);}};
-    var bu=$("#bUn");if(bu)bu.onclick=function(){var ns=picked();if(!ns.length){toast("請勾選登錄人員");return;}ask("收回 "+ns.map(uname).join("、")+" 的病人？已填的內容不會刪除。").then(function(ok){if(ok)done(unassign(ns),"已收回 # 位");});};
-    var bi=$("#bIds");if(bi)bi.onclick=function(){var ns=picked();if(!ns.length){toast("請勾選一位登錄人員");return;}
-      var ids=$("#idsTo").value.split(/[\s,，]+/).map(function(x){return x.trim();}).filter(Boolean),bad=ids.filter(function(id){return !DOCS[id];});
-      if(bad.length){toast("找不到："+bad.slice(0,5).join("、"));return;}done(assignIds(ids,ns[0]),"已指定 # 位");};
+    var re=function(){drawAssign();};
+    $("#fG").onchange=function(){ASG.g=this.value;re();};$("#fY").onchange=function(){ASG.y=this.value;re();};$("#fW").onchange=function(){ASG.who=this.value;re();};$("#fT").onchange=function(){ASG.tag=this.value;re();};
+    $("#fQ").oninput=function(){ASG.q=this.value;var v=this.value;re();var q=$("#fQ");q.focus();q.value=v;};
+    $$("[data-sel]",m).forEach(function(c){c.onchange=function(){if(c.checked)ASG.sel[c.dataset.sel]=1;else delete ASG.sel[c.dataset.sel];};});
+    $("#selAll").onclick=function(){var on=this.checked;rows.forEach(function(id){if(on)ASG.sel[id]=1;else delete ASG.sel[id];});re();};
+    var selIds=function(){var ids=Object.keys(ASG.sel).filter(function(id){return DOCS[id];});if(!ids.length)toast("請先勾選病人");return ids;};
+    var done=function(p,msg){p.then(function(n){toast(msg.replace("#",n));ASG.sel={};refreshStates();renderRail();renderAssign();}).catch(function(e){toast(cErr(e));});};
+    var bt=$("#bTo");if(bt)bt.onclick=function(){var ids=selIds();if(!ids.length)return;done(assignIds(ids,$("#toWho").value),"已分派 # 位");};
+    var bev=$("#bEvenSel");if(bev)bev.onclick=function(){var ids=selIds();if(!ids.length)return;
+      done(flush().then(function(){return Promise.all(ids.map(function(id,i){return setAssignee(id,abs[i%abs.length]);}));}).then(function(){secLog("平均分派 "+ids.length+" 位給 "+abs.map(uname).join("、"));return ids.length;}),"已平均分派 # 位");};
+    var br=$("#bRecall");if(br)br.onclick=function(){var ids=selIds();if(!ids.length)return;ask("收回 "+ids.length+" 位病人的分派？已填的內容不會刪除。").then(function(ok){if(!ok)return;
+      done(flush().then(function(){return Promise.all(ids.map(function(id){return setAssignee(id,"");}));}).then(function(){secLog("收回 "+ids.length+" 位病人");return ids.length;}),"已收回 # 位");});};
+    $("#bTagAdd").onclick=function(){var t=$("#tagNew").value.trim();if(!t){toast("請輸入標籤");return;}var ids=selIds();if(!ids.length)return;done(setTags(ids,[t],[]),"已為 # 位加標籤 "+t);};
+    var brm=$("#bTagRm");if(brm)brm.onclick=function(){var t=$("#tagRm").value;var ids=selIds();if(!ids.length)return;done(setTags(ids,[],[t]),"已為 # 位移除標籤 "+t);};
+    $("#bDel").onclick=function(){var ids=selIds();if(!ids.length)return;var nd=ids.filter(hasData).length;
+      dialog({title:"刪除 "+ids.length+" 位病人",msg:"會從雲端永久刪除這些病人的預填資料與摘錄內容"+(nd?"；其中 "+nd+" 位已有摘錄內容！":"")+"。此動作無法復原，會記入安全紀錄。請輸入「刪除」確認。",fields:[{k:"c",label:"輸入 刪除",req:1}],ok:"永久刪除"})
+        .then(function(v){if(!v)return;if(v.c!=="刪除"){toast("未刪除：確認字不符");return;}done(deletePatients(ids),"已刪除 # 位");});};
     $("#bCsvIn").onclick=function(){pickFile($("#fCsv"),function(t){loadCsv(t);});};
     $("#bPkgIn").onclick=function(){pickFile($("#fJson"),function(t){dialog({title:"匯入加密分包",fields:[{k:"p",label:"分包密碼",type:"password",req:1}],ok:"匯入"})
       .then(function(v){if(!v)return;importPackage(t,v.p).then(function(){toast("已匯入並加密上傳");refreshStates();renderRail();renderAssign();}).catch(function(e){toast(cErr(e));});});});};
