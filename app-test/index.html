@@ -676,7 +676,7 @@ setInterval(function(){if(cur&&!document.hidden)tick();},60000);
 function openPt(id){tick();cur=id;touched={};UNLOCK={};tStart=Date.now();
   if(auditMode()){audOf(id);if(!FORM_BY[tab].audit)tab="core_abstraction";}
   var fm=FORM_BY[tab];if(fm&&!formShown(id,fm))tab="core_abstraction";
-  renderMain();renderRail();window.scrollTo(0,0);}
+  renderMain();renderRail();window.scrollTo(0,0);if(typeof DOCIMPORT!=="undefined")DOCIMPORT.spineBar();}
 function renderMain(){
   var m=$("#main");
   if(!DB.order.length){
@@ -2123,10 +2123,29 @@ var DOCIMPORT=(function(){
     return chain.then(function(){return pages.join("\n");});});}
   function pickPdf(fmId){if(!needWho())return;var inp=$("#fDoc");inp.onchange=function(){var f=inp.files&&inp.files[0];if(!f)return;inp.value="";
     pdfText(f).then(function(t){if(!t.replace(/\s/g,"").length){toast("這個 PDF 沒有文字層(掃描影像)，請改貼文字");return;}var res=fromText(cur,fmId,t,"",f.name);if(res)report(res,fmId);}).catch(function(e){toast(e.message||String(e));});};inp.click();}
-  function bar(fmId,area){if(!SEC.can("docin")||auditMode())return;var d=document.createElement("div");d.className="addrow";
+  function bar(fmId,area){if(fmId==="pathology_specimen")indexBox(area);if(!SEC.can("docin")||auditMode())return;var d=document.createElement("div");d.className="addrow";
     d.innerHTML='<button class="btn" type="button" data-docpaste="'+fmId+'">貼上'+DOC_NAME[fmId]+'文字 → 草稿</button> <button class="btn" type="button" data-docpdf="'+fmId+'">上傳'+DOC_NAME[fmId]+' PDF → 草稿</button><span class="desc"> 擷取後請逐欄核對；原文不會上傳</span>';
     area.insertBefore(d,area.firstChild);$("[data-docpaste]",d).onclick=function(){pasteDialog(fmId);};$("[data-docpdf]",d).onclick=function(){pickPdf(fmId);};}
-  return {fromText:fromText,bar:bar,pdfText:pdfText};
+  /* one entry point: paste anything, the type is detected and routed */
+  var KIND_FM={rt:"rt_course",path:"pathology_specimen",biomarker:"biomarker"};
+  function pasteAnyText(id,text,docDate){var k=DOCP.detect(text);
+    if(k==="pathlist"){var L=DOCP.parsePathList(text),r=recOf(id),eso=L.items.filter(function(x){return /esophag|oesophag|mediastin/i.test(x.diagnosis);}),other=L.items.filter(function(x){return !/esophag|oesophag|mediastin/i.test(x.diagnosis);});
+      r.pathindex={at:stamp(),items:eso,others:other.map(function(x){return {report_no:x.report_no,date:x.date,diagnosis:x.diagnosis.slice(0,120)};})};
+      logChange("pathology_specimen","貼入病理清單："+eso.length+" 份食道相關、"+other.length+" 份其他");persist(true);return {kind:"pathlist",eso:eso.length,other:other.length};}
+    if(!KIND_FM[k])return null;var res=fromText(id,KIND_FM[k],text,docDate||"","貼上文字");return res?{kind:k,fmId:KIND_FM[k],res:res}:null;}
+  function pasteAny(){if(!needWho())return;
+    dialog({title:"貼上任何報告",msg:"病理報告、放療摘要、PD-L1 報告或病理清單都可以，系統會自動辨識並送到對應表單產生草稿。化療明細表請用 QRP 檔匯入。",
+      fields:[{k:"t",label:"報告全文",type:"textarea",req:1},{k:"d",label:"報告日期（選填）"}],ok:"辨識並擷取"}).then(function(v){if(!v)return;var d=v.d?parseDate(v.d).iso:"";
+      var out=pasteAnyText(cur,v.t,d);if(!out){toast("無法辨識這段文字是哪一種報告");return;}
+      if(out.kind==="pathlist"){dialog({title:"已建立病理索引",info:1,msg:"食道相關 "+out.eso+" 份、其他 "+out.other+" 份。索引列在「病理與檢體」分頁上方；需要細看的報告，再把該份全文貼進來。",ok:"知道了"}).then(function(){tab="pathology_specimen";renderMain();});return;}
+      tab=out.fmId;renderMain();report(out.res,out.fmId);});}
+  function spineBar(){var sp=$(".spine");if(!sp||$("#spinePaste")||!SEC.can("docin")||auditMode())return;var b=document.createElement("button");b.className="btn go";b.type="button";b.id="spinePaste";b.textContent="貼上任何報告 → 自動辨識";b.style.marginTop="8px";b.onclick=pasteAny;sp.appendChild(b);}
+  function indexBox(area){var r=recOf(cur),ix=r.pathindex;if(!ix)return;var d=document.createElement("div");d.className="draftbox";
+    d.innerHTML='<h3 class="drafth">病理索引（'+esc(ix.at)+' 貼入）：食道相關 '+ix.items.length+' 份</h3><div class="tw"><table><thead><tr><th>報告號</th><th>日期</th><th>診斷</th><th>已擷取</th></tr></thead><tbody>'+
+      ix.items.map(function(x){var done=(r.pathology_specimen||[]).some(function(pth){return pth.path_report_no&&pth.path_report_no===x.report_no;});return '<tr><td class="mono">'+esc(x.report_no)+'</td><td>'+esc(x.date||"")+'</td><td>'+esc(x.diagnosis)+'</td><td>'+(done?'✓':'<span class="desc">尚未</span>')+'</td></tr>';}).join("")+'</tbody></table></div>'+
+      (ix.others&&ix.others.length?'<p class="desc">其他部位報告 '+ix.others.length+' 份（例如 '+esc(ix.others[0].diagnosis.slice(0,60))+'…）— 若為其他原發癌請登在「其他原發癌」</p>':'');
+    area.insertBefore(d,area.firstChild);}
+  return {fromText:fromText,bar:bar,pdfText:pdfText,pasteAny:pasteAny,pasteAnyText:pasteAnyText,spineBar:spineBar,indexBox:indexBox};
 })();
 
 /* ---------- init ---------- */
