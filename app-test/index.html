@@ -5441,15 +5441,13 @@ function drawDetail(id){var r=RECS[id];if(!r){$("#pmDet").innerHTML="";return;}v
   if(!en.flags.today.length&&!en.hasText&&!chg.length)gist+='<span class="g g-ok">無須今日處理</span>';
   gist+='<span class="g '+(l2?"g-vio":"g-grey")+'">'+(l2?"初審 "+E(l2.name)+(b.layer2.length>1?"（共 "+b.layer2.length+" 次）":""):"未初審")+'</span>'+(r.meta.closed?'<span class="g g-ok">已結案 '+E(b.layer3?b.layer3.name:"")+'</span>':"")+
     '<span style="margin-left:auto" class="kbd">填寫 '+E(tsText(b.filledAt))+'　CTCAE '+E(b.ctcaeV)+'　v'+E(r.meta.ver||1)+'</span></div>';
-  var L="",wt=(b.answers||{}).weight||{},wtx=(wt.baseline_kg&&wt.now_kg)?"（"+wt.baseline_kg+" → "+wt.now_kg+" kg，"+Math.round((wt.now_kg-wt.baseline_kg)/wt.baseline_kg*100)+"%）":"";
+  var L="",L2="",wt=(b.answers||{}).weight||{},wtx=(wt.baseline_kg&&wt.now_kg)?"（"+wt.baseline_kg+" → "+wt.now_kg+" kg，"+Math.round((wt.now_kg-wt.baseline_kg)/wt.baseline_kg*100)+"%）":"";
   if(en.flags.today.length)L+='<div class="box b-red"><h3>看診時優先處理</h3><ul>'+en.flags.today.map(function(f){return "<li>"+E(f.text)+(/體重/.test(f.text)?E(wtx):"")+"</li>";}).join("")+'</ul></div>';
   if(en.hasText){L+='<div class="box b-cc"><h3>病人自己說的話</h3>';if(String(cc.text||"").trim())L+='<p class="ccq">'+E(cc.text)+'</p>';if((b.mediaFailed||[]).indexOf("audio")>=0)L+='<p class="msg" style="color:var(--err)">⚠️ 病人錄了音但檔案沒存成功，請直接聯絡病人。</p>';L+='</div>';}
   if(chg.length)L+='<div class="box b-amb"><h3>比上次惡化（'+E(tsText(en.prev.filledAt))+'）</h3><ul>'+chg.map(function(d){return "<li>"+E(d.term)+"　"+d.was+" → <b>"+d.now+"</b></li>";}).join("")+'</ul></div>';
-  if(e.triggers.length)L+='<div class="box b-amb"><h3>建議安排的檢查</h3><ul>'+e.triggers.map(function(t){return "<li>"+E(t)+"</li>";}).join("")+'</ul></div>';
+  if(e.triggers.length)L2+='<div class="box b-amb"><h3>建議安排的檢查</h3><ul>'+e.triggers.map(function(t){return "<li>"+E(t)+"</li>";}).join("")+'</ul></div>';
   var unk=[];if(en.unfilled.length)unk.push("未填："+en.unfilled.join("、"));if(en.flags.unknown.length)unk.push("資料不足："+en.flags.unknown.map(function(f){return f.text;}).join("；"));
-  if(unk.length)L+='<div class="box b-grey"><h3>判不出來（未填 ≠ 沒症狀）</h3><ul>'+unk.map(function(u){return "<li>"+E(u)+"</li>";}).join("")+'</ul></div>';
-  var L2="";if(e.triggers.length){L2+=L.slice(L.lastIndexOf('<div class="box b-amb"><h3>建議安排的檢查'));L=L.slice(0,L.lastIndexOf('<div class="box b-amb"><h3>建議安排的檢查'));}
-  if(unk.length){var ui=L.lastIndexOf('<div class="box b-grey"><h3>判不出來');L2+=L.slice(ui);L=L.slice(0,ui);}
+  if(unk.length)L2+='<div class="box b-grey"><h3>判不出來（未填 ≠ 沒症狀）</h3><ul>'+unk.map(function(u){return "<li>"+E(u)+"</li>";}).join("")+'</ul></div>';
   var L3="";(b.layer2||[]).forEach(function(l,i){L3+='<div class="box b-cc"><h3>第二層　個管師初審'+(b.layer2.length>1?"（第 "+(i+1)+" 次）":"")+'</h3><div class="kv"><dt>初審</dt><dd>'+E(l.name)+'　'+E(tsText(l.at))+'</dd><dt>緊急度</dt><dd>'+E(URG[l.urgency]||l.urgency)+'　'+(l.contacted?"已電聯":"未電聯")+(l.signal?"　"+E(SIG[l.signal]||l.signal):"")+'</dd>'+
     (l.terms&&l.terms.length?'<dt>對應詞條</dt><dd>'+E(l.terms.join("、"))+'</dd>':"")+(l.note?'<dt>加註</dt><dd>'+E(l.note)+'</dd>':"")+'</div></div>';});
   if(b.layer3)L3+='<div class="box b-ok"><h3>第三層　醫師確認</h3><div class="kv"><dt>確認</dt><dd>'+E(b.layer3.name)+'　'+E(tsText(b.layer3.at))+'</dd><dt>等級</dt><dd>'+E(Object.keys(b.layer3.grades).sort().map(function(k){return k+" G"+b.layer3.grades[k];}).join("、")||"—")+'</dd>'+(b.layer3.plan?'<dt>處置</dt><dd>'+E(b.layer3.plan)+'</dd>':"")+'</div></div>';
