@@ -2141,20 +2141,23 @@ var DOCP=(function(){
     if(!h.length||!h.every(function(x){return /^[A-Za-z][\w.\-\/%]*$/.test(x.name);}))return null;if(h.length>2&&known<2)return null;return h;}
   var LAB_MAP={"WBC":"wbc","Neu.":"neu_pct","Lym.":"lym_pct","Hb":"hb","PLT":"plt","CRE":"cre","GFR":"egfr","Alb.BCG":"alb","Albumin":"alb","hsCRP":"crp","CRP":"crp","Na":"na","K":"k","T-Bil.":"tbil","AST":"ast","ALT":"alt","BUN":"bun"};
   function wide(l){return l.replace(/[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]/g,function(c){return c+c;});}
-  function parseLabs(text){var t=norm(text),lines=t.split("\n"),rows=[],hdr=null,i,m;
+  function parseLabs(text){var t=norm(text),lines=t.split("\n"),rows=[],hdr=null,i,m,unassigned=[],orphan=0;
     for(i=0;i<lines.length;i++){var l=wide(lines[i]);
       var hh=labHeader(l);if(hh){hdr=hh;continue;}
+      if(!hdr&&/^\d{7}\s/.test(l)){orphan++;continue;}
       if(hdr&&(m=l.match(/^(\d{7})\s/))){var d=toISO(m[1]);if(!d)continue;
         /* assign each value token to the nearest header column by start position (tolerates a few columns of drift) */
         var re2=/\S+/g,tok;while((tok=re2.exec(l))){if(tok.index===0)continue;var v=tok[0],best=-1,bd=1e9;
           for(var c=0;c<hdr.length;c++){var dd=Math.abs(hdr[c].at-tok.index);if(dd<bd){bd=dd;best=c;}}
-          if(best<0||bd>4)continue;var vv=v.replace(/[*HL]+$/,"");if(vv==="-"||/^[<>]/.test(vv))continue;var num=parseFloat(vv);if(isNaN(num)||!/^-?\d/.test(vv))continue;
+          if(best<0||bd>4){if(/^[<>]?-?\d+(?:\.\d+)?[*HL]*$/.test(v)&&!/^\d{5,}$/.test(v))unassigned.push(m[1]+" "+v);continue;}var vv=v.replace(/[*HL]+$/,"");if(vv==="-"||/^[<>]/.test(vv))continue;var num=parseFloat(vv);if(isNaN(num)||!/^-?\d/.test(vv))continue;
           rows.push({date:d,test:hdr[best].name,value:num,flag:/[*HL]$/.test(v)});}}}
     if(!rows.length)return {kind:"labs",ok:false,fields:[],note:"找不到檢驗值表格(需有檢驗項目表頭與 7 碼日期列)"};
     var F=[],dates=rows.map(function(r){return r.date;}).sort(),base=dates[0];
     Object.keys(LAB_MAP).forEach(function(k){var f=LAB_MAP[k];if(F.some(function(x){return x.f==="lab_"+f;}))return;var r=rows.filter(function(x){return x.test===k;}).sort(function(a,b){return a.date<b.date?-1:1;})[0];if(r)F.push(V("lab_"+f,String(r.value),k+" "+r.value+" ("+r.date+")",r.date===base));});
     if(rows.length)F.push(V("lab_date",base,"最早一次檢驗日 "+base+"（共 "+dates.length+" 筆、"+rows.length+" 個值）",false));
-    return {kind:"labs",ok:F.length>1,fields:F,meta:{rows:rows,dates:Array.from(new Set(dates)),n:rows.length}};}
+    /* monitoring: values that could not be placed under a header column, and dated rows with no header above them → new layout variant, needs a human look */
+    var warn=[];if(unassigned.length)warn.push("有 "+unassigned.length+" 個數值無法對到表頭欄（可能是新版型）："+unassigned.slice(0,5).join("；"));if(orphan)warn.push("有 "+orphan+" 列日期資料前面沒有表頭，已略過");
+    return {kind:"labs",ok:F.length>1,fields:F,meta:{rows:rows,dates:Array.from(new Set(dates)),n:rows.length,unassigned:unassigned,orphan:orphan,warn:warn}};}
   /* biomarker (PD-L1 IHC) report */
   function parseBiomarker(text){var t=norm(text),F=[],meta={},m;
     if(!/PD-?L1|pharmDx|\bCPS\b|\bTPS\b|22C3|28-8|SP263|SP142/i.test(t))return {kind:"biomarker",ok:false,fields:[],note:"不像生物標記報告"};
@@ -2266,7 +2269,7 @@ var DOCIMPORT=(function(){
           (out.core?"帶入："+(out.core.filled.join("、")||"無（欄位已有值）")+(out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):""):"這份胃鏡沒有可帶入的欄位（沒有距門齒距離）")+"\n\n請到核心補登「① 首次內視鏡報告」核對。";
         dialog({title:"胃鏡報告",info:1,msg:msg,ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
       if(out.kind==="serology"){dialog({title:"已帶入肝炎血清結果",info:1,msg:"帶入："+(out.core.filled.join("、")||"無")+(out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):"")+"\n\n請到核心補登「⑥ 病毒性肝炎」核對。",ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
-      if(out.kind==="labs"){dialog({title:"已帶入基礎檢驗值",info:1,msg:"讀到 "+out.meta.rows.length+" 個檢驗值（"+out.meta.dates.length+" 個日期，全部已保存在病人紀錄），基礎值取最早一次 "+out.meta.dates[0]+"。\n\n帶入："+((out.core&&out.core.filled.join("、"))||"無（欄位已有值）")+(out.core&&out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):"")+"\n\n請到核心補登「⑦ 治療前基礎檢驗值」確認該日期是首次治療前；若不是，請改填正確日期與數值。",ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
+      if(out.kind==="labs"){dialog({title:"已帶入基礎檢驗值",info:1,msg:"讀到 "+out.meta.rows.length+" 個檢驗值（"+out.meta.dates.length+" 個日期，全部已保存在病人紀錄），基礎值取最早一次 "+out.meta.dates[0]+"。\n\n帶入："+((out.core&&out.core.filled.join("、"))||"無（欄位已有值）")+(out.core&&out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):"")+(out.meta.warn&&out.meta.warn.length?"\n\n⚠️ 請人工核對：\n・"+out.meta.warn.join("\n・"):"")+"\n\n請到核心補登「⑦ 治療前基礎檢驗值」確認該日期是首次治療前；若不是，請改填正確日期與數值。",ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
       if(out.kind==="pathlist"){dialog({title:"已建立病理索引",info:1,msg:"食道相關 "+out.eso+" 份、其他 "+out.other+" 份。索引列在「病理與檢體」分頁上方；需要細看的報告，再把該份全文貼進來。",ok:"知道了"}).then(function(){tab="pathology_specimen";renderMain();});return;}
       tab=out.fmId;renderMain();report(out.res,out.fmId);});}
   function spineBar(){var sp=$(".spine");if(!sp||$("#spinePaste")||!SEC.can("docin")||auditMode())return;var b=document.createElement("button");b.className="btn go";b.type="button";b.id="spinePaste";b.textContent="貼上任何報告 → 自動辨識";b.style.marginTop="8px";b.onclick=pasteAny;sp.appendChild(b);}
