@@ -233,6 +233,9 @@ h3{font-size:1rem;color:var(--ink);}
 @media (prefers-color-scheme: dark){.opts button{background:#1C262B;border-color:#5A6A72;color:var(--ink);} input[type=text],select,textarea{background:#151D21;border-color:#5A6A72;}}
 .chip{font-size:.84rem;color:var(--soft);} .chip b{color:var(--ink);font-weight:600;}
 .bkbar{position:sticky;top:0;z-index:40;background:#FBF1DE;color:#6d4205;border-bottom:1px solid #E8CC95;padding:8px 16px;font-size:.9rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;} .bkbar[hidden]{display:none!important;} .bkhint{font-size:.8rem;opacity:.85;}
+.inst{border:2px solid var(--rule);border-radius:8px;margin:0 0 18px;} .inst .ih b{background:#0D6468;color:#fff;padding:2px 9px;border-radius:4px;} .inst.done{background:var(--well);} .inst.done .ib,.inst.collapsed .ib{display:none;}
+.inst .f.filled{border-left:3px solid #0D6468;padding-left:10px;background:linear-gradient(90deg,rgba(13,100,104,.06),transparent 40%);} .inst.compact .f:not(.filled):not(.req):not(.srcrow){display:none;} .inst.compact .srcrow{display:none;} .inst.compact h3[data-sech]{display:none;}
+.ih .btn.mini{font-size:.78rem;padding:3px 8px;} .ih .cnt{font-size:.8rem;color:var(--soft);margin-left:6px;}
 .asgbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 10px;font-size:.88rem;} .asgbar label{display:flex;gap:4px;align-items:center;} .pill.ok{background:var(--okbg,#DDF0E7);color:var(--ok,#1E7355);} .mono{font-family:ui-monospace,Consolas,monospace;}
 .sync{font-size:.8rem;color:var(--ok,#1E7355);white-space:nowrap;} .sync.busy{color:var(--soft);} .sync.off{color:var(--warn,#A0660F);} .sync.bad{color:var(--err);font-weight:600;}
 #auth{position:fixed;inset:0;z-index:90;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto;}
@@ -720,7 +723,10 @@ function renderForm(){
   else{
     var arr=r[fm.id];arr.forEach(function(x){if(!x._uid)x._uid=uid("i");});
     area.innerHTML=(arr.length?"":'<p class="empty">這位病人還沒有'+fm.name+'紀錄。病歷沒有就不用新增。</p>')+
-      arr.map(function(x,i){return '<div class="inst" data-i="'+i+'"><div class="ih"><b>第 '+(i+1)+' 筆</b><span>'+esc(summary(fm,x))+'</span>'+
+      arr.map(function(x,i){var nf=(BYFORM[fm.id]||[]).filter(function(f){return isData(f)&&x[f.v]!=null&&x[f.v]!==""&&!(Array.isArray(x[f.v])&&!x[f.v].length);}).length;
+        var collapsed=x._s===2?x._open!==true:x._open===false;
+        return '<div class="inst'+(x._s===2?" done":"")+(collapsed?" collapsed":"")+(x._compact?" compact":"")+'" data-i="'+i+'"><div class="ih"><b>第 '+(i+1)+' 筆</b><span>'+esc(summary(fm,x))+'</span><span class="cnt">已填 '+nf+' 欄</span>'+
+        '<button class="btn mini" type="button" data-tog="'+i+'">'+(collapsed?"展開":"收合")+'</button><button class="btn mini" type="button" data-cmp="'+i+'">'+(x._compact?"顯示全部欄位":"只看有值")+'</button>'+
         '<button class="btn" type="button" data-done="'+i+'">'+(x._s===2?"已完成":"標記完成")+'</button><button class="btn warn" type="button" data-del="'+i+'">刪除</button></div>'+
         '<div class="ib">'+(x._docnote&&x._docnote.length?'<ul class="dflags">'+x._docnote.map(function(n){return '<li>'+n+'</li>';}).join("")+'</ul>':'')+(x._docsrc?'<p class="desc">由文件擷取：'+esc(x._docsrc)+'</p>':'')+fieldsHtml(fm,x,"i"+i+"_")+'</div></div>';}).join("")+
       '<div class="addrow"><button class="btn" type="button" id="bAdd">＋ 新增一筆'+fm.name+'</button></div>';
@@ -739,6 +745,9 @@ function renderForm(){
       if(DB.q.some(function(q){return q.inst===x._uid&&(q.status==="open"||q.status==="returned");})){toast("這一筆有未結案的問題，請先結案或撤回");return;}
       guardEdit(fm,x,function(){ask("刪除第 "+(i+1)+" 筆"+fm.name+"？").then(function(ok){if(!ok)return;arr.splice(i,1);logChange(fm.id,"刪除第 "+(i+1)+" 筆");persist();renderForm();refreshCur();});});};});
     $$("[data-done]",area).forEach(function(b){b.onclick=function(){completeInst(fm,arr[+b.dataset.done]);};});
+    $$("[data-tog]",area).forEach(function(b){b.onclick=function(){var x=arr[+b.dataset.tog];x._open=$('.inst[data-i="'+b.dataset.tog+'"]',area).classList.contains("collapsed");renderForm();};});
+    $$("[data-cmp]",area).forEach(function(b){b.onclick=function(){var x=arr[+b.dataset.cmp];x._compact=!x._compact;renderForm();};});
+    arr.forEach(function(x,i){var box=$('.inst[data-i="'+i+'"]',area);if(!box)return;$$(".f",box).forEach(function(w){if(w.dataset.src)return;var f=FIELD[w.dataset.f];if(!f)return;var v=x[f.v];var has=!(v==null||v===""||(Array.isArray(v)&&!v.length));w.classList.toggle("filled",has);if(f.req)w.classList.add("req");});});
   }
   if(tab==="systemic_line"&&typeof CHEMO!=="undefined"&&!auditMode()){CHEMO.renderDrafts(area);
     if(SEC.can("chemoin")){var ib=document.createElement("div");ib.className="addrow";ib.innerHTML='<button class="btn" type="button" id="bQrpCur">匯入這位病人的化療明細表(QRP)</button><span class="desc"> 系統會核對明細表上的病歷號是否為 '+esc(cur)+'</span>';
