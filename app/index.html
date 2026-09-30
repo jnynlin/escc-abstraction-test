@@ -2080,10 +2080,26 @@ var DOCP=(function(){
     return {kind:"path",ok:F.length>1,fields:F,meta:meta};}
   /* staging imaging: CT structured "Report Form for Esophageal Carcinoma", FDG PET/CT, EUS -> staging_imaging form */
   function tnm(str){var m=String(str||"").match(/\b(?:c|y|p)?T\s*(x|0|is|1a|1b|1|2|3|4a|4b|4)\s*,?\s*(?:c|p)?N\s*(x|0|1|2|3)(?:\s*,?\s*(?:c|p)?M\s*(x|0|1a|1b|1))?/i);return m?{t:m[1].toLowerCase(),n:m[2].toLowerCase(),m:m[3]?m[3].toLowerCase():""}:null;}
+  function endoDistances(t){var F=[],m=t.match(/(\d{2})\s*(?:cm)?\s*(?:-|–|~|to)\s*(\d{2})\s*cm\s*(?:distal\s*)?(?:from|below)\s*(?:the\s*)?(?:oral\s*)?(?:bite|incisors?)/i)||t.match(/(?:since|at|over)[^\n]{0,40}?(\d{2})\s*(?:cm)?\s*(?:-|–|~|to)\s*(\d{2})\s*cm/i);
+    if(m){var a=+m[1],b=+m[2];if(a>=15&&b<=45&&b>=a){F.push(V("tumor_upper_cm",String(a),m[0]));F.push(V("tumor_lower_cm",String(b),m[0]));F.push(V("tumor_dist_unknown","0",m[0]));var sg=segsOf(a+" to "+b+" cm");if(sg.length)F.push(V("tumor_segments",sg,m[0]));}}
+    else{var m2=t.match(/\b([UML](?:-[UML])?)\/3\b/i);if(m2){var sg2=segsOf(m2[0]);if(sg2.length)F.push(V("tumor_segments",sg2,m2[0]));}}
+    if((m=t.match(/EGJ (?:is )?at\s*(\d{2})\s*cm/i)))F.push(V("_egj_cm",m[1],m[0],false));return F;}
+  /* diagnostic / follow-up EGD (Procedure Note and Report of Esophagogastroduodenoscopy) */
+  function parseEGD(text){var t=norm(text),F=[],meta={},m;
+    if(!/Esophagogastroduodenoscopy|\[Report of EGD\]|Endoscopic findings/i.test(t))return {kind:"egd",ok:false,fields:[],note:"不像胃鏡報告"};
+    meta.postop=/s\/p\s+(?:thoracoscopic\s+)?esophagectomy|gastric tube pull-?up|anastomosis site/i.test(t);
+    if((m=t.match(/(?:報告日期|檢查日期)\s*[:：]\s*'?(\d{7}|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/))){var d=toISO(m[1]);if(d)meta.date=d;}
+    if((m=t.match(/Indications?\s*[:：]\s*\n?\s*([^\n]+)/i))){meta.indication=m[1].trim();var ind=m[1].toLowerCase();var dm=/symptom|dysphagia|pain|bleed/.test(ind)?"1":/health|screen|check-?up/.test(ind)?"3":/surveillance|follow/.test(ind)?"2":"";if(dm&&!meta.postop)F.push(V("detection_mode",dm,m[0],false));}
+    if((m=t.match(/Specimen of\s+Biopsy\s*[:：]\s*([^\n]+)/i)))meta.biopsy=m[1].trim();
+    var imp=(t.match(/\[Diagnostic Impression\]\s*[:：]?\s*\n([\s\S]*?)(?=\n\s*\[|$)/i)||["",""])[1].trim();meta.impression=imp.split("\n").map(function(l){return l.replace(/^\s*\d+\.\s*/,"").trim();}).filter(Boolean);
+    meta.stricture=/stricture|stenosis|narrowing/i.test(imp);meta.dilation=/dilat/i.test(t);
+    if(!meta.postop)endoDistances(t).forEach(function(f){if(f.f.charAt(0)!=="_")F.push(f);});
+    meta.tumorLike=/tumor|malignan|carcinoma|mass/i.test(imp);
+    return {kind:"egd",ok:true,fields:F,meta:meta};}
   function parseImaging(text){var t=norm(text),F=[],meta={},m,mod="";
     if(/Report Form for Esophageal Carcinoma|CT scan of (?:chest|neck)|Imaging by CT/i.test(t))mod="1";else if(/FDG PET|PET\/CT|PET-CT/i.test(t))mod="2";else if(/EUS findings|endosonograph|Invasion layer/i.test(t))mod="3";else if(/MRI/i.test(t))mod="4";
     if(!mod)return {kind:"imaging",ok:false,fields:[],note:"不像分期影像報告(CT／PET／EUS／MRI)"};
-    var ph=/re-?staging|post[- ]?(?:CCRT|treatment|chemoradi|neoadjuvant)|after (?:CCRT|treatment)/i.test(t)?"2":/recurren|relapse|progress/i.test(t)?"3":"1";F.push(V("si_phase",ph,ph==="1"?"未見再分期或復發字樣，預設初始分期":(t.match(/[^\n]*(?:staging|recurren|relapse|progress|post)[^\n]*/i)||[""])[0],false));
+    var ph=/re-?staging|post[- ]?(?:CCRT|treatment|chemoradi|neoadjuvant)|after (?:CCRT|treatment)|remission/i.test(t)?"2":/recurren|relapse|progress/i.test(t)?"3":"1";F.push(V("si_phase",ph,ph==="1"?"未見再分期或復發字樣，預設初始分期":(t.match(/[^\n]*(?:staging|recurren|relapse|progress|post)[^\n]*/i)||[""])[0],false));
     F.push(V("si_modality",mod,(t.match(/[^\n]*(?:CT scan|FDG PET|EUS|MRI)[^\n]*/i)||[""])[0]));
     if((m=t.match(/Imaging Date\s*:\s*([^\n]+)/i))){var d=toISO(m[1].trim());F.push(V("si_date",d||"",m[0],!!d));}
     else if((m=t.match(/(?:報告日期|檢查日期)\s*[:：]\s*'?(\d{7}|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/))){var d2=toISO(m[1]);if(d2)F.push(V("si_date",d2,m[0],/檢查日期/.test(m[0])));}
@@ -2100,7 +2116,9 @@ var DOCP=(function(){
     if((m=t.match(/Length\s*:\s*(\d+(?:\.\d+)?)\s*cm/i)))F.push(V("si_length_cm",m[1],m[0]));if((m=t.match(/Max(?:imal)? thickness\s*:\s*(\d+(?:\.\d+)?)\s*cm/i)))F.push(V("si_thickness_cm",m[1],m[0]));
     if((m=t.match(/tumor size is about\s*(\d+)\s*x\s*(\d+)\s*mm/i))&&!F.some(function(f){return f.f==="si_length_cm";})){F.push(V("si_length_cm",String(+m[1]/10),m[0]));F.push(V("si_thickness_cm",String(+m[2]/10),m[0]));}
     if((m=t.match(/SUVmax\s*:?\s*(\d+(?:\.\d+)?)/i)))F.push(V("si_suvmax",m[1],(t.match(/[^\n]*SUVmax[^\n]*/i)||[""])[0]));
-    if(mod==="3"){if((m=t.match(/Invasion layer[^:\n]*:\s*([^\n]+)/i))){var dl=m[1].toLowerCase(),dc=/mucosa(?!l)|\bm\b|epitheli/.test(dl)&&!/submucosa|muscularis/.test(dl)?"1":/submucosa/.test(dl)?"2":/muscularis propria/.test(dl)?"3":/adventitia/.test(dl)?"4":/adjacent|organ/.test(dl)?"5":"";if(dc)F.push(V("si_eus_depth",dc,m[0]));}
+    if(mod==="3"){endoDistances(t).forEach(function(f){if(f.f.charAt(0)!=="_")F.push(f);});
+      if(!/Invasion layer/i.test(t)){var dw=/penetrat\w* (?:the )?adventitia|adventitia/i.test(t)?"4":/muscularis propria/i.test(t)?"3":/submucosa/i.test(t)?"2":"";if(dw)F.push(V("si_eus_depth",dw,(t.match(/[^\n]*(?:adventitia|muscularis|submucosa)[^\n]*/i)||[""])[0],false));}
+      if((m=t.match(/Invasion layer[^:\n]*:\s*([^\n]+)/i))){var dl=m[1].toLowerCase(),dc=/mucosa(?!l)|\bm\b|epitheli/.test(dl)&&!/submucosa|muscularis/.test(dl)?"1":/submucosa/.test(dl)?"2":/muscularis propria/.test(dl)?"3":/adventitia/.test(dl)?"4":/adjacent|organ/.test(dl)?"5":"";if(dc)F.push(V("si_eus_depth",dc,m[0]));}
       if((m=t.match(/Length\s*:\s*(\d+(?:\.\d+)?)\s*cm/i))&&!F.some(function(f){return f.f==="si_length_cm";}))F.push(V("si_length_cm",m[1],m[0]));}
     var lnl=checked.filter(function(l){return /paratracheal|gastroduodenal|prevascular|retrotracheal|subaortic|paraaortic|subcarinal|paraesophageal|hilar|cervical, supraclavicular|paracardial/i.test(l);});
     if(!lnl.length&&(m=t.match(/(?:Regional lymphatics|Locoregional LN)[^\n]*:\s*\n?([^\n]+)/i)))lnl=[m[1].trim()];if(lnl.length)F.push(V("si_ln_sites",lnl.join("; ").slice(0,200),lnl.join("; ").slice(0,160)));
@@ -2139,9 +2157,10 @@ var DOCP=(function(){
   function detect(text){var t=norm(text);if(/Dates of Whole Course Radiation|RT Target Summary|External Beam Radiation/i.test(t))return "rt";if(/pharmDx|PD-?L1 (?:IHC|expression)|Combined Positive Score|Tumor Proportion Score/i.test(t))return "biomarker";
     if(/Report Form for Esophageal Carcinoma|FDG PET|EUS findings|Invasion layer|CT scan of (?:chest|neck)|MRI of Brain|Imaging stage/i.test(t)&&!/MICROSCOPIC|Histologic/i.test(t))return "imaging";
     if(/HBsAg|Anti-?HBc|HCV\s*Ab|Anti-?HCV/i.test(t)&&!/carcinoma|biopsy/i.test(t))return "serology";
+    if(/Esophagogastroduodenoscopy|\[Report of EGD\]/i.test(t)&&!/EUS findings|endosonograph|Invasion layer/i.test(t))return "egd";
     if((t.match(/C[A-Z]-[A-Z]\d{3}-\d{4,}/g)||[]).length>=2&&!/MACROSCOPIC SUMMARY/i.test(t)&&!/^\s*(?:中中中中|Diagnosis)\s*:/m.test(t.split("\n").slice(0,3).join("\n")))return "pathlist";if(/pathology|carcinoma|biopsy|specimen/i.test(t))return "path";return "";}
-  function parse(text){var k=detect(text);return k==="rt"?parseRT(text):k==="biomarker"?parseBiomarker(text):k==="imaging"?parseImaging(text):k==="serology"?parseSerology(text):k==="pathlist"?parsePathList(text):k==="path"?parsePath(text):{kind:"",ok:false,fields:[],note:"無法辨識文件類型"};}
-  out={parse:parse,parseRT:parseRT,parsePath:parsePath,parseBiomarker:parseBiomarker,parseImaging:parseImaging,parseSerology:parseSerology,parsePathList:parsePathList,detect:detect,toISO:toISO,norm:norm};return out;
+  function parse(text){var k=detect(text);return k==="rt"?parseRT(text):k==="biomarker"?parseBiomarker(text):k==="imaging"?parseImaging(text):k==="serology"?parseSerology(text):k==="egd"?parseEGD(text):k==="pathlist"?parsePathList(text):k==="path"?parsePath(text):{kind:"",ok:false,fields:[],note:"無法辨識文件類型"};}
+  out={parse:parse,parseRT:parseRT,parsePath:parsePath,parseBiomarker:parseBiomarker,parseImaging:parseImaging,parseSerology:parseSerology,parseEGD:parseEGD,endoDistances:endoDistances,parsePathList:parsePathList,detect:detect,toISO:toISO,norm:norm};return out;
 })();
 if(typeof module!=="undefined")module.exports=DOCP;
 
@@ -2206,12 +2225,20 @@ var DOCIMPORT=(function(){
     if(k==="pathlist"){var L=DOCP.parsePathList(text),r=recOf(id),eso=L.items.filter(function(x){return /esophag|oesophag|mediastin/i.test(x.diagnosis);}),other=L.items.filter(function(x){return !/esophag|oesophag|mediastin/i.test(x.diagnosis);});
       r.pathindex={at:stamp(),items:eso,others:other.map(function(x){return {report_no:x.report_no,date:x.date,diagnosis:x.diagnosis.slice(0,120)};})};
       logChange("pathology_specimen","貼入病理清單："+eso.length+" 份食道相關、"+other.length+" 份其他");persist(true);return {kind:"pathlist",eso:eso.length,other:other.length};}
+    if(k==="egd"){var eg=DOCP.parseEGD(text);if(!eg.ok)return null;var r2=recOf(id),core2=null;
+      if(eg.meta.postop){r2.followup_egd=r2.followup_egd||[];r2.followup_egd.push({date:eg.meta.date||docDate||"",at:stamp(),impression:eg.meta.impression.slice(0,6),stricture:!!eg.meta.stricture,dilation:!!eg.meta.dilation});
+        logChange("core_abstraction","術後追蹤胃鏡："+(eg.meta.impression[0]||"")+(eg.meta.stricture?"（吻合口狹窄）":""));persist(true);}
+      else if(eg.fields.length)core2=applyCore(id,eg,"胃鏡報告");
+      return {kind:"egd",fmId:"core_abstraction",postop:eg.meta.postop,core:core2,meta:eg.meta};}
     if(k==="serology"){var sp=DOCP.parseSerology(text);if(!sp.ok)return null;var cr=applyCore(id,sp,"肝炎血清報告");return cr?{kind:"serology",fmId:"core_abstraction",core:cr}:null;}
     if(!KIND_FM[k])return null;var res=fromText(id,KIND_FM[k],text,docDate||"","貼上文字");return res?{kind:k,fmId:KIND_FM[k],res:res}:null;}
   function pasteAny(){if(!needWho())return;
-    dialog({title:"貼上任何報告",msg:"病理報告、放療摘要、PD-L1 報告、CT／PET／EUS 分期報告、B／C 肝血清報告或病理清單都可以，系統會自動辨識並送到對應表單產生草稿。化療明細表請用 QRP 檔匯入。",
+    dialog({title:"貼上任何報告",msg:"病理報告、胃鏡、放療摘要、PD-L1 報告、CT／PET／EUS 分期報告、B／C 肝血清報告或病理清單都可以，系統會自動辨識並送到對應表單產生草稿。化療明細表請用 QRP 檔匯入。",
       fields:[{k:"t",label:"報告全文",type:"textarea",req:1},{k:"d",label:"報告日期（選填）"}],ok:"辨識並擷取"}).then(function(v){if(!v)return;var d=v.d?parseDate(v.d).iso:"";
       var out=pasteAnyText(cur,v.t,d);if(!out){toast("無法辨識這段文字是哪一種報告");return;}
+      if(out.kind==="egd"){var msg=out.postop?"這是術後追蹤胃鏡（"+(out.meta.stricture?"有吻合口狹窄":"無狹窄")+(out.meta.dilation?"、建議擴張":"")+"）。已記入病人紀錄；手術與併發症表單建好後會轉入。":
+          (out.core?"帶入："+(out.core.filled.join("、")||"無（欄位已有值）")+(out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):""):"這份胃鏡沒有可帶入的欄位（沒有距門齒距離）")+"\n\n請到核心補登「① 首次內視鏡報告」核對。";
+        dialog({title:"胃鏡報告",info:1,msg:msg,ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
       if(out.kind==="serology"){dialog({title:"已帶入肝炎血清結果",info:1,msg:"帶入："+(out.core.filled.join("、")||"無")+(out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):"")+"\n\n請到核心補登「⑥ 病毒性肝炎」核對。",ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
       if(out.kind==="pathlist"){dialog({title:"已建立病理索引",info:1,msg:"食道相關 "+out.eso+" 份、其他 "+out.other+" 份。索引列在「病理與檢體」分頁上方；需要細看的報告，再把該份全文貼進來。",ok:"知道了"}).then(function(){tab="pathology_specimen";renderMain();});return;}
       tab=out.fmId;renderMain();report(out.res,out.fmId);});}
