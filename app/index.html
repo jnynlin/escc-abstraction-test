@@ -1564,9 +1564,10 @@ var SEC=(function(){
     var rows=asgRows(),tags=allTags(),nsel=Object.keys(ASG.sel).length,allSel=rows.length>0&&rows.every(function(id){return ASG.sel[id];});
     var opt=function(v,l,cur){return '<option value="'+esc(v)+'"'+(String(cur)===String(v)?" selected":"")+'>'+esc(l)+'</option>';};
     var prog=function(id){var s=STATE[id]||{};return s.allDone?'<span class="pill ok">完成</span>':s.core_abstraction===2?'核心✓':s.core_abstraction===1?'進行中':'—';};
-    var trs=rows.map(function(id){var p=DB.pre[id]||{},a=DB.assign[id]||"";
+    var rowHtml=function(id){var p=DB.pre[id]||{},a=DB.assign[id]||"";
       return '<tr><td><input type="checkbox" data-sel="'+esc(id)+'"'+(ASG.sel[id]?" checked":"")+'></td><td class="mono">'+esc(id)+'</td><td>'+esc(p.dx_year||"")+'</td><td>'+esc(COHORT_NAME[cohortOf(id)])+'</td><td>'+esc(lbl("tx_pathway",p.tx_pathway)||"")+'</td>'+
-        '<td>'+(a?esc(uname(a)):'<span class="desc">未分派</span>')+'</td><td>'+prog(id)+'</td><td>'+tagsOf(id).map(function(t){return '<span class="pill">'+esc(t)+'</span>';}).join(" ")+(hasData(id)?'':'')+'</td></tr>';}).join("");
+        '<td>'+(a?esc(uname(a)):'<span class="desc">未分派</span>')+'</td><td>'+prog(id)+'</td><td>'+tagsOf(id).map(function(t){return '<span class="pill">'+esc(t)+'</span>';}).join(" ")+'</td></tr>';};
+    var trs=rows.map(rowHtml).join("");
     m.innerHTML='<section class="sheet report"><h3>病人清單與分派</h3><p class="desc">共 '+DB.order.length+' 位，尚未分派 '+(cnt[""]||0)+' 位。組別：'+Object.keys(COHORT_NAME).map(function(k){return COHORT_NAME[k]+" "+(co[k]||0);}).join("／")+'。登錄人員只看得到、也只解得開分派給自己的病人。</p>'+
       '<div class="asgbar"><label>組別 <select id="fG">'+opt("","全部",ASG.g)+Object.keys(COHORT_NAME).map(function(k){return opt(k,COHORT_NAME[k],ASG.g);}).join("")+'</select></label>'+
       '<label>診斷年 <select id="fY">'+opt("","全部",ASG.y)+Object.keys(years).sort().map(function(y){return opt(y,y,ASG.y);}).join("")+'</select></label>'+
@@ -1574,8 +1575,8 @@ var SEC=(function(){
         Object.keys(cnt).filter(function(u){return u&&abs.indexOf(u)<0;}).map(function(u){return opt(u,uname(u)+"（已停用或未加入）",ASG.who);}).join("")+'</select></label>'+
       '<label>標籤 <select id="fT">'+opt("","全部",ASG.tag)+tags.map(function(t){return opt(t,t,ASG.tag);}).join("")+'</select></label>'+
       '<label>研究編號 <input type="text" id="fQ" value="'+esc(ASG.q)+'" placeholder="搜尋" autocomplete="off" style="width:110px"></label>'+
-      '<span class="desc">符合 '+rows.length+' 位・已勾選 <b id="nSel">'+nsel+'</b> 位</span></div>'+
-      '<div class="tw" style="max-height:52vh;overflow:auto"><table><thead><tr><th><input type="checkbox" id="selAll" title="全選／取消全選符合的病人"'+(allSel?" checked":"")+'></th><th>研究編號</th><th>診斷年</th><th>組別</th><th>治療路徑(癌登)</th><th>分派給</th><th>進度</th><th>標籤</th></tr></thead><tbody>'+(trs||'<tr><td colspan="8" class="desc">沒有符合的病人</td></tr>')+'</tbody></table></div>'+
+      '<span class="desc">符合 <b id="nRows">'+rows.length+'</b> 位・已勾選 <b id="nSel">'+nsel+'</b> 位</span></div>'+
+      '<div class="tw" style="max-height:52vh;overflow:auto"><table id="asgTbl"><thead><tr><th><input type="checkbox" id="selAll" title="全選／取消全選符合的病人"'+(allSel?" checked":"")+'></th><th>研究編號</th><th>診斷年</th><th>組別</th><th>治療路徑(癌登)</th><th>分派給</th><th>進度</th><th>標籤</th></tr></thead><tbody>'+(trs||'<tr><td colspan="8" class="desc">沒有符合的病人</td></tr>')+'</tbody></table></div>'+
       '<h3>對勾選的病人</h3>'+(abs.length?
       '<div class="asgbar"><select id="toWho">'+abs.map(function(u){return '<option value="'+u+'">'+esc(uname(u))+'（目前 '+(cnt[u]||0)+' 位）</option>';}).join("")+'</select> <button class="btn go" type="button" id="bTo">分派給這位</button> '+
       '<button class="btn" type="button" id="bEvenSel">平均分給所有登錄人員</button> <button class="btn" type="button" id="bRecall">收回分派</button></div>':'<p class="desc">還沒有核准的登錄人員，請先到「帳號管理」核准。</p>')+
@@ -1586,9 +1587,12 @@ var SEC=(function(){
       '<p><button class="btn" type="button" id="bPkgIn">匯入加密分包</button> <button class="btn" type="button" id="bCsvIn">載入預填檔(CSV)</button></p></section>';
     var re=function(){drawAssign();};
     $("#fG").onchange=function(){ASG.g=this.value;re();};$("#fY").onchange=function(){ASG.y=this.value;re();};$("#fW").onchange=function(){ASG.who=this.value;re();};$("#fT").onchange=function(){ASG.tag=this.value;re();};
-    $("#fQ").oninput=function(){ASG.q=this.value;var v=this.value;re();var q=$("#fQ");q.focus();q.value=v;};
-    $$("[data-sel]",m).forEach(function(c){c.onchange=function(){if(c.checked)ASG.sel[c.dataset.sel]=1;else delete ASG.sel[c.dataset.sel];
-      $("#nSel").textContent=Object.keys(ASG.sel).length;$("#selAll").checked=rows.length>0&&rows.every(function(id){return ASG.sel[id];});};});
+    var bindRows=function(){$$("[data-sel]",m).forEach(function(c){c.onchange=function(){if(c.checked)ASG.sel[c.dataset.sel]=1;else delete ASG.sel[c.dataset.sel];
+      $("#nSel").textContent=Object.keys(ASG.sel).length;$("#selAll").checked=rows.length>0&&rows.every(function(id){return ASG.sel[id];});};});};
+    /* live search only swaps the table rows, so the input keeps focus and caret */
+    $("#fQ").oninput=function(){ASG.q=this.value;rows=asgRows();allSel=rows.length>0&&rows.every(function(id){return ASG.sel[id];});
+      $("#asgTbl tbody").innerHTML=rows.map(rowHtml).join("")||'<tr><td colspan="8" class="desc">沒有符合的病人</td></tr>';$("#nRows").textContent=rows.length;$("#selAll").checked=allSel;bindRows();};
+    bindRows();
     $("#selAll").onclick=function(){var on=!allSel;rows.forEach(function(id){if(on)ASG.sel[id]=1;else delete ASG.sel[id];});re();};
     var selIds=function(){var ids=Object.keys(ASG.sel).filter(function(id){return DOCS[id];});if(!ids.length)toast("請先勾選病人");return ids;};
     var done=function(p,msg){p.then(function(n){toast(msg.replace("#",n));ASG.sel={};refreshStates();renderRail();renderAssign();}).catch(function(e){toast(cErr(e));});};
