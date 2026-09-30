@@ -715,7 +715,7 @@ function renderForm(){
   if(tab==="systemic_line"&&typeof CHEMO!=="undefined"&&!auditMode()){CHEMO.renderDrafts(area);
     if(SEC.can("chemoin")){var ib=document.createElement("div");ib.className="addrow";ib.innerHTML='<button class="btn" type="button" id="bQrpCur">匯入這位病人的化療明細表(QRP)</button><span class="desc"> 系統會核對明細表上的病歷號是否為 '+esc(cur)+'</span>';
       area.insertBefore(ib,area.firstChild);$("#bQrpCur").onclick=function(){CHEMO.pickQrp(cur);};}}
-  if((tab==="rt_course"||tab==="pathology_specimen")&&typeof DOCIMPORT!=="undefined")DOCIMPORT.bar(tab,area);
+  if((tab==="rt_course"||tab==="pathology_specimen"||tab==="biomarker")&&typeof DOCIMPORT!=="undefined")DOCIMPORT.bar(tab,area);
   updateDock();
 }
 function summary(fm,x){
@@ -1974,37 +1974,51 @@ var DOCP=(function(){
   function gradeCode(s){s=s.toLowerCase();var m=s.match(/\bg\s*([1-3x])\b/);if(m)return m[1]==="x"?"4":m[1];if(/well[- ]differentiated/.test(s))return "1";if(/moderately[- ]differentiated/.test(s))return "2";if(/poorly[- ]differentiated|undifferentiated/.test(s))return "3";return "";}
   function locCode(s){s=s.toLowerCase();if(/e-?g junction|gastroesophageal|cardia/.test(s))return "4";if(/\bm-l\/3|middle[- ]lower/.test(s))return "3";if(/\bu-m\/3|upper[- ]middle/.test(s))return "2";if(/\bu\/3\b/.test(s))return "1";if(/\bm\/3\b/.test(s))return "2";if(/\bl\/3\b/.test(s))return "3";if(/upper|cervical|proximal third|u\/3/.test(s))return "1";if(/middle|mid|m\/3/.test(s))return "2";if(/lower|distal third|l\/3/.test(s))return "3";
     var m=s.match(/(\d{2})\s*(?:cm)?\s*(?:to|-|~)\s*(\d{2})\s*cm/);if(m){var mid=(+m[1]+ +m[2])/2;return mid<25?"1":mid<30?"2":"3";}return "";}
-  function parsePath(text){var t=norm(text),F=[],meta={},m,low=t.toLowerCase();
+  function parsePath(text){var t=norm(text).replace(/\n\s*Ref\s*:[\s\S]*$/i,""),F=[],meta={},m,low=t.toLowerCase();
     var synoptic=/MACROSCOPIC SUMMARY|MICROSCOPIC EXAMINATION|Histologic Type/i.test(t);meta.synoptic=synoptic;
+    var head=t.split("\n").filter(function(l){return /,\s*[^,\n]{0,40}?(?:biopsy|dissection|esophagectomy|resection|polypectomy|excision|hepatectomy|colectomy|gastrectomy|lymphadenectomy|nephrectomy|mastectomy|lobectomy|EBUS|TBNA)/i.test(l);}).slice(0,3).join(" ");
+    if(head&&!/esophag|oesophag|mediastin|lymph node/i.test(head)){var organ=(head.match(/^\s*\d*\.?\s*([A-Za-z ]+?),/)||["",""])[1].trim();meta.nonEsophageal=organ||"非食道";return {kind:"path",ok:false,fields:[],meta:meta,note:"這份報告的檢體是「"+(organ||"非食道器官")+"」,不是食道；如果是其他原發癌，請登在「其他原發癌」"};}
     if((m=t.match(/\b(CA-[A-Z]\d{3}-\d{4,})\b/)))F.push(V("path_report_no",m[1],m[0]));
     /* diagnosis text = the lines that read like a diagnosis (site, procedure, histology), wherever the header puts them */
     var dlines=t.split("\n").filter(function(l){return /carcinoma|malignancy|neoplasia|dysplasia|hyperplasia|adenoma|,\s*(?:biopsy|dissection|esophagectomy|resection|polypectomy|excision)/i.test(l)&&!/^\s*(?:Microscopically|Grossly|The specimen)/i.test(l);});
     var dtext=dlines.length?dlines.slice(0,12).join("\n"):t.slice(0,600);
     // specimen type
-    var type=/esophagectomy|esophagogastrectomy/i.test(dtext+" "+(t.match(/Specimen Type\s*:\s*([^\n]+)/i)||["",""])[1])?"3":/endoscopic submucosal|\bESD\b|\bEMR\b|endoscopic mucosal/i.test(t)?"2":/lymph node/i.test(dtext)&&!/esophag/i.test(dtext)?"4":/biopsy/i.test(dtext)?"1":"";
+    var type=/esophagectomy|esophagogastrectomy/i.test(dtext+" "+(t.match(/Specimen Type\s*:\s*([^\n]+)/i)||["",""])[1])?"3":/endoscopic submucosal|\bESD\b|\bEMR\b|endoscopic mucosal/i.test(t)?"2":/^\s*\d*\.?\s*lymph node/im.test(dtext)&&!/esophag(?!.*lymph)/i.test(dtext.split("\n")[0])?"4":/biopsy|EBUS|TBNA/i.test(dtext)?"1":"";
+    if(type==="1"&&/EBUS|TBNA|lymph node/i.test(dtext.split("\n")[0]))type="4";
     if(type)F.push(V("path_type",type,(t.match(/Specimen Type\s*:\s*[^\n]+/i)||[dtext.split("\n")[0]])[0]));
-    var neo=/status post (?:CCRT|chemoradiation|neoadjuvant)|s\/p CCRT|after neoadjuvant chemoradio|ypT/i.test(t)?"2":/status post (?:chemotherapy|C\/T)|after neoadjuvant chemo(?!radi)/i.test(t)?"1":"";
+    var neo=/status post (?:CCRT|chemoradiation|neoadjuvant)|s\/p CCRT|after neoadjuvant chemoradio|ypT|y \(post-treatment\)|status of neoadjuvant therapy/i.test(t)?"2":/status post (?:chemotherapy|C\/T)|after neoadjuvant chemo(?!radi)/i.test(t)?"1":"";
     if(type==="3"||type==="2")F.push(V("path_neo",neo||"0",(t.match(/status post[^\n,.]*/i)||[neo?"ypT":"無術前治療字樣"])[0],!!neo));
-    var hist=histoCode((t.match(/Histologic Type\s*:\s*([^\n]+)/i)||["",dtext])[1]);if(hist)F.push(V("path_histo",hist,(t.match(/Histologic Type\s*:[^\n]+/i)||[dtext.split("\n").filter(function(l){return /carcinoma|malignancy/i.test(l);})[0]||""])[0]));
-    var gr=gradeCode((t.match(/Histologic Grade\s*:\s*([^\n]+)/i)||["",dtext])[1]);if(gr)F.push(V("path_grade",gr,(t.match(/Histologic Grade\s*:[^\n]+/i)||[(dtext.match(/[^\n]*differentiated[^\n]*/i)||[""])[0]])[0]));
+    var htxt=(t.match(/Histologic Type\s*:\s*([^\n]+)/i)||["",dtext])[1],hist=histoCode(htxt);
+    if(hist==="3"&&/squamous cell carcinoma with (?:focal )?(?:sarcomatoid|spindle)/i.test(htxt)){hist="1";meta.histoNote="鱗癌伴肉瘤樣變化(sarcomatoid change)：暫歸鱗狀細胞癌，若為梭形細胞癌請改選";}
+    if(!hist&&type==="4"&&/metastatic carcinoma/i.test(t))hist=/p40\s*\(\s*(?:diffuse\s*)?\+|squamous/i.test(t)?"1":"";
+    if(hist)F.push(V("path_histo",hist,(t.match(/Histologic Type\s*:[^\n]+/i)||[dtext.split("\n").filter(function(l){return /carcinoma|malignancy/i.test(l);})[0]||""])[0],!meta.histoNote));
+    var gr=gradeCode((t.match(/Histologic Grade\s*:\s*([^\n]+)/i)||["",dtext])[1])||gradeCode((t.match(/[^\n]*(?:well|moderately|poorly)[- ]differentiated[^\n]*/i)||[""])[0]);if(gr)F.push(V("path_grade",gr,(t.match(/Histologic Grade\s*:[^\n]+/i)||[(dtext.match(/[^\n]*differentiated[^\n]*/i)||[""])[0]])[0]));
     var lc=locCode((t.match(/Tumor Site\s*:\s*([^\n]+)/i)||["",dtext])[1]);if(lc)F.push(V("path_location",lc,(t.match(/Tumor Site\s*:[^\n]+/i)||[(dtext.match(/[^\n]*(?:thoracic|third|incisor|junction)[^\n]*/i)||[""])[0]])[0]));
     if((m=t.match(/Greatest dimension\s*:\s*(\d+(?:\.\d+)?)/i))||(m=t.match(/(?:tumor|lesion)[^\n]{0,60}?measur(?:ing|es)\s*(?:up to\s*)?(\d+(?:\.\d+)?)\s*(?:[x\*×]|cm|mm)/i))){var sz=+m[1];if(/(\d+(?:\.\d+)?)\s*mm/i.test(m[0])&&!/cm/i.test(m[0]))sz=sz/10;F.push(V("path_size_cm",String(sz),m[0]));}
-    if((m=t.match(/\(?\s*p?T\s*\)?\s*:\s*y?pT\s*(is|0|1a|1b|1|2|3|4a|4b|4|x)\b/i))||(m=t.match(/\by?pT(is|0|1a|1b|1|2|3|4a|4b|4|x)\s*N/i))||(m=t.match(/\bpT(is|1a|1b)\b/i)))F.push(V("path_pt",m[1].toLowerCase()==="x"?"x":m[1].toLowerCase(),m[0]));
+    if((m=t.match(/\(?\s*p?T\s*\)?\s*:\s*y?pT\s*(is|0|1a|1b|1|2|3|4a|4b|4|x)\b/i))||(m=t.match(/\by?pT(is|0|1a|1b|1|2|3|4a|4b|4|x)\s*N/i))||(m=t.match(/pT Category\s*:\s*y?pT\s*(is|0|1a|1b|1|2|3|4a|4b|4|x)\b/i))||(m=t.match(/\by?pT\s*(is|0|1a|1b|1|2|3|4a|4b|4|x)\s*,?\s*(?:c|y)?p?N/i))||(m=t.match(/\bpT(is|1a|1b)\b/i)))F.push(V("path_pt",m[1].toLowerCase()==="x"?"x":m[1].toLowerCase(),m[0]));
     else if(/carcinoma,? in situ|intraepithelial neoplasia|\bHGIN\b/i.test(dtext))F.push(V("path_pt","is",(dtext.match(/[^\n]*(?:in situ|intraepithelial|HGIN)[^\n]*/i)||[""])[0],false));
-    if((m=t.match(/\(?\s*p?N\s*\)?\s*:\s*y?pN\s*(0|1|2|3|x)\b/i))||(m=t.match(/\by?pT[0-4][ab]?\s*N(0|1|2|3|x)\b/i)))F.push(V("path_pn",m[1].toLowerCase(),m[0]));
+    if((m=t.match(/\(?\s*p?N\s*\)?\s*:\s*y?pN\s*(0|1|2|3|x)\b/i))||(m=t.match(/pN Category\s*:\s*y?pN\s*(0|1|2|3|x)\b/i))||(m=t.match(/\by?pT(?:is|[0-4][ab]?)\s*,?\s*y?p?N\s*(0|1|2|3|x)\b/i)))F.push(V("path_pn",m[1].toLowerCase(),m[0]));
     if((m=t.match(/Number examined\s*:\s*(\d+)/i)))F.push(V("path_ln_exam",m[1],m[0]));else if((m=t.match(/Negative for malignancy \((\d+)\/(\d+)\)/i)))F.push(V("path_ln_exam",m[2],m[0]));
-    if((m=t.match(/Number involved\s*:\s*(\d+)/i)))F.push(V("path_ln_pos",m[1],m[0]));else if((m=t.match(/lymph node[^\n]*\((\d+)\/(\d+)\)[^\n]*(?:\((\d+)\/(\d+)\))?/i))){var tot=m[0].match(/\((\d+)\/(\d+)\)\s*\.?$/);if(tot){F.push(V("path_ln_pos",tot[1],m[0]));if(!F.some(function(x){return x.f==="path_ln_exam";}))F.push(V("path_ln_exam",tot[2],m[0]));}}
-    if((m=t.match(/extranodal extension\s*:\s*(absent|present|not identified)/i)))F.push(V("path_ene",/present/i.test(m[1])?"1":"0",m[0]));
-    var margins=t.match(/Margin[^\n]*:\s*(Uninvolved|Involved)[^\n]*/gi)||[];
-    if(margins.length){var r=margins.some(function(x){return /:\s*Involved/i.test(x);})?"2":"1";F.push(V("path_margin",r,margins.join(" | ")));}
+    if((m=t.match(/Number involved\s*:\s*(\d+)/i)))F.push(V("path_ln_pos",m[1],m[0]));
+    else{var lnLines=t.split("\n").filter(function(l){return /lymph node|nodes involved|Specify \(nodes/i.test(l)&&/\(\d+\/\d+\)/.test(l);});
+      var spec=lnLines.filter(function(l){return /Specify|involved\/\s*exam/i.test(l);});if(spec.length)lnLines=spec;
+      if(lnLines.length){var pos=0,ex=0,pairs=0;lnLines.forEach(function(l){var re=/\((\d+)\/(\d+)\)/g,mm;while((mm=re.exec(l))){pos+=+mm[1];ex+=+mm[2];pairs++;}});
+        if(pairs){F.push(V("path_ln_pos",String(pos),lnLines.join(" | ").slice(0,160),true));if(!F.some(function(x){return x.f==="path_ln_exam";}))F.push(V("path_ln_exam",String(ex),lnLines.join(" | ").slice(0,160),true));}}}
+    if((m=t.match(/extra(?:nodal|capsular) extension\s*:\s*(absent|present|not identified)/i)))F.push(V("path_ene",/present/i.test(m[1])?"1":"0",m[0]));
+    var margins=t.match(/(?:margin|cut-end|anastomosis ring)[^\n]*:\s*(?:Uninvolved|Involved|Free of tumor|Free|Clear|Negative|Positive)[^\n]*/gi)||[];
+    if(margins.length){var r=margins.some(function(x){return /:\s*(?:Involved|Positive)/i.test(x);})?"2":"1";F.push(V("path_margin",r,margins.slice(0,4).join(" | ")));}
     else if(/R0\b/.test(t))F.push(V("path_margin","1",(t.match(/[^\n]*R0[^\n]*/)||[""])[0]));else if(/R1\b/.test(t))F.push(V("path_margin","2",(t.match(/[^\n]*R1[^\n]*/)||[""])[0]));
-    if((m=t.match(/closest margin\s*:\s*(less than|<|>|at least)?\s*(\d+(?:\.\d+)?)\s*(mm|cm)/i))){var mm=+m[2]*(m[3].toLowerCase()==="cm"?10:1);F.push(V("path_margin_mm",String(mm),m[0],!/less than|</.test(m[1]||"")));
+    if(!(m=t.match(/closest margin\s*:\s*(less than|<|>|at least)?\s*(\d+(?:\.\d+)?)\s*(mm|cm)/i))&&(m=t.match(/()(\d+(?:\.\d+)?)\s*(cm|mm) to (?:the )?(?:outmost|radial|circumferential|adventitial)/i)))meta.marginGross=true;
+    if(m){var mm=+m[2]*(m[3].toLowerCase()==="cm"?10:1);F.push(V("path_margin_mm",String(mm),m[0],!/less than|</.test(m[1]||"")));
       if(/less than|</.test(m[1]||"")&&mm<=1)meta.marginNote="最近切緣 <1 mm:CAP 判 R0,RCPath 判 R1,請選判定依據";}
     if((m=t.match(/Lymphovascular invasion\s*:\s*(absent|present|not identified|identified)/i)))F.push(V("path_lvi",/^(present|identified)$/i.test(m[1])?"1":"0",m[0]));
-    if((m=t.match(/Perineural invasion\s*:\s*(absent|present|not identified|identified)/i)))F.push(V("path_pni",/^(present|identified)$/i.test(m[1])?"1":"0",m[0]));
+    else if((m=t.match(/no (?:definite )?evidence of (?:lymphovascular|lymph-vascular|lymphatic|vascular)[^\n.]*?(?:permeation|invasion)[^\n.]*/i)))F.push(V("path_lvi","0",m[0],false));
+    if(!F.some(function(x){return x.f==="path_pni";})&&(m=t.match(/no (?:definite )?evidence of[^\n.]*?perineural invasion[^\n.]*/i)))F.push(V("path_pni","0",m[0],false));
+    if(!F.some(function(x){return x.f==="path_pni";})&&(m=t.match(/Perineural invasion\s*:\s*(absent|present|not identified|identified)/i)))F.push(V("path_pni",/^(present|identified)$/i.test(m[1])?"1":"0",m[0]));
     if((m=t.match(/(?:Tumor regression grade|TRG|Treatment effect)\s*:?\s*(\d)\s*(?:\(([^)]+)\))?/i))){var sys=/mandard/i.test(m[2]||"")?"1":/cap|ryan/i.test(m[2]||"")?"2":/becker/i.test(m[2]||"")?"3":/jes|japan/i.test(m[2]||"")?"4":"";F.push(V("path_trg",m[1],m[0]));if(sys)F.push(V("path_trg_sys",sys,m[0]));}
-    if(/ypT0\s*N0|no residual (?:tumor|carcinoma)|complete pathologic(?:al)? response/i.test(t))F.push(V("path_pcr","1",(t.match(/[^\n]*(?:ypT0|no residual|complete pathologic)[^\n]*/i)||[""])[0]));else if(neo)F.push(V("path_pcr","0","有殘存腫瘤(ypT>0 或未見 pCR 字樣)",false));
-    if((m=t.match(/\((\d{4})\s*AJCC\)|AJCC\s*(\d)(?:th|st|nd|rd)\s*(?:ed|edition)|(\d)(?:th|st|nd|rd)\s*(?:ed|edition)\s*AJCC/i))){var yr=m[1]?+m[1]:null,ed=m[2]||m[3];var code=yr?(yr>=2017?"1":"3"):ed?(+ed>=8?"1":"3"):"";if(code)F.push(V("path_stage_sys",code,m[0]));}else if(/UICC.{0,10}9/i.test(t))F.push(V("path_stage_sys","2",(t.match(/[^\n]*UICC[^\n]*/i)||[""])[0]));
+    else if((m=t.match(/Treatment Effect\s*:[^\n]*?(?:score|grade)\s*(\d)/i))){F.push(V("path_trg",m[1],m[0]));F.push(V("path_trg_sys",/mandard/i.test(m[0])?"1":"2",m[0],/mandard|ryan|cap/i.test(m[0])));}
+    if(/ypT0\s*,?\s*N0|no residual (?:tumor|carcinoma)|complete pathologic(?:al)? response|Treatment Effect\s*:[^\n]*(?:complete response|score 0)/i.test(t))F.push(V("path_pcr","1",(t.match(/[^\n]*(?:ypT0|no residual|complete pathologic)[^\n]*/i)||[""])[0]));else if(neo&&type==="3")F.push(V("path_pcr","0","有殘存腫瘤(ypT>0 或未見 pCR 字樣)",false));
+    if((m=t.match(/\((\d{4})\s*AJCC\)|AJCC,?\s*(\d)(?:th|st|nd|rd)\s*(?:ed|edition)|(\d)(?:th|st|nd|rd)\s*(?:ed|edition)\s*AJCC/i))){var yr=m[1]?+m[1]:null,ed=m[2]||m[3];var code=yr?(yr>=2017?"1":"3"):ed?(+ed>=8?"1":"3"):"";if(code)F.push(V("path_stage_sys",code,m[0]));}else if(/UICC.{0,10}9/i.test(t))F.push(V("path_stage_sys","2",(t.match(/[^\n]*UICC[^\n]*/i)||[""])[0]));
     if((m=t.match(/(?:Depth of invasion|invasion depth)\s*:?\s*([^\n]+)/i))&&type==="2"){var dl=m[1].toLowerCase(),dc=/\bep\b|epithelium|intraepithelial/.test(dl)?"1":/lpm|lamina propria/.test(dl)?"2":/\bmm\b|muscularis mucosa/.test(dl)?"3":/sm1|≤\s*200|<\s*200/.test(dl)?"4":/sm2|sm3|>\s*200|submucosa/.test(dl)?"5":"";if(dc)F.push(V("path_esd_depth",dc,m[0],dc!=="5"));
       var um=dl.match(/(\d{2,5})\s*(?:μm|um|µm)/);if(um)F.push(V("path_esd_sm_um",um[1],m[0]));}
     if(type==="2"&&!F.some(function(x){return x.f==="path_esd_depth";})){var dd=/no evidence of invasive|carcinoma,? in situ|intraepithelial neoplasia|\bpTis\b|confined to (?:the )?epithelium/i.test(t)?"1":/lamina propria/i.test(t)?"2":/muscularis mucosa/i.test(t)?"3":(m=t.match(/submucosa[^\n]{0,80}?(\d{2,5})\s*(?:μm|um|µm)/i))?(+m[1]<=200?"4":"5"):/submucosa/i.test(t)?"5":"";
@@ -2017,14 +2031,29 @@ var DOCP=(function(){
     var dates=[];var rd=/(Received|Reported|Report date|Collected|中中中)\s*[:：]?\s*'?(\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}|\d{7}|\d{2,3}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/gi;while((m=rd.exec(t)))dates.push({k:m[1],d:toISO(m[2])});meta.dates=dates;
     var rec=dates.filter(function(x){return /received|collected|中中中/i.test(x.k)&&x.d;})[0];if(rec)F.push(V("path_date",rec.d,rec.k+" "+rec.d,false));
     return {kind:"path",ok:F.length>1,fields:F,meta:meta};}
+  /* biomarker (PD-L1 IHC) report */
+  function parseBiomarker(text){var t=norm(text),F=[],meta={},m;
+    if(!/PD-?L1|pharmDx|\bCPS\b|\bTPS\b|22C3|28-8|SP263|SP142/i.test(t))return {kind:"biomarker",ok:false,fields:[],note:"不像生物標記報告"};
+    F.push(V("bm_marker","1",(t.match(/[^\n]*PD-?L1[^\n]*/i)||["PD-L1"])[0]));F.push(V("bm_method","1",(t.match(/[^\n]*(?:IHC|immunohisto)[^\n]*/i)||["IHC"])[0]));
+    if((m=t.match(/\b(22C3|28-8|SP263|SP142|73-10|E1L3N)\b/i)))F.push(V("bm_clone",m[1].toUpperCase(),(t.match(new RegExp("[^\\n]*"+m[1]+"[^\\n]*","i"))||[m[0]])[0]));
+    var sp=/esophagectomy/i.test(t)?"3":/ESD|endoscopic submucosal/i.test(t)?"2":/biopsy/i.test(t)?"1":/metasta/i.test(t)?"4":"";if(sp)F.push(V("bm_specimen",sp,(t.match(/[^\n]*(?:biopsy|esophagectomy|ESD)[^\n]*/i)||[""])[0]));
+    var st="",val=null,cut="",res="";
+    if((m=t.match(/(?:Combined Positive Score(?:\s*\(CPS\))?|\bCPS\b)\s*[:=]?\s*(?:is\s*)?(<|>=|≥|>)?\s*(\d+(?:\.\d+)?)/i))){st="1";val=m[2];cut="CPS≥1";res=+m[2]>=1?"1":"0";}
+    else if((m=t.match(/(?:TPS|Tumor Proportion Score)\s*[:=]?\s*(<|>=|≥|>)?\s*(\d+(?:\.\d+)?)\s*%?/i))){st="2";val=m[2];cut="TPS≥1%";res=+m[2]>=1?"1":"0";}
+    else if((m=t.match(/Percent of PD-?L1 expression in tumor cells\s*\(TC\)\s*:\s*(\d+(?:\.\d+)?)/i))||(m=t.match(/tumor cells\s*\(TC\)\s*:?\s*(?:\[v\]\s*)?TC\s*(<|>=|≥|>)\s*(\d+)\s*%/i))){st="3";
+      var v2=m[2]!==undefined?m[2]:m[1];var op=m[2]!==undefined?m[1]:"";if(m[2]===undefined){val=m[1];res=+m[1]>=1?"1":"0";}else{val=op==="<"?String(Math.max(0,+v2-1)):v2;res=op==="<"&&+v2<=1?"0":"1";}cut="TC≥1%";}
+    if(st){F.push(V("bm_score_type",st,(t.match(/[^\n]*(?:CPS|TPS|tumor cells \(TC\))[^\n]*/i)||[""])[0]));if(val!==null)F.push(V("bm_value",String(val),(t.match(/[^\n]*(?:Percent|CPS|TPS)[^\n]*\d[^\n]*/i)||[""])[0]));
+      F.push(V("bm_result",res,(t.match(/\[v\][^\n]*/i)||[(t.match(/[^\n]*(?:CPS|TPS|TC)[^\n]*\d[^\n]*/i)||[""])[0]])[0],true));F.push(V("bm_cutoff",cut,"依報告計分方式的常用門檻，請確認"));}
+    if((m=t.match(/(\d{4}-\d{4,6})/)))F.push(V("bm_block",m[1],m[0],false));
+    return {kind:"biomarker",ok:F.length>=4,fields:F,meta:meta};}
   /* HIS pathology list: "報告號 … 日期 …\n診斷行" blocks */
   function parsePathList(text){var t=norm(text),items=[],re=/(C[A-Z]-[A-Z]\d{3}-\d{4,})[^\n]*?\(?(\d{7}|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}|\d{2,3}[\/\-.]\d{1,2}[\/\-.]\d{1,2})?\)?[^\n]*\n([\s\S]*?)(?=\n\s*\n|\n\s*中中中:|$)/g,m;
     while((m=re.exec(t)))items.push({report_no:m[1],date:m[2]?toISO(m[2]):null,diagnosis:m[3].trim().replace(/\s+/g," ").slice(0,300),histo:histoCode(m[3]),grade:gradeCode(m[3]),specimen:/biopsy/i.test(m[3])?"1":/esophagectomy/i.test(m[3])?"3":/ESD|endoscopic submucosal/i.test(m[3])?"2":""});
     return {kind:"pathlist",ok:items.length>0,items:items};}
-  function detect(text){var t=norm(text);if(/Dates of Whole Course Radiation|RT Target Summary|External Beam Radiation/i.test(t))return "rt";
+  function detect(text){var t=norm(text);if(/Dates of Whole Course Radiation|RT Target Summary|External Beam Radiation/i.test(t))return "rt";if(/pharmDx|PD-?L1 (?:IHC|expression)|Combined Positive Score|Tumor Proportion Score/i.test(t))return "biomarker";
     if((t.match(/C[A-Z]-[A-Z]\d{3}-\d{4,}/g)||[]).length>=2&&!/MACROSCOPIC SUMMARY/i.test(t)&&!/^\s*(?:中中中中|Diagnosis)\s*:/m.test(t.split("\n").slice(0,3).join("\n")))return "pathlist";if(/pathology|carcinoma|biopsy|specimen/i.test(t))return "path";return "";}
-  function parse(text){var k=detect(text);return k==="rt"?parseRT(text):k==="pathlist"?parsePathList(text):k==="path"?parsePath(text):{kind:"",ok:false,fields:[],note:"無法辨識文件類型"};}
-  out={parse:parse,parseRT:parseRT,parsePath:parsePath,parsePathList:parsePathList,detect:detect,toISO:toISO,norm:norm};return out;
+  function parse(text){var k=detect(text);return k==="rt"?parseRT(text):k==="biomarker"?parseBiomarker(text):k==="pathlist"?parsePathList(text):k==="path"?parsePath(text):{kind:"",ok:false,fields:[],note:"無法辨識文件類型"};}
+  out={parse:parse,parseRT:parseRT,parsePath:parsePath,parseBiomarker:parseBiomarker,parsePathList:parsePathList,detect:detect,toISO:toISO,norm:norm};return out;
 })();
 if(typeof module!=="undefined")module.exports=DOCP;
 
@@ -2032,7 +2061,7 @@ if(typeof module!=="undefined")module.exports=DOCP;
    Text is parsed in the browser (DOCP); a new repeating-form instance is created with the extracted values,
    its source document noted, and uncertain values listed for the abstractor. Nothing leaves the browser. */
 var DOCIMPORT=(function(){
-  var SRC_FOR={rt_course:"放療紀錄",pathology_specimen:"病理報告"};
+  var SRC_FOR={rt_course:"放療紀錄",pathology_specimen:"病理報告",biomarker:"病理報告"},DOC_NAME={rt_course:"放療摘要",pathology_specimen:"病理報告",biomarker:"PD-L1／生物標記報告"};
   function firstKeys(fmId){return sectionsOf(fmId).map(function(s){return s.key;});}
   function apply(id,fmId,parsed,docDate,fileName){
     var r=recOf(id),fm=FORM_BY[fmId],inst={_s:1,_uid:uid("i"),_docsrc:fileName||"貼上文字"},core=r.core_abstraction,coreFilled=[],unsure=[],set=0;
@@ -2046,18 +2075,21 @@ var DOCIMPORT=(function(){
     if(parsed.meta&&parsed.meta.marginNote)unsure.push(parsed.meta.marginNote);
     if(parsed.meta&&parsed.meta.boost)unsure.push("有多個劑量層(boost)："+parsed.meta.levels.map(function(l){return l.name+" "+l.cgy/100+" Gy/"+l.fx+" fx";}).join("、")+"；總劑量取最高層");
     if(parsed.meta&&parsed.meta.ptnm)unsure.push("摘要記載病理分期 "+parsed.meta.ptnm+"，請與病理表單核對");
+    if(parsed.meta&&parsed.meta.histoNote)unsure.push(parsed.meta.histoNote);if(parsed.meta&&parsed.meta.marginGross)unsure.push("切緣距離取自肉眼描述，請以顯微結果為準");
     inst._docnote=unsure;
     r[fmId].push(inst);
     logChange(fmId,"由"+SRC_FOR[fmId]+"擷取新增第 "+r[fmId].length+" 筆（"+set+" 欄"+(coreFilled.length?"；核心補登帶入 "+coreFilled.join("、"):"")+"）");
     if(typeof SEC!=="undefined"&&SEC.secLog)SEC.secLog("文件擷取 "+fmId+" "+id);
     persist(true);refreshStates();return {inst:inst,set:set,coreFilled:coreFilled,unsure:unsure};}
   function report(res,fmId){var fm=FORM_BY[fmId];
-    dialog({title:"已從"+SRC_FOR[fmId]+"建立草稿",info:1,msg:"新增第 "+recOf(cur)[fmId].length+" 筆"+fm.name+"，帶入 "+res.set+" 個欄位"+(res.coreFilled.length?"；核心補登也帶入："+res.coreFilled.join("、"):"")+
+    dialog({title:"已從"+DOC_NAME[fmId]+"建立草稿",info:1,msg:"新增第 "+recOf(cur)[fmId].length+" 筆"+fm.name+"，帶入 "+res.set+" 個欄位"+(res.coreFilled.length?"；核心補登也帶入："+res.coreFilled.join("、"):"")+
       (res.unsure.length?"\n\n請特別核對：\n・"+res.unsure.join("\n・"):"")+"\n\n請逐欄與原始報告核對後再標記完成。",ok:"知道了"}).then(function(){renderForm();refreshCur();});}
-  function fromText(id,fmId,text,docDate,fileName){var p=fmId==="rt_course"?DOCP.parseRT(text):DOCP.parsePath(text);
-    if(!p.ok){toast(p.note||"無法解析這段文字");return null;}return apply(id,fmId,p,docDate,fileName);}
+  function fromText(id,fmId,text,docDate,fileName){var p=fmId==="rt_course"?DOCP.parseRT(text):fmId==="biomarker"?DOCP.parseBiomarker(text):DOCP.parsePath(text);
+    if(!p.ok){toast(p.note||"無法解析這段文字");return null;}
+    if(fmId==="pathology_specimen"&&DOCP.detect(text)==="biomarker"){toast("這是生物標記(PD-L1)報告，請到「生物標記」分頁匯入");return null;}
+    return apply(id,fmId,p,docDate,fileName);}
   function pasteDialog(fmId){if(!needWho())return;var fm=FORM_BY[fmId];
-    dialog({title:"貼上"+SRC_FOR[fmId]+"文字",msg:"從醫院系統複製整份報告文字貼到下面（不會上傳原文；只有擷取出的欄位會存入）。",
+    dialog({title:"貼上"+DOC_NAME[fmId]+"文字",msg:"從醫院系統複製整份報告文字貼到下面（不會上傳原文；只有擷取出的欄位會存入）。",
       fields:[{k:"t",label:"報告全文",type:"textarea",req:1},{k:"d",label:"報告日期（民國或西元，選填）"}],ok:"擷取成草稿"}).then(function(v){if(!v)return;
       var d=v.d?parseDate(v.d).iso:"";var res=fromText(cur,fmId,v.t,d,"貼上文字");if(res)report(res,fmId);});}
   var PDFJS="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
@@ -2071,7 +2103,7 @@ var DOCIMPORT=(function(){
   function pickPdf(fmId){if(!needWho())return;var inp=$("#fDoc");inp.onchange=function(){var f=inp.files&&inp.files[0];if(!f)return;inp.value="";
     pdfText(f).then(function(t){if(!t.replace(/\s/g,"").length){toast("這個 PDF 沒有文字層(掃描影像)，請改貼文字");return;}var res=fromText(cur,fmId,t,"",f.name);if(res)report(res,fmId);}).catch(function(e){toast(e.message||String(e));});};inp.click();}
   function bar(fmId,area){if(!SEC.can("docin")||auditMode())return;var d=document.createElement("div");d.className="addrow";
-    d.innerHTML='<button class="btn" type="button" data-docpaste="'+fmId+'">貼上'+SRC_FOR[fmId]+'文字 → 草稿</button> <button class="btn" type="button" data-docpdf="'+fmId+'">上傳'+SRC_FOR[fmId]+' PDF → 草稿</button><span class="desc"> 擷取後請逐欄核對；原文不會上傳</span>';
+    d.innerHTML='<button class="btn" type="button" data-docpaste="'+fmId+'">貼上'+DOC_NAME[fmId]+'文字 → 草稿</button> <button class="btn" type="button" data-docpdf="'+fmId+'">上傳'+DOC_NAME[fmId]+' PDF → 草稿</button><span class="desc"> 擷取後請逐欄核對；原文不會上傳</span>';
     area.insertBefore(d,area.firstChild);$("[data-docpaste]",d).onclick=function(){pasteDialog(fmId);};$("[data-docpdf]",d).onclick=function(){pickPdf(fmId);};}
   return {fromText:fromText,bar:bar,pdfText:pdfText};
 })();
