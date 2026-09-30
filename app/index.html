@@ -566,6 +566,9 @@ var cur=null, tab="core_abstraction", queue="core", touched={}, UNLOCK={}, STATE
 function refreshStates(){DB.order.forEach(function(id){STATE[id]=recordState(id);});}
 function lbl(v,code){var f=FIELD[v];if(!f||!f.ch)return code;for(var i=0;i<f.ch.length;i++)if(f.ch[i][0]===String(code))return f.ch[i][1];return code;}
 function mineQ(q){var w=who();return !q.to||!w||q.to===w;}
+/* v3: treatment cohorts from the registry-derived pathway (1 內視鏡/局部切除; 2,3 食道切除; 4–8 無根除手術) */
+var COHORT_NAME={op:"開刀組",nonop:"無根除手術組",esd:"內視鏡切除組",unk:"路徑未推導"};
+function cohortOf(id){var p=String((DB.pre[id]||{}).tx_pathway||"");if(p==="2"||p==="3")return "op";if(p==="1")return "esd";if(/^[45678]$/.test(p))return "nonop";return "unk";}
 var QUEUES={
   abstractor:[
     {id:"core",name:"核心待補",test:function(id,s){return s.core_abstraction!==2;}},
@@ -574,6 +577,10 @@ var QUEUES={
     {id:"p3",name:"分期檢查待補",test:function(id,s){return s.staging_workup!==2;}},
     {id:"p4",name:"病理待補",test:function(id,s){return s.pathology_specimen!==2;}},
     {id:"p5",name:"待追蹤更新",test:function(id,s){return s.stale;}},
+    {id:"g_op",name:"開刀組",test:function(id){return cohortOf(id)==="op";}},
+    {id:"g_nonop",name:"無根除手術組",test:function(id){return cohortOf(id)==="nonop";}},
+    {id:"g_esd",name:"內視鏡切除組",test:function(id){return cohortOf(id)==="esd";}},
+    {id:"g_unk",name:"路徑未推導",test:function(id){return cohortOf(id)==="unk";}},
     {id:"ret",name:"醫師退回補查",test:function(id,s){return s.returned>0;}},
     {id:"wait",name:"等待醫師確認",test:function(id,s){return s.open>0;}},
     {id:"bad",name:"有錯誤",test:function(id,s){return s.bad;}},
@@ -1369,8 +1376,8 @@ var SEC=(function(){
   function refreshUsers(){return Promise.all([col("users").get(),col("members").get()]).then(function(r){USERS={};r[0].forEach(function(u){USERS[u.id]=u.data();});MEMBERS={};r[1].forEach(function(m){MEMBERS[m.id]=m.data();});});}
   function abstractors(){return Object.keys(MEMBERS).filter(function(k){return MEMBERS[k].role==="abstractor"&&USERS[k]&&USERS[k].role==="user";});}
   function uname(uid){var u=USERS[uid];return u?(u.name||u.email):uid;}
-  function assignEven(uids){if(!isAdmin())throw new Error("只有主持人可以分派");if(!uids.length)throw new Error("請勾選登錄人員");
-    var un=DB.order.filter(function(id){return !DB.assign[id];});
+  function assignEven(uids,pick){if(!isAdmin())throw new Error("只有主持人可以分派");if(!uids.length)throw new Error("請勾選登錄人員");
+    var un=DB.order.filter(function(id){return !DB.assign[id]&&(!pick||pick(id));});if(!un.length)throw new Error("這個範圍內沒有尚未分派的病人");
     return flush().then(function(){return Promise.all(un.map(function(id,i){return setAssignee(id,uids[i%uids.length]);}));})
       .then(function(){secLog("分派 "+un.length+" 位病人給 "+uids.map(uname).join("、"));return un.length;});}
   function unassign(uids){if(!isAdmin())throw new Error("只有主持人可以收回");var ids=DB.order.filter(function(id){return uids.indexOf(DB.assign[id])>=0;});
@@ -1534,7 +1541,10 @@ var SEC=(function(){
   function drawAssign(){
     var m=$("#main"),abs=abstractors(),cnt={};
     DB.order.forEach(function(id){var a=DB.assign[id]||"";cnt[a]=(cnt[a]||0)+1;});
-    m.innerHTML='<section class="sheet report"><h3>分派病人</h3><p class="desc">共 '+DB.order.length+' 位，尚未分派 '+(cnt[""]||0)+' 位。登錄人員只看得到、也只解得開分派給自己的病人。</p>'+
+    var co={};DB.order.forEach(function(id){var k=cohortOf(id);co[k]=(co[k]||0)+1;});var years={};DB.order.forEach(function(id){var y=(DB.pre[id]||{}).dx_year||"";if(y)years[y]=1;});
+    m.innerHTML='<section class="sheet report"><h3>分派病人</h3><p class="desc">共 '+DB.order.length+' 位，尚未分派 '+(cnt[""]||0)+' 位。組別：'+Object.keys(COHORT_NAME).map(function(k){return COHORT_NAME[k]+" "+(co[k]||0);}).join("／")+'。登錄人員只看得到、也只解得開分派給自己的病人。</p>'+
+      '<p>分派範圍：<select id="asgGroup"><option value="">全部組別</option>'+Object.keys(COHORT_NAME).map(function(k){return '<option value="'+k+'">'+COHORT_NAME[k]+'</option>';}).join("")+'</select> '+
+      '<select id="asgYear"><option value="">全部診斷年</option>'+Object.keys(years).sort().map(function(y){return '<option value="'+esc(y)+'">'+esc(y)+' 年</option>';}).join("")+'</select></p>'+
       (abs.length?'<div class="tw"><table><thead><tr><th>登錄人員</th><th>已分派</th></tr></thead><tbody>'+abs.map(function(u){return '<tr><td><label class="ck"><input type="checkbox" data-an="'+u+'"> '+esc(uname(u))+'</label></td><td>'+(cnt[u]||0)+'</td></tr>';}).join("")+'</tbody></table></div>'+
         '<p><button class="btn go" type="button" id="bEven">把尚未分派的病人平均分給勾選的人</button> <button class="btn warn" type="button" id="bUn">收回勾選者的病人</button></p>'+
         '<p class="desc">指定特定病人:貼上研究編號(一行一個或用逗號分隔),分給勾選的第一位。</p><textarea id="idsTo" rows="3" style="width:100%"></textarea><p><button class="btn" type="button" id="bIds">指定這些病人</button></p>'
@@ -1543,7 +1553,8 @@ var SEC=(function(){
       '<p><button class="btn" type="button" id="bPkgIn">匯入加密分包</button> <button class="btn" type="button" id="bCsvIn">載入預填檔(CSV)</button></p></section>';
     var picked=function(){return $$("[data-an]",m).filter(function(c){return c.checked;}).map(function(c){return c.dataset.an;});};
     var done=function(p,msg){p.then(function(n){toast(msg.replace("#",n));refreshStates();renderRail();renderAssign();}).catch(function(e){toast(cErr(e));});};
-    var be=$("#bEven");if(be)be.onclick=function(){try{done(assignEven(picked()),"已分派 # 位");}catch(e){toast(e.message);}};
+    var pickFn=function(){var g=$("#asgGroup").value,y=$("#asgYear").value;return function(id){return (!g||cohortOf(id)===g)&&(!y||String((DB.pre[id]||{}).dx_year)===y);};};
+    var be=$("#bEven");if(be)be.onclick=function(){try{done(assignEven(picked(),pickFn()),"已分派 # 位");}catch(e){toast(e.message);}};
     var bu=$("#bUn");if(bu)bu.onclick=function(){var ns=picked();if(!ns.length){toast("請勾選登錄人員");return;}ask("收回 "+ns.map(uname).join("、")+" 的病人？已填的內容不會刪除。").then(function(ok){if(ok)done(unassign(ns),"已收回 # 位");});};
     var bi=$("#bIds");if(bi)bi.onclick=function(){var ns=picked();if(!ns.length){toast("請勾選一位登錄人員");return;}
       var ids=$("#idsTo").value.split(/[\s,，]+/).map(function(x){return x.trim();}).filter(Boolean),bad=ids.filter(function(id){return !DOCS[id];});
