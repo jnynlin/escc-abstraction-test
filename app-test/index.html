@@ -1054,6 +1054,7 @@ function loadCsv(text){
   var h=rows[0].map(function(x){return x.trim();});
   if(h.indexOf("record_id")<0||h.indexOf("tx_pathway")<0){toast("不是預填檔：缺少 record_id 或 tx_pathway 欄");return;}
   var add=0,upd=0;
+  if(h.indexOf("mrn")<0){var okNoMrn=confirm("這份預填檔沒有「病歷號(mrn)」欄位，助理將無法調閱病歷。只有測試假資料才適合這樣載入。仍要載入？");if(!okNoMrn){toast("已取消載入");return;}}
   rows.slice(1).forEach(function(r){var o={};h.forEach(function(k,i){if(PREFILL.indexOf(k)>=0||k==="mrn")o[k]=(r[i]||"").trim();});
     if(!o.record_id)return;if(DB.pre[o.record_id])upd++;else{add++;DB.order.push(o.record_id);}DB.pre[o.record_id]=o;});
   DB.order.sort(function(a,b){var ya=+DB.pre[a].dx_year,yb=+DB.pre[b].dx_year;return ya-yb||(a<b?-1:1);});
