@@ -725,7 +725,7 @@ document.addEventListener("visibilitychange",function(){if(document.hidden)tick(
 setInterval(function(){if(cur&&!document.hidden)tick();},60000);
 
 /* ---------- main ---------- */
-function openPt(id){tick();cur=id;touched={};UNLOCK={};tStart=Date.now();
+function openPt(id){if(typeof PROM!=="undefined")PROM.onLeave();tick();cur=id;touched={};UNLOCK={};tStart=Date.now();
   if(auditMode()){audOf(id);if(!FORM_BY[tab].audit)tab="core_abstraction";}
   var fm=FORM_BY[tab];if(fm&&!formShown(id,fm))tab="core_abstraction";
   renderMain();renderRail();window.scrollTo(0,0);if(typeof DOCIMPORT!=="undefined")DOCIMPORT.spineBar();}
@@ -1649,7 +1649,7 @@ var SEC=(function(){
   function asgRows(){var g=ASG.g,y=ASG.y,w=ASG.who,t=ASG.tag,q=ASG.q.trim().toUpperCase();
     return DB.order.filter(function(id){var p=DB.pre[id]||{},a=DB.assign[id]||"";
       return (!g||cohortOf(id)===g)&&(!y||String(p.dx_year)===y)&&(!w||(w==="_none"?!a:a===w))&&(!t||tagsOf(id).indexOf(t)>=0)&&(!q||id.toUpperCase().indexOf(q)>=0);});}
-  function renderAssign(){if(!isAdmin())return;cur=null;$("#dock").hidden=true;
+  function renderAssign(){if(typeof PROM!=="undefined")PROM.onLeave();if(!isAdmin())return;cur=null;$("#dock").hidden=true;
     return refreshUsers().then(drawAssign,function(e){toast(cErr(e));});}
   function drawAssign(){
     var m=$("#main"),abs=abstractors(),cnt={};DB.order.forEach(function(id){var a=DB.assign[id]||"";cnt[a]=(cnt[a]||0)+1;});
@@ -5506,7 +5506,7 @@ function openChart(r,en){var txt=chartText(r.body,en,PICK,($("#pmPlan")||{}).val
   dialog({title:"複製到病歷",msg:"只包含醫師確認過的等級。系統預帶與個管師建議不會出現。",fields:[{k:"t",label:"內容（全選複製）",type:"textarea",value:txt}],ok:"複製"}).then(function(v){if(!v)return;
     if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(function(){toast("已複製");},function(){toast("請手動全選複製");});else toast("請手動全選複製");});}
 document.addEventListener("keydown",function(ev){if(!VIEW||!S())return;if(/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName||""))return;var ids=listIds(),idx=ids.indexOf(SEL);
-  if(ev.key==="j"||ev.key==="k"){ev.preventDefault();if(!ids.length)return;idx=idx<0?0:(idx+(ev.key==="j"?1:-1)+ids.length)%ids.length;SEL=ids[idx];PICK={};TERMS=[];drawDetail(SEL);$("#pmDet").scrollIntoView({behavior:"smooth",block:"start"});return;}
+  if(ev.key==="j"||ev.key==="k"){ev.preventDefault();if(!ids.length)return;idx=idx<0?0:(idx+(ev.key==="j"?1:-1)+ids.length)%ids.length;SEL=ids[idx];PICK={};TERMS=[];$$("#pmTbl tr.prow").forEach(function(z){z.classList.toggle("on",z.dataset.id===SEL);});var on=$("#pmTbl tr.prow.on");if(on)on.scrollIntoView({block:"nearest"});drawDetail(SEL);$("#pmDet").scrollTop=0;return;}
   var rs=rowsEl();if(!rs.length)return;if(ev.key==="ArrowDown"){ev.preventDefault();FOCUS=Math.min(FOCUS+1,rs.length-1);paintFocus();return;}if(ev.key==="ArrowUp"){ev.preventDefault();FOCUS=Math.max(FOCUS-1,0);paintFocus();return;}
   if(ev.key==="i"){ev.preventDefault();var d=rs[FOCUS].nextElementSibling;if(d)d.classList.toggle("hid");return;}
   if(/^[0-4]$/.test(ev.key)){var bt=$('.gb[data-g="'+ev.key+'"]',rs[FOCUS]);if(bt){ev.preventDefault();bt.click();}return;}
