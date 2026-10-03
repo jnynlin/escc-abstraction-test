@@ -1455,9 +1455,11 @@ var SEC=(function(){
     var sid=SESSION.sid,upd={approvedAt:TS(),approvedBy:SESSION.uid},join=["abstractor","nurse","doctor"].indexOf(role)>=0;upd.role=join||role==="user"?"user":role;if(name)upd.name=name;
     if(join)upd["studies."+sid]=true;
     return col("users").doc(uid).update(upd).then(function(){if(join)return col("members").doc(uid).set({role:role,name:name||USERS[uid].name||"",at:TS()});})
-      .then(refreshUsers).then(function(){secLog((join?"核准並加入本研究("+RN[role]+") ":"設定帳號 "+upd.role+" ")+USERS[uid].email);if(join)return role==="abstractor"?regrant(uid):PROM.grant(uid);});}
+      .then(refreshUsers).then(function(){secLog((join?"核准並加入本研究("+RN[role]+") ":"設定帳號 "+upd.role+" ")+USERS[uid].email);return (join?(role==="abstractor"?regrant(uid):PROM.grant(uid)):Promise.resolve()).then(function(){return role==="nurse"||role==="doctor"?0:promRevokeStale();});});}
   function leaveStudy(uid){if(!isAdmin())return Promise.reject(new Error("只有主持人可以設定"));
-    return col("members").doc(uid).set({role:"disabled",at:TS()},{merge:true}).then(refreshUsers).then(function(){secLog("移出本研究 "+USERS[uid].email);});}
+    return col("members").doc(uid).set({role:"disabled",at:TS()},{merge:true}).then(refreshUsers).then(function(){secLog("移出本研究 "+USERS[uid].email);}).then(promRevokeStale);}
+  /* 收回已非個管師/醫師者的 PROM 金鑰；失敗不擋主要動作(規則本來就已擋讀)，下次主持人開 PROM 分頁會自動補收 */
+  function promRevokeStale(){return (typeof PROM!=="undefined"&&PROM.revokeStale)?PROM.revokeStale().catch(function(e){console.warn("PROM 金鑰收回失敗，下次開 PROM 分頁會補收",e);return 0;}):Promise.resolve(0);}
   function staleRegrant(){var jobs=[];DB.order.forEach(function(id){var d=DOCS[id],u=d&&d.assignee;if(!u||!USERS[u]||!d.kfp||!d.kfp[u])return;
       jobs.push(fpOf(USERS[u].pub).then(function(f){if(f!==d.kfp[u]&&USERS[u].role==="user"&&MEMBERS[u]&&MEMBERS[u].role==="abstractor")return setAssignee(id,u).then(function(){return 1;});return 0;}));});
     return Promise.all(jobs).then(function(a){return a.reduce(function(x,y){return x+y;},0);});}
@@ -5284,6 +5286,14 @@ function grant(uid){if(!x().isAdmin())return Promise.reject(new Error("只有主
 function revoke(uid){if(!x().isAdmin())return Promise.reject(new Error("只有主持人可以收回"));return (PK?Promise.resolve(PK):openKey()).then(function(){
   var keys=Object.assign({},PK.keys),kfp=Object.assign({},PK.kfp);delete keys[uid];delete kfp[uid];
   return x().col("meta").doc("promkey").update({keys:keys,kfp:kfp,ver:(PK.ver||1)+1,updatedAt:x().TS()}).then(function(){PK.keys=keys;PK.kfp=kfp;PK.ver=(PK.ver||1)+1;SEC.secLog("收回 PROM 金鑰 "+uid);return writeRecipients();});});}
+/* 離開研究／改角色後，收回「已不是個管師/醫師、也不是主持人」的人的 PROM 金鑰與收件人名冊（2026-10-01：先前 PROM.revoke 全站無人呼叫）。
+   純函式 staleKeyUids 可在 node 測；members/users 沒載入（空）時一律不動，免得誤收回所有人。保留：自己、主持人帳號、(帳號 user 且成員角色 nurse/doctor)。 */
+function staleKeyUids(keys,M,U,me){var ks=Object.keys(keys||{});if(!ks.length||!Object.keys(M||{}).length||!Object.keys(U||{}).length)return [];
+  return ks.filter(function(uid){if(uid===me)return false;var u=U[uid],m=M[uid];if(u&&u.role==="admin")return false;return !(u&&u.role==="user"&&m&&(m.role==="nurse"||m.role==="doctor"));});}
+function revokeStale(){if(!x().isAdmin()||!PK)return Promise.resolve(0);
+  var gone=staleKeyUids(PK.keys,x().members(),x().users(),meUid());if(!gone.length)return Promise.resolve(0);
+  var keys=Object.assign({},PK.keys),kfp=Object.assign({},PK.kfp);gone.forEach(function(uid){delete keys[uid];delete kfp[uid];});
+  return x().col("meta").doc("promkey").update({keys:keys,kfp:kfp,ver:(PK.ver||1)+1,updatedAt:x().TS()}).then(function(){PK.keys=keys;PK.kfp=kfp;PK.ver=(PK.ver||1)+1;SEC.secLog("收回 PROM 金鑰（已非個管師／醫師）"+gone.length+" 人");return writeRecipients();}).then(function(){return gone.length;});}
 /* 個管師/醫師重建金鑰後，主持人載入時自動重新授權(對齊病歷摘錄的 staleRegrant) */
 function regrantStale(){if(!x().isAdmin()||!PK)return Promise.resolve(0);var U=x().users(),M=x().members(),jobs=[];
   Object.keys(M).forEach(function(uid){var m=M[uid];if(!(m.role==="nurse"||m.role==="doctor"))return;var u=U[uid];if(!u||!u.pub||u.role!=="user")return;
@@ -5550,14 +5560,14 @@ document.addEventListener("keydown",function(ev){if(!VIEW||!S())return;if(/^(INP
   if(/^[0-4]$/.test(ev.key)){var bt=$('.gb[data-g="'+ev.key+'"]',rs[FOCUS]);if(bt){ev.preventDefault();bt.click();}return;}
   if(ev.key==="Enter"){var o=$("#pmOk");if(o){ev.preventDefault();o.click();}}});
 function ensureButton(){if($("#bProm"))return;var b=document.createElement("button");b.className="btn";b.type="button";b.id="bProm";b.textContent="PROM 症狀";var u=$("#bUsers");u.parentNode.insertBefore(b,u);
-  b.onclick=function(){if(S()&&S().offline){render();return;}$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取 PROM 中…</p></section>';loadAll().then(function(){return regrantStale();}).then(function(n){if(n)toast("已自動把 PROM 金鑰重新授權給 "+n+" 位更新過金鑰的成員");render();},function(e){toast(e.message||x().cErr(e));});};}
+  b.onclick=function(){if(S()&&S().offline){render();return;}$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取 PROM 中…</p></section>';loadAll().then(function(){return regrantStale();}).then(function(n){return revokeStale().then(function(g){if(g)toast("已收回 "+g+" 位已離開／改角色成員的 PROM 金鑰");return n;});}).then(function(n){if(n)toast("已自動把 PROM 金鑰重新授權給 "+n+" 位更新過金鑰的成員");render();},function(e){toast(e.message||x().cErr(e));});};}
 function onSession(){var s=S();if(!s)return;VIEW=false;if(clin()){document.body.classList.add("prom-only");render();}else{document.body.classList.remove("prom-only");if(x().isAdmin())ensureButton();var b=$("#bProm");if(b)b.hidden=!x().isAdmin()||(!!s.offline&&!LOADED);}}
 function onLeave(){VIEW=false;document.body.classList.remove("prom-view");}
 function onLock(){VIEW=false;LOADED=false;PK=null;RECS={};ORDER=[];SEL=null;document.body.classList.remove("prom-only");var b=$("#bProm");if(b)b.hidden=true;}
-return {loadAll:loadAll,render:render,onSession:onSession,onLock:onLock,onLeave:onLeave,grant:grant,revoke:revoke,regrantStale:regrantStale,loadDemo:loadDemo,importPayload:importPayload,review:review,confirm:confirm,reopen:reopen,remove:remove,create:create,
+return {loadAll:loadAll,render:render,onSession:onSession,onLock:onLock,onLeave:onLeave,grant:grant,revoke:revoke,regrantStale:regrantStale,revokeStale:revokeStale,loadDemo:loadDemo,importPayload:importPayload,review:review,confirm:confirm,reopen:reopen,remove:remove,create:create,
   issueToken:issueToken,revokeToken:revokeToken,listTokens:listTokens,tokLink:tokLink,consumeInbox:consumeInbox,writeRecipients:writeRecipients,lastConsume:lastConsume,purgeInbox:purgeInbox,loadFromBackup:loadFromBackup,qrSvg:qrSvg,
   core:{enrich:enrich,applyReview:applyReview,applyConfirm:applyConfirm,newBody:newBody,chartText:chartText,inScope:inScope,unfilledOf:unfilledOf,deltasOf:deltasOf,demoBodies:demoBodies,lastReview:lastReview},
-  _t:{seal:seal,openCt:openCt,setKey:function(k){PK=k;},recs:function(){return RECS;},order:function(){return ORDER;},setScope:function(s){SCOPE=s;},setFilt:function(f){FILT=f;},listIds:function(){EN=ens();return listIds();}}};
+  _t:{staleKeyUids:staleKeyUids,seal:seal,openCt:openCt,setKey:function(k){PK=k;},recs:function(){return RECS;},order:function(){return ORDER;},setScope:function(s){SCOPE=s;},setFilt:function(f){FILT=f;},listIds:function(){EN=ens();return listIds();}}};
 })();
 
 /* ---------- init ---------- */
