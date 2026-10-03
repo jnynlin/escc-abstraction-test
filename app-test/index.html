@@ -338,6 +338,20 @@ h3{font-size:1rem;color:var(--ink);}
 .prom .pm-foot .actbar{margin:0;padding:8px 10px;flex-wrap:wrap;} .prom .pm-foot .actbar input:not([type]){flex:1 1 160px;min-width:120px;} .prom .pm-tail{margin:14px 0 0;background:transparent;padding:0;}
 @media (max-width:1250px){.prom .pm-foot .actbar input:not([type]){order:9;flex-basis:100%;}}
 .prom summary.btn{font-weight:600;}
+/* P10.1 對話框 RWD：高度不超過視窗（內文自己捲動、按鈕固定在底部）；表單在寬螢幕兩欄、窄螢幕一欄；小卡格與 QR 隨寬度縮放 */
+#modal{padding:12px;padding-top:max(12px,env(safe-area-inset-top,0px));padding-bottom:max(12px,env(safe-area-inset-bottom,0px));}
+#modal .box{display:flex;flex-direction:column;width:min(100%,460px);max-width:none;padding:0;overflow:hidden;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);}
+#modal #mBody{overflow:auto;min-height:0;padding:18px 20px 10px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+#modal .acts{flex:none;flex-wrap:wrap;padding:10px 20px calc(12px + env(safe-area-inset-bottom,0px)) ;border-top:1px solid var(--rule);background:var(--sheet);} #modal .acts .btn{min-height:44px;min-width:84px;}
+#modal.pm-wide .box{width:min(100%,720px);}
+#modal.pm-issue #mBody{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-content:start;} #modal.pm-issue #mBody>h3,#modal.pm-issue #mBody>p,#modal.pm-issue #mBody>label.pm-full{grid-column:1/-1;}
+@media (max-width:560px){#modal.pm-issue #mBody{grid-template-columns:1fr;} #modal #mBody{padding:14px 14px 8px;} #modal .acts{padding-inline:14px;} #modal .acts .btn{flex:1 1 0;}}
+@media (max-height:520px){#modal #mBody{padding-top:10px;} #modal .box h3{margin-bottom:6px;}}
+#modal .pmtk{max-height:none;overflow:visible;} .pmqr svg{width:min(60vw,300px);}
+#modal .mf input,#modal .mf select,#modal .mf textarea{min-height:44px;font-size:1rem;} #modal .mf textarea{min-height:90px;}
+#modal .pmcards{grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr));}
+#modal .mini,#modal .desc,#modal .pmcard .mini{font-size:.92rem;}
+.prom .desc,.prom td.desc{font-size:.95rem;}
 /* P10 門診 PROM 空間：沒有摘錄側欄、分派；PROM 是唯一作業。小卡與列印 */
 .prom-space .rail,.prom-space #dock,.prom-space #bAssign{display:none!important;} .prom-space .shell{display:block;}
 .pmcode{font:600 1.5rem/1.25 ui-monospace,Consolas,monospace;letter-spacing:.06em;text-align:center;margin:4px 0 6px;color:var(--ink);}
@@ -1495,7 +1509,8 @@ var SEC=(function(){
     return flush().then(function(){return Promise.race([FS.waitForPendingWrites(),new Promise(function(r){setTimeout(r,10000);})]);}).catch(function(){}).then(function(){
       if(typeof PROM!=="undefined")PROM.onLock();DB=emptyDB();DEKS={};DOCS={};USERS={};MEMBERS={};GLOBAL=null;SESSION=null;cur=null;STATE={};
       $("#main").innerHTML="";$("#dock").hidden=true;$("#list").innerHTML="";var bb=$("#bkbar");if(bb)bb.hidden=true;$("#auth").hidden=false;err("");
-      return start(u,p);});}
+      /* 重新讀一次自己的帳號文件：登入後才被主持人加進別的空間的人，切換作業時才看得到（舊版會沿用登入當下的 profile） */
+      return col("users").doc(u.uid).get().then(function(d){var p2=d.exists?d.data():p;if(p2.role==="pending"||p2.role==="disabled")p2=p;PROFILE=p2;return start(u,p2);},function(){return start(u,p);});});}
   function enter(u,p,st){SESSION={uid:u.uid,email:u.email,name:p.name||u.email,role:p.role==="admin"?"manager":"abstractor",fbRole:p.role,sid:st.sid,studyName:st.name,mode:st.mode||""};
     lastAct=Date.now();loading=true;$("#aSub").textContent="解密資料中…";$("#aBody").innerHTML='<p class="adesc" id="aProg"></p>';
     var pre=isAdmin()?Promise.resolve():col("members").doc(u.uid).get().then(function(m){var r=m.exists&&m.data().role;if(r==="nurse"||r==="doctor")SESSION.role=r;});
@@ -5304,6 +5319,9 @@ function canReview(){return role()==="nurse"||role()==="manager";}
 function canConfirm(){return role()==="doctor"||role()==="manager";}
 function meUid(){var s=S();return s?s.uid:"";}
 function meName(){var s=S();return s?s.name:"";}
+var MODALWATCH=false;
+function mcls(c){var m=$("#modal");if(!m)return;if(!MODALWATCH&&typeof MutationObserver!=="undefined"){MODALWATCH=true;new MutationObserver(function(){if(!m.classList.contains("open")&&(m.classList.contains("pm-issue")||m.classList.contains("pm-wide")))m.classList.remove("pm-issue","pm-wide");})  /* 只在真的有殘留類別時才動，否則 remove() 本身又觸發一次觀察 → 無窮迴圈、頁面凍結 */.observe(m,{attributes:true,attributeFilter:["class"]});}
+  (c||"").split(" ").filter(Boolean).forEach(function(k){m.classList.add(k);});}
 function applyFs(){document.documentElement.style.fontSize=FSV[FSI]?FSV[FSI]+"px":"";}
 function p2(n){return (n<10?"0":"")+n;}
 function tsText(ms){if(!ms)return "";var d=new Date(ms);return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate())+" "+p2(d.getHours())+":"+p2(d.getMinutes());}
@@ -5530,16 +5548,18 @@ function pidListHtml(){var ids=[];try{if(typeof DB!=="undefined"&&DB.rec)ids=Obj
 function openIssueDialog(){
   var lastTx="chemo,rt",lastKind=0;try{lastTx=localStorage.getItem("promTx")||lastTx;lastKind=parseInt(localStorage.getItem("promKind")||"0",10)||0;}catch(e){}
   var KOPT=["standing 常駐（療程）","visit 單次（7 天）"];
-  var pr=dialog({title:"發權杖給病人",msg:"病人用這個連結（QR 或小卡）填症狀。有研究編號就填（可從清單選）；門診病人把編號留白，系統自動產生代號，不放姓名。常駐＝整個療程用同一個，單次＝7 天。生日四碼（月日，例 0315）是第二因子。",
-    fields:[{k:"p",label:"編號（留白＝自動產生門診代號）"},{k:"n",label:"張數（編號留白時可一次發多張，1–30）",value:"1"},{k:"k",label:"種類",type:"select",options:lastKind?[KOPT[1],KOPT[0]]:KOPT},{k:"tx",label:"治療（chemo,rt,io,adc,surgery 以逗號分隔）",value:lastTx},{k:"w",label:"治療前體重 kg（空白＝從病歷摘錄帶入；病人端不會問）"},{k:"b",label:"生日四碼（月日；一次發多張時不用）"},{k:"l",label:"備註（不放個資）"}],ok:"發出"});
-  var box=$("#mBody"),inp=box&&box.querySelector("label.mf input");if(inp&&pidListHtml()){inp.setAttribute("list","pmPidList");inp.insertAdjacentHTML("afterend",pidListHtml());}
+  var pr=dialog({title:"發權杖給病人",msg:"有研究編號就填（可從清單選）；門診病人把編號留白，系統自動產生代號，不放姓名。",
+    fields:[{k:"p",label:"編號（留白＝自動產生門診代號）"},{k:"n",label:"張數（編號留白時可一次發多張，1–30）",value:"1"},{k:"k",label:"種類（常駐＝整個療程同一條；單次＝7 天）",type:"select",options:lastKind?[KOPT[1],KOPT[0]]:KOPT},{k:"tx",label:"治療（chemo,rt,io,adc,surgery 以逗號分隔）",value:lastTx},{k:"w",label:"治療前體重 kg（空白＝從病歷摘錄帶入；病人端不會問）"},{k:"b",label:"生日四碼（月日，例 0315；第二因子）"},{k:"l",label:"備註（不放個資）"}],ok:"發出"});
+  mcls("pm-wide pm-issue");var box=$("#mBody"),inp=box&&box.querySelector("label.mf input");
+  {var ks=box&&box.querySelector('select[data-k="k"]');if(ks&&!ks.value)ks.selectedIndex=1;var ln=box&&box.querySelector('[data-k="l"]');if(ln&&ln.closest)ln.closest("label").classList.add("pm-full");}
+  if(inp&&pidListHtml()){inp.setAttribute("list","pmPidList");inp.insertAdjacentHTML("afterend",pidListHtml());}
   pr.then(function(v){if(!v)return;var kind=/visit/.test(v.k)?"visit":"standing",tx=String(v.tx||"").split(/[,\s，]+/).filter(Boolean);
     try{localStorage.setItem("promTx",tx.join(","));localStorage.setItem("promKind",kind==="visit"?"1":"0");}catch(e){}
     issueTokens({pid:v.p,n:v.n,kind:kind,treatments:tx,baselineKg:v.w,birth4:v.b,label:v.l,base:location.origin+location.pathname.replace(/[^/]*$/,"")+"prom_patient.html"}).then(function(rs){
       if(rs.length===1){var r=rs[0],pr2=dialog({title:"權杖已發出",msg:"請病人用手機相機掃這個 QR（或把連結做成小卡）。連結不含姓名或病歷號。"+(r.kind==="visit"?"單次權杖：收件後即失效。":"常駐權杖：整個療程同一個，建議請病人加到手機主畫面。")+" 代號請寫在小卡上，並自己記下這張卡發給誰（雲端不存身分）。",fields:[{k:"u",label:"連結（全選複製）",type:"textarea",value:r.link}],ok:"複製"});
         var svg=qrSvg(r.link,7),bx=$("#mBody");if(bx){var d=document.createElement("div");d.className="pmqr";d.innerHTML='<div class="pmcode">'+E(r.pid)+'</div>'+(svg||"");bx.insertBefore(d,bx.querySelector("label.mf"));}
         pr2.then(function(w){if(w&&navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(r.link).then(function(){toast("已複製");});});return;}
-      var pr3=dialog({title:"已發出 "+rs.length+" 張",msg:"每張代號不同。按「列印小卡」整頁印出，剪開發給病人；請自己記下哪張發給誰（雲端不存身分）。",fields:[{k:"u",label:"代號與連結（全選複製）",type:"textarea",value:rs.map(function(r){return r.pid+"\t"+r.link;}).join("\n")}],ok:"關閉",info:true});
+      var pr3=dialog({title:"已發出 "+rs.length+" 張",msg:"每張代號不同。按「列印小卡」整頁印出，剪開發給病人；請自己記下哪張發給誰（雲端不存身分）。",fields:[{k:"u",label:"代號與連結（全選複製）",type:"textarea",value:rs.map(function(r){return r.pid+"\t"+r.link;}).join("\n")}],ok:"關閉",info:true});mcls("pm-wide");
       var bx2=$("#mBody");if(bx2){var g=document.createElement("div");g.innerHTML='<div class="pmcards">'+rs.map(cardHtml).join("")+'</div><p><button class="btn go" type="button" id="pmPrint">列印小卡</button></p>';bx2.insertBefore(g,bx2.querySelector("label.mf"));var pb=$("#pmPrint");if(pb)pb.onclick=function(){printCards(rs);};}
       return pr3;}).catch(function(e){toast(e.message||x().cErr(e));});});}
 /* ---------- 權杖管理（2026-10-01）：列出／撤銷／複製連結／QR ----------
@@ -5549,7 +5569,7 @@ function tokLink(tid){return location.origin+location.pathname.replace(/[^/]*$/,
 var TOKST={active:"有效",revoked:"已撤銷",expired:"已過期"},TOKKIND={standing:"常駐",visit:"單次"};
 function tokState(t,now){return t.revoked?"revoked":(t.expiresMs&&t.expiresMs<now?"expired":"active");}
 function openTokMgr(){
-  var pr=dialog({title:"權杖管理",msg:"撤銷後病人那條連結立刻失效（已送出的紀錄不受影響）。單次權杖收件後會自動撤銷。",ok:"關閉",info:true});
+  var pr=dialog({title:"權杖管理",msg:"撤銷後病人那條連結立刻失效（已送出的紀錄不受影響）。單次權杖收件後會自動撤銷。",ok:"關閉",info:true});mcls("pm-wide");
   var box=$("#mBody"),wrap=document.createElement("div"),ARM=null,TIMER=null;wrap.className="pmtk";box.insertBefore(wrap,$("#mErr"));
   function disarm(){clearTimeout(TIMER);if(ARM){var ob=wrap.querySelector('[data-tid="'+ARM+'"] button[data-a="rev"]');if(ob){ob.textContent="撤銷";ob.classList.remove("armed");}ARM=null;}}
   function paint(rows){var now=Date.now(),h="";rows.sort(function(a,b){return (b.issuedMs||0)-(a.issuedMs||0);});
@@ -5595,7 +5615,7 @@ function cleanApply(sel){if(!x().isAdmin())return Promise.reject(new Error("只�
     .then(function(){return seq(sel.tokens,function(id){return x().col("tokens").doc(id).delete().then(function(){n.tokens++;});});})
     .then(function(){sortOrder();SEL=null;SEC.secLog("清除 PROM 測試資料：紀錄 "+n.prom+"、權杖 "+n.tokens+"、收件 "+n.inbox+(err.length?"，失敗 "+err.length:""));return {n:n,errors:err};});}
 function openCleanTest(){
-  var pr=dialog({title:"清除測試資料",msg:"只會刪 PROM 的測試紀錄、測試權杖和這些權杖的收件匣（研究編號 ESCC9xxx 或 ESCC1234，或來源是示範／測試）。不會動金鑰、收件人名冊、成員、摘錄病歷和其他研究編號。刪除後無法復原。",fields:[{k:"c",label:"確認：請輸入「清除測試資料」",req:1}],ok:"刪除所選"});
+  var pr=dialog({title:"清除測試資料",msg:"只會刪 PROM 的測試紀錄、測試權杖和這些權杖的收件匣（研究編號 ESCC9xxx 或 ESCC1234，或來源是示範／測試）。不會動金鑰、收件人名冊、成員、摘錄病歷和其他研究編號。刪除後無法復原。",fields:[{k:"c",label:"確認：請輸入「清除測試資料」",req:1}],ok:"刪除所選"});mcls("pm-wide");
   var box=$("#mBody"),wrap=document.createElement("div"),SC=null,ON={prom:{},tokens:{},inbox:{}};wrap.className="pmtk";wrap.innerHTML='<p class="mini">掃描中…</p>';box.insertBefore(wrap,box.querySelector("label.mf")||$("#mErr"));
   function sect(key,title,rows,line){if(!rows.length)return "";return '<h4 class="ph4">'+E(title)+'（'+rows.length+'）</h4>'+rows.map(function(r){return '<label class="ck"><input type="checkbox" data-k="'+key+'" data-id="'+E(r.id)+'" checked> <span>'+line(r)+'</span></label>';}).join("");}
   function paint(sc){SC=sc;["prom","tokens","inbox"].forEach(function(k){sc[k].forEach(function(r){ON[k][r.id]=true;});});var tot=sc.prom.length+sc.tokens.length+sc.inbox.length;
