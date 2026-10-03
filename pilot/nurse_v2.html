@@ -1,0 +1,213 @@
+<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>個管師回診前確認原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 版面：左邊是今天的病人佇列（依緊急度排序），右邊是一位病人的處理畫面：今日處理 → 待確認清單 → 實測欄位 → 病人回報 → 初審。電腦為主，窄螢幕改成上下排。名稱沿用正式版：個管師、第二層初審、第三層醫師確認、今日處理。 */
+:root{
+  --bg:#EEF2F1; --panel:#FFFFFF; --ink:#16231F; --soft:#4B5C56; --rule:#D0D9D5; --well:#E4EBE8;
+  --acc:#1B6757; --acc-ink:#FFFFFF; --acc-soft:#D7EAE3;
+  --today:#B3261E; --today-soft:#FCE8E5; --act:#8A5A00; --act-soft:#FFF0CF; --read:#1F5E94; --read-soft:#DDEBF8; --ok:#2C6B3F; --ok-soft:#DDF0E1;
+  --focus:#2F6FA3; --sans:"Noto Sans TC",-apple-system,BlinkMacSystemFont,"Microsoft JhengHei","PingFang TC",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1614; --panel:#18211F; --ink:#E4ECE9; --soft:#A3B3AC; --rule:#30403A; --well:#202C29;
+  --acc:#6CC3AC; --acc-ink:#0D1714; --acc-soft:#1C3731;
+  --today:#F2877C; --today-soft:#3A1F1C; --act:#F0C674; --act-soft:#3A2F14; --read:#8DBEEA; --read-soft:#1B2B3B; --ok:#8FD3A1; --ok-soft:#1C3324; --focus:#7FB4E0; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0F1614; --panel:#18211F; --ink:#E4ECE9; --soft:#A3B3AC; --rule:#30403A; --well:#202C29;
+  --acc:#6CC3AC; --acc-ink:#0D1714; --acc-soft:#1C3731;
+  --today:#F2877C; --today-soft:#3A1F1C; --act:#F0C674; --act-soft:#3A2F14; --read:#8DBEEA; --read-soft:#1B2B3B; --ok:#8FD3A1; --ok-soft:#1C3324; --focus:#7FB4E0; color-scheme:dark;}
+html{font-size:16px;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;padding-inline:16px;padding-block:0 40px;}
+*{box-sizing:border-box;} :focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:6px;}
+.wrap{max-width:1180px;margin:0 auto;}
+.proto{margin:0 -16px;padding:6px 16px;background:var(--well);color:var(--soft);font-size:.82rem;text-align:center;}
+header{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline;padding-block:14px 8px;}
+h1{margin:0;font-size:1.3rem;} .sl{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.92rem;color:var(--soft);} .sl b{color:var(--ink);font-family:var(--mono);font-variant-numeric:tabular-nums;} .sl b.t{color:var(--today);}
+.reset{margin-left:auto;min-height:36px;padding:0 12px;border:1px solid var(--rule);border-radius:8px;background:transparent;color:var(--ink);font:inherit;font-size:.88rem;cursor:pointer;}
+.cols{display:grid;grid-template-columns:minmax(260px,320px) minmax(0,1fr);gap:16px;align-items:start;}
+@media (max-width:820px){.cols{grid-template-columns:1fr;}}
+.q{display:grid;gap:8px;margin:0;padding:0;list-style:none;}
+.qi{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;width:100%;text-align:left;padding:10px 12px;border:2px solid var(--rule);border-radius:12px;background:var(--panel);color:var(--ink);font:inherit;cursor:pointer;}
+.qi[aria-current=true]{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft);}
+.qi .code{font-family:var(--mono);font-size:.92rem;font-weight:500;} .qi small{display:block;color:var(--soft);font-size:.84rem;}
+.chip{display:inline-block;min-width:3.4em;text-align:center;padding:2px 8px;border-radius:6px;font-size:.82rem;font-weight:700;white-space:nowrap;}
+.c-today{background:var(--today-soft);color:var(--today);} .c-act,.c-confirm{background:var(--act-soft);color:var(--act);} .c-read{background:var(--read-soft);color:var(--read);} .c-skip{background:var(--well);color:var(--soft);} .c-ok{background:var(--ok-soft);color:var(--ok);}
+.pane{display:grid;gap:12px;}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:12px;padding:12px 14px;}
+.card h2{margin:0 0 6px;font-size:1.02rem;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;} .card h2 small{font-weight:400;color:var(--soft);font-size:.85rem;}
+.card.today{border-color:var(--today);} .card.today h2{color:var(--today);} .card.todo{border-color:var(--act);} .card.todo h2{color:var(--act);}
+.head{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;} .head .code{font-family:var(--mono);font-size:1.15rem;font-weight:500;} .head span{color:var(--soft);font-size:.92rem;}
+ul.fl{margin:0;padding:0;list-style:none;display:grid;gap:8px;}
+.fi{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:8px 10px;border-radius:10px;background:var(--today-soft);}
+.fi.act{background:var(--act-soft);} .fi.read{background:var(--read-soft);} .fi.done{background:var(--ok-soft);} .fi b{font-size:.98rem;} .fi small{display:block;color:var(--soft);font-size:.86rem;}
+.btn{min-height:40px;padding:0 14px;border-radius:10px;border:2px solid var(--acc);background:var(--acc);color:var(--acc-ink);font:inherit;font-size:.95rem;font-weight:700;cursor:pointer;}
+.btn.ghost{background:transparent;color:var(--acc);} .btn.warn{border-color:var(--today);background:transparent;color:var(--today);} .btn[disabled]{opacity:.5;cursor:not-allowed;}
+.cf{display:grid;gap:8px;padding:10px;border:1px solid var(--rule);border-radius:10px;background:var(--well);} .cf.done{background:var(--ok-soft);border-color:var(--ok);}
+.cf .t{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;} .cf .t b{font-size:.98rem;} .cf .t small{color:var(--soft);font-size:.86rem;}
+.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;} .acts input[type=text]{flex:1 1 140px;min-width:0;min-height:40px;padding:0 10px;border:1px solid var(--rule);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;}
+.num{display:flex;gap:8px;align-items:center;flex-wrap:wrap;} .num input{width:7rem;min-height:40px;padding:0 10px;border:1px solid var(--rule);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-family:var(--mono);}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:0;} .kv dt{color:var(--soft);font-size:.9rem;} .kv dd{margin:0;} .kv .calc{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+table.rep{border-collapse:collapse;width:100%;font-size:.92rem;} .rep th,.rep td{border-bottom:1px solid var(--rule);padding:5px 6px;text-align:left;vertical-align:top;} .rep th{color:var(--soft);font-weight:500;}
+.rep tr.u td{background:var(--act-soft);} .rep tr.r td:first-child{font-weight:700;}
+.mini{color:var(--soft);font-size:.88rem;margin:4px 0 0;}
+.sign{display:flex;flex-wrap:wrap;gap:10px;align-items:center;} .sign .why{color:var(--today);font-size:.9rem;}
+.log{font-family:var(--mono);font-size:.8rem;color:var(--soft);max-height:9rem;overflow:auto;margin:0;padding-left:1.1rem;}
+details summary{cursor:pointer;color:var(--soft);font-size:.9rem;min-height:32px;}
+</style>
+
+<div class="proto">原型：病人與資料都是虛構的，不會連到正式系統</div>
+<div class="wrap">
+  <header><h1>回診前確認</h1><div class="sl" id="sl" aria-live="polite"></div><button class="reset" id="reset" type="button">重設試用資料</button></header>
+  <div class="cols"><nav aria-label="今天的病人"><ul class="q" id="queue"></ul></nav><main class="pane" id="pane"></main></div>
+</div>
+
+<script>
+/* ---- 項目名稱與量題選項（和病人端 v9 一致）---- */
+const NAME = {fever:"發燒",swallow:"吞嚥困難",breath:"喘或咳嗽",weight:"體重掉很多",blood:"血便或黏液便",hemo:"咳血或吐血",weak:"肌肉沒力",chest:"胸悶或胸痛",palp:"心跳很快或不規則",dizzy:"站起來頭暈、眼前發黑",eyepain:"眼睛痛、很紅或怕光",
+  fatigue:"疲倦、沒力氣",nausea:"噁心、吃不下",diarrhea:"拉肚子",constipation:"便秘",dehyd:"口乾、尿很少",pain:"疼痛",joint:"關節或肌肉痛",rash:"皮膚起疹子",itch:"皮膚癢",skin_rt:"照射部位的皮膚",mouth:"嘴巴破",voice:"聲音沙啞",neuro:"手腳麻、刺痛",coldhot:"特別怕冷或怕熱",thirst:"很容易口渴、一直跑廁所",swell:"腳腫",blur:"視力變模糊",dryeye:"眼睛乾澀、有異物感"};
+const REDIDS = ["fever","swallow","breath","weight","blood","hemo","weak","chest","palp","dizzy","eyepain"];
+const QL = {fever:{none:"沒量，只是覺得發燒",lt375:"37.5 度以下","375_379":"37.5–37.9 度","38_389":"38–38.9 度",ge39:"39 度以上"},
+  diarrhea:{0:"沒有比平常多","1_3":"多 1–3 次","4_6":"多 4–6 次",ge7:"多 7 次以上",unk:"說不準，請護理確認"},
+  nausea:{0:"沒吐","1_2":"1–2 次","3_5":"3–5 次",ge6:"6 次以上"}, weight:{none:"沒量","1_2":"1–2 公斤","3_4":"3–4 公斤","5_7":"5–7 公斤","8_12":"8–12 公斤",ge13:"13 公斤以上"}};
+const SEVN = ["", "輕微", "有些影響", "很嚴重"], ANS = {y:"有", n:"沒有", u:"不確定"};
+const LOCN = {head:"頭頸",chest:"胸",abd:"腹",back:"背部／腰",armL:"左手臂",armR:"右手臂",legL:"左腿",legR:"右腿",whole:"全身",unknown:"說不出位置"};
+/* ---- 虛構病人 ---- */
+const SEED = () => [
+ {code:"P261003-K7QH", age:"70 多歲", tx:"化療＋放療", visit:"今天 09:20", staff:{base_kg:66, usual:2, weight:null, temp:null}, note:"晚上常拉肚子，擔心會脫水。",
+  ans:{fever:{a:"y",q:"none"}, swallow:{a:"n"}, breath:{a:"n"}, weight:{a:"y",q:"none"}, blood:{a:"u"}, hemo:{a:"n"}, weak:{a:"n"}, diarrhea:{a:"y",q:"unk"}, fatigue:{a:"y",sev:2}, pain:{a:"y",sev:2,loc:["abd","armL"]}, nausea:{a:"y",sev:1,q:"1_2"}, rash:{a:"n"}, itch:{a:"n"}}},
+ {code:"P261003-M3RT", age:"60 多歲", tx:"免疫治療", visit:"今天 09:40", staff:{base_kg:58, usual:1, weight:null, temp:null}, note:"",
+  ans:{fever:{a:"n"}, swallow:{a:"n"}, breath:{a:"n"}, weight:{a:"n"}, blood:{a:"n"}, hemo:{a:"n"}, weak:{a:"y"}, chest:{a:"y"}, palp:{a:"n"}, dizzy:{a:"u"}, eyepain:{a:"n"}, fatigue:{a:"y",sev:2}, joint:{a:"y",sev:2,loc:["legL","legR"]}}},
+ {code:"P261003-W8CN", age:"70 多歲，低視力", tx:"化療＋放療", visit:"今天 10:05", staff:{base_kg:72, usual:1, weight:null, temp:null}, note:"",
+  ans:{fever:{a:"n"}, swallow:{a:"y",sev:3}, breath:{a:"n"}, weight:{a:"y",q:"ge13"}, blood:{a:"n"}, hemo:{a:"n"}, weak:{a:"n"}, fatigue:{a:"y",sev:3}, nausea:{a:"y",sev:2,q:"3_5"}}},
+ {code:"P261003-D2XB", age:"50 多歲", tx:"化療", visit:"今天 10:30", staff:{base_kg:61, usual:1, weight:null, temp:null}, note:"",
+  ans:{fever:{a:"n"}, swallow:{a:"n"}, breath:{a:"n"}, weight:{a:"n"}, blood:{a:"n"}, hemo:{a:"n"}, weak:{a:"n"}, fatigue:{a:"y",sev:1}, neuro:{a:"y",sev:1,loc:["armL","armR"]}, constipation:{a:"y",sev:1}}}];
+const EMPTY = /[?&]empty=1/.test(location.search);
+let P = EMPTY ? [] : SEED(), CUR = 0; const LOG = [];
+P.forEach(p => { p.conf = {}; p.ack = {}; p.l2 = null; });
+/* ---- 規則（對應題庫 hard_red_flags 的一部分；其餘等正式版接上真正的追問題）---- */
+function effA(p, id) { const c = p.conf[id]; if (c && (c.res === "y" || c.res === "n")) return c.res; return (p.ans[id] || {}).a || null; }
+function evaluate(p) {
+  const A = id => p.ans[id] || {}, e = id => effA(p, id), S = p.staff, F = [], C = [];
+  const flag = (level, id, text, why) => F.push({ level, id, text, why });
+  const confirm = (id, kind, text, ask, red) => { const cc = p.conf[id], gone = cc && cc.res === "measured" && ((id === "fever" && S.temp == null) || (id === "weight" && S.weight == null));   // 實測值被清掉，就回到待確認
+    if (!cc || cc.res === "nc" || gone) C.push({ id, kind, text, ask, red: !!red, nc: !!(p.conf[id] && p.conf[id].res === "nc") }); };
+  // 發燒
+  if (S.temp != null) { if (S.temp >= 39) flag("today", "fever_high", `發燒超過 39 度（院內體溫 ${S.temp}°C）`, "實測"); else if (S.temp >= 38) flag("today", "fever_38", `發燒 38 度以上（院內體溫 ${S.temp}°C）；化療期間需排除發燒性嗜中性球低下`, "實測"); }
+  else if (e("fever") === "y") { const q = A("fever").q;
+    if (q === "ge39") flag("today", "fever_high", "發燒超過 39 度（病人自報）", "自報"); else if (q === "38_389") flag("today", "fever_38", "發燒 38 度以上（病人自報）；化療期間需排除發燒性嗜中性球低下", "自報");
+    else if (!q || q === "none") confirm("fever", "measure", "病人說有發燒，但沒量體溫", "請在院內量體溫，或電話請病人量", true); }
+  else if (A("fever").a === "u") confirm("fever", "unsure", "發燒：病人選「不確定」", "電話問：這一週有沒有發燒？", true);
+  // 紅旗題答「有」就是今日處理；答「不確定」要確認
+  const R = [["blood","blood_stool","血便或黏液便"],["hemo","hemoptysis","咳血或吐血，需排除腫瘤出血或氣道侵犯"],["eyepain","eye_pain","眼睛痛或畏光，需眼科評估"]];
+  R.forEach(([id, fid, text]) => { if (e(id) === "y") flag("today", fid, text, p.conf[id] ? "已電話確認" : "自報"); else if (A(id).a === "u") confirm(id, "unsure", `${NAME[id]}：病人選「不確定」`, `電話問：${NAME[id]}？`, true); });
+  if (e("chest") === "y" || e("palp") === "y") flag("today", "chest", "胸悶、胸痛或心悸，需排除心肌炎", "自報");
+  ["chest","palp"].forEach(id => { if (A(id).a === "u") confirm(id, "unsure", `${NAME[id]}：病人選「不確定」`, `電話問：${NAME[id]}？`, true); });
+  if (e("weak") === "y" && (e("chest") === "y" || e("palp") === "y")) flag("today", "myositis", "肌肉無力合併心臟症狀，需一併排除肌炎與心肌炎", "自報");
+  else if (e("weak") === "y") flag("act", "weak", "肌肉沒力（免疫治療期間要留意肌炎）", "自報");
+  if (A("weak").a === "u") confirm("weak", "unsure", "肌肉沒力：病人選「不確定」", "電話問：蹲下站不起來、手舉不高嗎？", true);
+  if (e("dizzy") === "y") flag("act", "adrenal", "站起來頭暈；請問疲倦休息後有沒有好一點，需排除腎上腺功能不全", "自報");
+  else if (A("dizzy").a === "u") confirm("dizzy", "unsure", "站起來頭暈：病人選「不確定」", "電話問：從坐著或躺著站起來會不會頭暈、眼前發黑？", true);
+  // 腹瀉
+  const dq = A("diarrhea").q; if (e("diarrhea") === "y") { if (dq === "ge7") flag("today", "diarrhea_7", "腹瀉比平常多 7 次以上", "自報"); else if (dq === "unk") confirm("diarrhea", "noquant", "腹瀉：病人選「說不準」", `問清楚比平常（平常一天 ${S.usual} 次）多幾次`, true); }
+  // 體重
+  if (S.weight != null) { const pct = (S.base_kg - S.weight) / S.base_kg * 100; if (pct >= 20) flag("today", "weight_20", `體重比治療前減少兩成以上（${S.base_kg} → ${S.weight} kg，${pct.toFixed(1)}%）`, "實測"); }
+  else if (e("weight") === "y") { const q = A("weight").q;
+    if (q === "ge13") confirm("weight", "measure", "病人自報掉 13 公斤以上，約佔治療前體重兩成", "請實測體重", true); else if (!q || q === "none") confirm("weight", "measure", "病人說體重掉很多，但沒量", "請實測體重", true); }
+  // 其他今日處理（用嚴重度近似；正式版用題庫追問題）
+  if (e("swallow") === "y") { if ((A("swallow").sev || 0) >= 3) flag("today", "cant_swallow", "吞嚥很嚴重，需排除阻塞、脫水與吸入風險", "自報"); else flag("act", "swallow", "吞嚥困難；請問現在吃得下什麼", "自報"); }
+  if (e("breath") === "y" && (A("breath").sev || 0) >= 3) flag("today", "dyspnea", "喘或咳很嚴重，請確認休息時是否也喘", "自報");
+  if (e("skin_rt") === "y" && (A("skin_rt").sev || 0) >= 3) flag("today", "skin_rt_severe", "照射部位皮膚很嚴重（濕性脫皮或出血）", "自報");
+  if (A("weight").a === "u") confirm("weight", "unsure", "體重掉很多：病人選「不確定」", "實測體重即可", true);
+  ["swallow","breath"].forEach(id => { if (A(id).a === "u") confirm(id, "unsure", `${NAME[id]}：病人選「不確定」`, `電話問：${NAME[id]}？`, true); });
+  // 非紅旗題選「不確定」：低優先
+  Object.keys(p.ans).forEach(id => { if (!REDIDS.includes(id) && p.ans[id].a === "u") confirm(id, "unsure", `${NAME[id]}：病人選「不確定」`, "看診時順便問", false); });
+  const unfilled = Object.keys(NAME).filter(id => !p.ans[id] && !(["chest","palp","dizzy","eyepain"].includes(id) && !/免疫/.test(p.tx)) && !(["skin_rt","voice"].includes(id) && !/放療/.test(p.tx)) && !(["constipation","mouth","neuro"].includes(id) && !/化療/.test(p.tx)) && !(["coldhot","thirst","swell"].includes(id) && !/免疫/.test(p.tx)) && !(id === "blur" && !/免疫|ADC/.test(p.tx)) && !(id === "dryeye" && !/ADC/.test(p.tx)));
+  Object.keys(p.conf).forEach(id => { if (p.conf[id].res === "escalate") flag("today", "unconf_" + id, `「${NAME[id] || id}」聯絡不到病人，未能確認，請醫師處理`, "未確認"); });
+  if (p.note) flag("read", "note", "病人有話要說", "自報");
+  F.forEach(f => { f.acked = !!p.ack[f.id]; });
+  const pendRed = C.filter(c => c.red).length, level = F.some(f => f.level === "today") ? "today" : pendRed ? "confirm" : F.some(f => f.level === "act") ? "act" : F.length ? "read" : "skip";   // 有紅旗相關的待確認，排在今日處理之後、建議處理之前
+  const blockers = [...C.filter(c => c.red).map(c => `待確認「${NAME[c.id]}」`), ...F.filter(f => f.level === "today" && !f.acked).map(f => `今日處理「${f.text.slice(0, 10)}…」未回覆`)];
+  return { F, C, level, unfilled, blockers };
+}
+const TOD = id => ({ today: "今日處理", confirm: "待確認", act: "建議處理", read: "閱讀", skip: "無須處理" })[id];
+const E = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const $ = (q, r = document) => r.querySelector(q), $$ = (q, r = document) => [...r.querySelectorAll(q)];
+const now = () => new Date().toTimeString().slice(0, 5);
+const log = t => { LOG.unshift(`${now()}　${t}`); };
+/* ---- 畫面 ---- */
+function render() {
+  if (!P.length) { $("#sl").textContent = "目前沒有病人"; $("#queue").innerHTML = ""; $("#pane").innerHTML = '<p class="mini">等待病人資料…</p>'; return; }
+  if (CUR >= P.length) CUR = 0;
+  const EV = P.map(evaluate), RK = { today: 0, confirm: 1, act: 2, read: 3, skip: 4 }, order = P.map((p, i) => i).sort((a, b) => (P[a].l2 ? 9 : RK[EV[a].level]) - (P[b].l2 ? 9 : RK[EV[b].level]) || a - b);
+  const open = P.filter((p, i) => !p.l2).length, tc = P.filter((p, i) => !p.l2 && EV[i].level === "today").length, pend = EV.reduce((a, e, i) => a + (P[i].l2 ? 0 : e.C.filter(c => c.red).length), 0);
+  $("#sl").innerHTML = `<span><b class="t">${tc}</b> 位看診時優先處理</span><span>待初審 <b>${open}</b></span><span>待確認（紅旗相關）<b>${pend}</b></span>`;
+  $("#queue").innerHTML = order.map(i => { const p = P[i], e = EV[i], lv = p.l2 ? "ok" : e.level;
+    return `<li><button type="button" class="qi" data-i="${i}" aria-current="${i === CUR}"><span class="chip c-${lv}">${p.l2 ? "已初審" : TOD(e.level)}</span><span><span class="code">${p.code}</span><small>${p.age}　${p.tx}　${p.visit}${e.C.filter(c => c.red).length && !p.l2 ? `　待確認 ${e.C.filter(c => c.red).length}` : ""}</small></span></button></li>`; }).join("");
+  const p = P[CUR], e = EV[CUR];
+  const today = e.F.filter(f => f.level === "today"), act = e.F.filter(f => f.level === "act"), read = e.F.filter(f => f.level === "read");
+  const flagRow = f => `<li class="fi ${f.level === "today" ? "" : f.level}${f.acked ? " done" : ""}"><span><b>${E(f.text)}</b><small>依據：${f.why}</small></span>${f.level === "today" ? (f.acked ? `<span class="chip c-ok">${E(p.ack[f.id])}</span>` : `<span class="acts"><button class="btn" type="button" data-ack="${f.id}|看診時處理">看診時處理</button><button class="btn ghost" type="button" data-ack="${f.id}|通知醫師">通知醫師</button></span>`) : ""}</li>`;
+  let h = `<section class="card"><div class="head"><span class="code">${p.code}</span><span>${p.age}</span><span>${p.tx}</span><span>${p.visit}</span><span class="chip c-${p.l2 ? "ok" : e.level}">${p.l2 ? "已初審" : TOD(e.level)}</span></div></section>`;
+  h += today.length ? `<section class="card today"><h2>今日處理 <small>${today.length} 項；每一項要回覆「看診時處理」或「通知醫師」</small></h2><ul class="fl">${today.map(flagRow).join("")}</ul></section>` : `<section class="card"><h2>今日處理 <small>沒有</small></h2></section>`;
+  if (act.length || read.length) h += `<section class="card"><h2>建議處理與閱讀</h2><ul class="fl">${[...act, ...read].map(f => `<li class="fi ${f.level}"><span><b>${E(f.text)}</b><small>依據：${f.why}${f.id === "note" ? `　「${E(p.note)}」` : ""}</small></span><span class="chip c-${f.level}">${TOD(f.level)}</span></li>`).join("")}</ul></section>`;
+  // 待確認清單
+  const cs = e.C.slice().sort((a, b) => b.red - a.red), doneC = Object.keys(p.conf).filter(id => p.conf[id].res === "y" || p.conf[id].res === "n" || p.conf[id].val != null);
+  h += `<section class="card ${cs.some(c => c.red) ? "todo" : ""}"><h2>待確認清單 <small>病人選了「不確定」「沒量」「說不準」的項目。沒有確認，不能算沒症狀</small></h2>`;
+  h += cs.length ? `<div class="pane" style="gap:8px">${cs.map(c => confirmCard(p, c)).join("")}</div>` : `<p class="mini">沒有待確認的項目。</p>`;
+  if (doneC.length) h += `<details style="margin-top:8px"><summary>已確認 ${doneC.length} 項</summary><ul class="log">${doneC.map(id => `<li>${E(NAME[id] || id)}：${p.conf[id].val != null ? `實測 ${p.conf[id].val}` : p.conf[id].res === "y" ? "電話確認：有" : "電話確認：沒有"}${p.conf[id].note ? `（${E(p.conf[id].note)}）` : ""}</li>`).join("")}</ul></details>`;
+  h += `</section>`;
+  // 實測欄位
+  const S = p.staff, pct = S.weight != null ? ((S.base_kg - S.weight) / S.base_kg * 100) : null;
+  h += `<section class="card"><h2>個管師填寫 <small>實測值以這裡為準；系統自動計算</small></h2><div class="pane" style="gap:10px">
+   <div class="num"><label for="w">當日體重（診間磅秤）</label><input id="w" type="text" inputmode="decimal" value="${S.weight ?? ""}" placeholder="kg" data-field="weight"><button class="btn ghost" type="button" data-save="weight">儲存</button><span class="mini">治療前 ${S.base_kg} kg（預填）</span></div>
+   <div class="num"><label for="t">院內體溫</label><input id="t" type="text" inputmode="decimal" value="${S.temp ?? ""}" placeholder="°C" data-field="temp"><button class="btn ghost" type="button" data-save="temp">儲存</button></div>
+   <dl class="kv"><dt>體重變化</dt><dd class="calc">${pct == null ? "—（尚未實測）" : `${S.weight} kg，比治療前 ${pct >= 0 ? "少" : "多"} ${Math.abs(pct).toFixed(1)}%${pct >= 20 ? "　⚠ 達兩成" : ""}`}</dd><dt>平常大便次數</dt><dd class="calc">${S.usual} 次／天（預填，可改）</dd></dl></div></section>`;
+  // 病人回報
+  const ids = Object.keys(p.ans).sort((a, b) => (REDIDS.includes(b) - REDIDS.includes(a)) || 0);
+  h += `<section class="card"><h2>病人回報 <small>紅色題在前</small></h2><table class="rep"><tr><th>項目</th><th>答案</th><th>程度／數量</th><th>位置</th></tr>${ids.map(id => { const a = p.ans[id], c = p.conf[id]; const ans = c && (c.res === "y" || c.res === "n") ? `${ANS[c.res]}（電話確認）` : ANS[a.a]; const q = a.q && QL[id] ? QL[id][a.q] : ""; return `<tr class="${a.a === "u" && !c ? "u" : ""} ${REDIDS.includes(id) ? "r" : ""}"><td>${E(NAME[id])}</td><td>${ans}</td><td>${[a.sev ? SEVN[a.sev] : "", q].filter(Boolean).join("；") || "—"}</td><td>${(a.loc || []).map(k => LOCN[k]).join("、") || "—"}</td></tr>`; }).join("")}</table>
+    ${e.unfilled.length ? `<details><summary>沒填的題目 ${e.unfilled.length} 項（未填不等於沒症狀）</summary><p class="mini">${e.unfilled.map(id => NAME[id]).join("、")}</p></details>` : ""}</section>`;
+  // 初審
+  const can = !e.blockers.length && !p.l2;
+  h += `<section class="card"><h2>第二層　個管師初審</h2><div class="sign"><button class="btn" id="sign" type="button" ${can ? "" : "disabled"}>${p.l2 ? "已完成初審" : "完成初審，送交醫師"}</button>${p.l2 ? `<span class="chip c-ok">${E(p.l2)}</span>` : e.blockers.length ? `<span class="why">還不能送出：${E(e.blockers.slice(0, 3).join("、"))}${e.blockers.length > 3 ? `等 ${e.blockers.length} 項` : ""}</span>` : `<span class="mini">所有紅旗相關項目都已處理。</span>`}</div><p class="mini">第三層由醫師確認。這個原型只做到第二層。</p></section>`;
+  h += `<details class="card"><summary>操作紀錄（原型，只存在這個畫面）</summary><ol class="log">${LOG.map(l => `<li>${E(l)}</li>`).join("") || "<li>尚無</li>"}</ol></details>`;
+  $("#pane").innerHTML = h;
+}
+function confirmCard(p, c) {
+  const id = c.id, head = `<div class="t"><b>${E(c.text)}</b>${c.red ? `<span class="chip c-today">紅旗相關</span>` : `<span class="chip c-skip">看診時問</span>`}${c.nc ? `<span class="chip c-act">聯絡不到</span>` : ""}<small>${E(c.ask)}</small></div>`;
+  if (c.kind === "measure") { const f = id === "fever" ? "temp" : "weight";
+    return `<div class="cf">${head}<div class="num"><label for="m-${id}">${f === "temp" ? "實測體溫" : "實測體重"}</label><input id="m-${id}" type="text" inputmode="decimal" placeholder="${f === "temp" ? "°C" : "kg"}" data-mfield="${f}"><button class="btn" type="button" data-measure="${id}|${f}">儲存實測值</button><button class="btn ghost" type="button" data-nc="${id}">聯絡不到</button>${c.nc ? `<button class="btn warn" type="button" data-esc="${id}">聯絡不到，交給醫師處理</button>` : ""}</div></div>`; }
+  if (c.kind === "noquant") return `<div class="cf">${head}<div class="acts">${["0", "1_3", "4_6", "ge7"].map(k => `<button class="btn ghost" type="button" data-bin="${id}|${k}">${QL[id][k]}</button>`).join("")}<button class="btn ghost" type="button" data-nc="${id}">聯絡不到</button>${c.nc ? `<button class="btn warn" type="button" data-esc="${id}">聯絡不到，交給醫師處理</button>` : ""}</div></div>`;
+  return `<div class="cf">${head}<div class="acts"><button class="btn" type="button" data-conf="${id}|y">電話確認：有</button><button class="btn ghost" type="button" data-conf="${id}|n">電話確認：沒有</button><button class="btn ghost" type="button" data-nc="${id}">聯絡不到</button>${c.nc ? `<button class="btn warn" type="button" data-esc="${id}">聯絡不到，交給醫師處理</button>` : ""}<input type="text" id="n-${id}" placeholder="備註（選填）" aria-label="備註"></div></div>`;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const p = P[CUR];
+  if (b.dataset.i != null) { CUR = +b.dataset.i; return render(); }
+  if (b.id === "reset") { P = SEED(); P.forEach(q => { q.conf = {}; q.ack = {}; q.l2 = null; }); LOG.length = 0; CUR = 0; return render(); }
+  if (b.dataset.ack) { const [id, how] = b.dataset.ack.split("|"); p.ack[id] = how; log(`${p.code}　今日處理「${id}」→ ${how}`); return render(); }
+  if (b.dataset.conf) { const [id, res] = b.dataset.conf.split("|"), n = $(`#n-${id}`); p.conf[id] = { res, note: n ? n.value.trim() : "" }; log(`${p.code}　電話確認「${NAME[id]}」→ ${ANS[res]}`); return render(); }
+  if (b.dataset.bin) { const [id, k] = b.dataset.bin.split("|"); p.ans[id].q = k; p.conf[id] = { res: k === "0" ? "n" : "y", note: QL[id][k] }; log(`${p.code}　電話確認「${NAME[id]}」→ ${QL[id][k]}`); return render(); }
+  if (b.dataset.esc) { const id = b.dataset.esc; p.conf[id] = { res: "escalate" }; log(`${p.code}　「${NAME[id]}」聯絡不到，交給醫師處理`); return render(); }
+  if (b.dataset.nc) { const id = b.dataset.nc; p.conf[id] = { res: "nc" }; log(`${p.code}　「${NAME[id]}」聯絡不到`); return render(); }
+  if (b.dataset.measure) { const [id, f] = b.dataset.measure.split("|"), inp = $(`#m-${id}`), v = parseFloat(inp.value); if (!isFinite(v)) { inp.focus(); return; } p.staff[f] = v; p.conf[id] = { res: "measured", val: v + (f === "temp" ? "°C" : " kg") }; log(`${p.code}　${f === "temp" ? "體溫" : "體重"}實測 ${v}`); return render(); }
+  if (b.dataset.save) { const f = b.dataset.save, inp = $(f === "weight" ? "#w" : "#t"), v = parseFloat(inp.value); p.staff[f] = isFinite(v) ? v : null; log(`${p.code}　${f === "weight" ? "當日體重" : "院內體溫"} ${isFinite(v) ? v : "清除"}`); return render(); }
+  if (b.id === "sign") { const ev = evaluate(p); if (ev.blockers.length) return; p.l2 = `${now()} 已送交醫師`; log(`${p.code}　完成第二層初審`); sendL2(p, ev); return render(); }
+});
+function sendL2(p, ev) {   // 第二層完成 → 把整理好的紀錄交給醫師端
+  const rec = { schema: "prom-flow/1", code: p.code, age: p.age, tx: p.txList || [], signedAt: Date.now(),
+    flags: ev.F.map(f => ({ id: f.id, level: f.level, text: f.text, why: f.why, resp: p.ack[f.id] || null })),
+    conf: Object.entries(p.conf).map(([id, c]) => ({ id, res: c.res, note: c.note || c.val || "" })), staff: { ...p.staff }, note: p.note, ans: p.ans };
+  try { parent.postMessage({ type: "l2done", record: rec }, "*"); } catch (e) {}
+}
+const TXN = { chemo: "化療", rt: "放療", io: "免疫治療", adc: "ADC" };
+window.addEventListener("message", ev => {   // 收件：病人端資料包。用 pid 去重（重送不會重複）
+  const m = ev.data; if (!m || m.type !== "ingest") return;
+  const pl = m.payload, ch = m.chart || {}; let dup = P.some(x => x.code === pl.pid);
+  let err = ""; try { if (!dup) { P.push({ code: pl.pid, age: ch.age || "", tx: (pl.tx || []).map(t => TXN[t]).join("＋"), txList: pl.tx || [], visit: "今天", staff: { base_kg: ch.base_kg, usual: ch.usual, weight: null, temp: null }, note: pl.note || "", ans: pl.answers, conf: {}, ack: {}, l2: null }); log(`${pl.pid}　收到病人資料`); render(); } } catch (e) { err = String(e && e.stack || e).slice(0, 300); }
+  try { ev.source.postMessage({ type: "ingested", pid: pl.pid, dup, err }, "*"); } catch (e) {}
+});
+window.__state = () => ({ patients: P.map(p => { const e = evaluate(p); return { code: p.code, level: e.level, flags: e.F.map(f => ({ id: f.id, level: f.level, acked: f.acked })), confirms: e.C.map(c => ({ id: c.id, red: c.red, nc: c.nc })), blockers: e.blockers, staff: { ...p.staff }, l2: p.l2, conf: JSON.parse(JSON.stringify(p.conf)) }; }), cur: CUR });
+render();
+</script>

@@ -1,0 +1,51 @@
+<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>三視窗流程測試台</title>
+<style>
+:root{--bg:#EEF2F1;--ink:#16231F;--soft:#4B5C56;--rule:#B8C4BF;--panel:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#0F1614;--ink:#E4ECE9;--soft:#A3B3AC;--rule:#30403A;--panel:#18211F}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC",-apple-system,"Microsoft JhengHei",sans-serif}
+header{padding:8px 14px;display:flex;gap:16px;align-items:baseline;flex-wrap:wrap} h1{margin:0;font-size:1.05rem} #stat{font-size:.9rem;color:var(--soft)} #stat b{color:var(--ink)}
+.row{display:flex;gap:8px;padding:0 8px 8px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:4px} .col b{font-size:.85rem;padding-left:4px} iframe{border:2px solid var(--rule);border-radius:8px;background:#fff}
+#fp{width:400px;height:770px} #fn{width:820px;height:770px} #fd{width:560px;height:770px}
+#cap{margin:0 8px 8px;padding:8px 14px;border-radius:8px;background:#1B6757;color:#fff;font-size:1rem;font-weight:700;min-height:1.6em;display:none} .col.on iframe{border-color:#1B6757;box-shadow:0 0 0 4px rgba(27,103,87,.35)} .col.on b{color:#1B6757}
+#log{margin:0 8px;font:12px/1.4 ui-monospace,Consolas,monospace;color:var(--soft);max-height:70px;overflow:auto;white-space:pre-wrap}
+</style>
+<header><h1>病人端 → 個管師端 → 醫師端</h1><div id="stat">待開始</div></header>
+<div id="ctl" style="padding:0 14px 8px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:.9rem">
+<label>人數 <input id="cn" type="number" value="60" min="5" max="500" style="width:4.5em"></label>
+<label><input id="cr" type="checkbox" checked> 個管師每位都量體重體溫</label>
+<label>丟包 <input id="cd" type="number" value="0.05" step="0.01" min="0" max="0.5" style="width:4em"></label>
+<label>重複 <input id="cu" type="number" value="0.05" step="0.01" min="0" max="0.5" style="width:4em"></label>
+<label><input id="cy" type="checkbox" checked> 丟包後重送</label>
+<label>聯絡不到 <input id="cc" type="number" value="0.08" step="0.01" min="0" max="0.6" style="width:4em"></label>
+<button id="go" type="button" style="min-height:36px;padding:0 16px;border-radius:8px;border:2px solid #1B6757;background:#1B6757;color:#fff;font:inherit;font-weight:700;cursor:pointer">開始自動測試</button>
+<button id="demo" type="button" style="min-height:36px;padding:0 16px;border-radius:8px;border:2px solid #1B6757;background:transparent;color:#1B6757;font:inherit;font-weight:700;cursor:pointer">播放示範（3 位）</button><span style="color:var(--soft)">虛擬病人與資料，不連正式系統</span></div>
+<div id="res" style="padding:0 14px 8px;font-size:.9rem"></div>
+<div id="cap"></div>
+<div class="row">
+<div class="col" id="colp"><b>① 病人端（手機）</b><iframe id="fp" src="about:blank"></iframe></div>
+<div class="col" id="coln"><b>② 個管師端</b><iframe id="fn" src="nurse_v2.html?empty=1"></iframe></div>
+<div class="col" id="cold"><b>③ 醫師端</b><iframe id="fd" src="doctor_v1.html"></iframe></div>
+</div>
+<pre id="log"></pre>
+<script>
+window.cap=t=>{const e=document.getElementById('cap');e.style.display=t?'block':'none';e.textContent=t||''};window.hl=k=>{['p','n','d'].forEach(x=>document.getElementById('col'+x).classList.toggle('on',x===k))};
+const E=s=>String(s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
+document.getElementById('demo').onclick=async function(){
+  this.disabled=true; try{ const src=await (await fetch('demo_runner.js')).text(); const out=await (0,eval)(src); if(String(out).startsWith('EXC')) throw new Error(out); }
+  catch(err){ document.getElementById('res').style.display='block'; document.getElementById('res').innerHTML='<b>無法在這個環境執行</b>：'+E(err.message||err).slice(0,300); }
+  this.disabled=false; document.getElementById('ctl').style.display='flex';
+};
+document.getElementById('go').onclick=async function(){
+  const b=this; b.disabled=true; document.getElementById('res').textContent='執行中…';
+  const cfg={n:+cn.value,seed:20261003,routine:cr.checked?1:0,drop:+cd.value,dup:+cu.value,retry:cy.checked?1:0,ncP:+cc.value,phoneAcc:.97};
+  try{
+    const src=(await (await fetch('flow_runner.js')).text()).replace('__RUNCFG__',JSON.stringify(cfg));
+    const out=await (0,eval)(src); if(typeof out==='string'&&out.startsWith('EXC')) throw new Error(out);
+    const d=JSON.parse(out), e=d.e2eTot, caught=e.TP+e.UNC, pos=caught+e.FN_patient+e.FN_nurse;
+    document.getElementById('res').innerHTML=`<b>結果</b>：${d.n} 位虛擬病人，填完 ${d.completed}、中途放棄 ${d.abandoned}、送達醫師端 ${d.delivered}；遺失 ${d.lostNurse+d.lostDoctor}（→個管師 ${d.lostNurse}、→醫師 ${d.lostDoctor}）、個管師端重複 ${d.dupNurse}、醫師端忽略重複 ${d.doctorDupes}。<br>資料包與病人畫面不一致 ${d.hop1Bad}；個管師端紅旗與獨立規則不一致 ${d.hop2Bad}；醫師端與個管師送出不一致 ${d.hop3Bad}。<br>真實紅旗 ${pos} 個：醫師端看到 ${e.TP}、交給醫師的未確認 ${e.UNC}、病人端漏 ${e.FN_patient}、個管師端漏 ${e.FN_nurse}；多報 ${e.FP}。個管師每位點擊中位 ${d.nurse.clicksMed}（p90 ${d.nurse.clicksP90}）。`;
+  }catch(err){document.getElementById('res').innerHTML='<b>無法在這個環境執行</b>：'+E(err.message||err).slice(0,300)+'<br>請在本機用 run_flow.sh 執行。';}
+  b.disabled=false;
+};
+</script>

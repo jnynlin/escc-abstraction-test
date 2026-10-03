@@ -1,0 +1,288 @@
+<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>症狀紀錄位置版原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 版面：手機單欄（最寬 520px），上方固定進度、下方固定「上一步／下一步」放在大拇指區。每屏只做一種決定：重要 4 題 → 症狀清單 2 屏（逐列有／沒有，答「有」才在該列展開嚴重度）→ 想說的話 → 確認。 */
+:root{
+  --bg:#F2F5F3; --panel:#FFFFFF; --ink:#18241F; --soft:#4F5F59; --rule:#D3DBD7; --well:#E7EDEA;
+  --acc:#1D6A5A; --acc-ink:#FFFFFF; --acc-soft:#D9EBE5;
+  --no:#34413C; --no-ink:#FFFFFF;
+  --red:#B3261E; --red-soft:#FCE9E6; --warn:#7A4B00; --warn-soft:#FFF1D6; --focus:#2F6FA3;
+  --sans:"Noto Sans TC",-apple-system,BlinkMacSystemFont,"Microsoft JhengHei","PingFang TC",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101715; --panel:#18211E; --ink:#E6EEEA; --soft:#A5B5AE; --rule:#32413B; --well:#202B27;
+  --acc:#6CC3AC; --acc-ink:#0D1714; --acc-soft:#1D3730; --no:#C9D4CF; --no-ink:#101715;
+  --red:#F2877C; --red-soft:#3A1F1C; --warn:#F0C674; --warn-soft:#3A2F14; --focus:#7FB4E0; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#101715; --panel:#18211E; --ink:#E6EEEA; --soft:#A5B5AE; --rule:#32413B; --well:#202B27;
+  --acc:#6CC3AC; --acc-ink:#0D1714; --acc-soft:#1D3730; --no:#C9D4CF; --no-ink:#101715;
+  --red:#F2877C; --red-soft:#3A1F1C; --warn:#F0C674; --warn-soft:#3A2F14; --focus:#7FB4E0; color-scheme:dark;}
+html{font-size:18px;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;padding-inline:16px;padding-block:0 128px;}
+*{box-sizing:border-box;}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:8px;}
+.col{max-width:520px;margin:0 auto;}
+.proto{margin:0 -16px;padding:6px 16px;background:var(--well);color:var(--soft);font-size:.8rem;text-align:center;}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:3;margin:0 -16px;padding:10px 16px 8px;background:var(--bg);border-bottom:1px solid var(--rule);}
+.top .l{display:flex;justify-content:space-between;gap:12px;align-items:baseline;font-size:.9rem;color:var(--soft);}
+.top b{color:var(--ink);font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums;}
+.bar{height:8px;border-radius:99px;background:var(--well);margin-top:6px;overflow:hidden;} .bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .25s;}
+h1{margin:22px 0 6px;font-size:1.55rem;line-height:1.3;text-wrap:balance;} h2{margin:18px 0 4px;font-size:1.3rem;line-height:1.35;text-wrap:balance;}
+.lead{margin:0 0 14px;color:var(--soft);font-size:1rem;}
+.list{display:grid;gap:10px;margin:14px 0;padding:0;list-style:none;}
+.list li{display:grid;grid-template-columns:1.6rem minmax(0,1fr);gap:10px;align-items:start;font-size:1rem;} .list svg{width:1.4rem;height:1.4rem;margin-top:.15rem;stroke:var(--acc);}
+.field{margin:18px 0 6px;} .field label{display:block;font-weight:700;margin-bottom:4px;} .field small{display:block;color:var(--soft);font-size:.9rem;margin-top:4px;}
+input[type=text],textarea{width:100%;font:inherit;font-size:1.3rem;padding:12px 14px;border:2px solid var(--rule);border-radius:12px;background:var(--panel);color:var(--ink);}
+input#birth{letter-spacing:.4em;font-family:var(--mono);max-width:11rem;}
+textarea{font-size:1.05rem;min-height:9rem;resize:vertical;}
+.btn{min-height:54px;padding:0 22px;border-radius:14px;border:2px solid var(--acc);background:var(--acc);color:var(--acc-ink);font:inherit;font-size:1.1rem;font-weight:700;cursor:pointer;}
+.btn.ghost{background:transparent;color:var(--acc);} .btn.full{width:100%;} .btn[disabled]{opacity:.55;cursor:not-allowed;}
+.short{margin:8px 0 4px;}
+.row{margin:12px 0;padding:14px;border:2px solid var(--rule);border-radius:14px;background:var(--panel);scroll-margin-top:96px;}
+.row.need{border-color:var(--red);box-shadow:0 0 0 3px var(--red-soft);}
+.row .q b{display:block;font-size:1.12rem;line-height:1.35;} .row .q span{display:block;color:var(--soft);font-size:.95rem;line-height:1.45;margin-top:2px;}
+.seg{display:grid;grid-template-columns:1fr 1fr .8fr;gap:8px;margin-top:10px;}
+.seg button{min-height:52px;border-radius:12px;border:2px solid var(--rule);background:var(--panel);color:var(--ink);font:inherit;font-size:1.08rem;font-weight:500;cursor:pointer;}
+.seg button[aria-pressed=true].y{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700;}
+.seg button[aria-pressed=true].n{background:var(--no);border-color:var(--no);color:var(--no-ink);font-weight:700;}
+.seg button[aria-pressed=true].u{background:var(--warn-soft);border-color:var(--warn);color:var(--warn);font-weight:700;}
+.seg button.u{font-size:.95rem;border-style:dashed;}
+.more{margin-top:12px;padding-top:12px;border-top:1px dashed var(--rule);} .more p{margin:0 0 8px;font-size:1rem;font-weight:500;}
+.sev{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;} .sev button{min-height:52px;border-radius:12px;border:2px solid var(--rule);background:var(--panel);color:var(--ink);font:inherit;font-size:1rem;cursor:pointer;line-height:1.25;padding:4px 6px;}
+.sev button[aria-pressed=true]{background:var(--acc-soft);border-color:var(--acc);font-weight:700;}
+.loc{margin-top:12px;padding-top:12px;border-top:1px dashed var(--rule);} .loc p{margin:0 0 6px;font-size:1rem;font-weight:500;}
+.fig{display:block;width:100%;max-width:330px;margin:4px auto 8px;height:auto;touch-action:manipulation;}
+.fig .blk{cursor:pointer;outline:none;} .fig .blk rect{fill:var(--well);stroke:var(--soft);stroke-width:2;} .fig .blk text{font:500 15px var(--sans);fill:var(--ink);text-anchor:middle;pointer-events:none;}
+.fig .blk[aria-pressed=true] rect{fill:var(--acc);stroke:var(--acc);} .fig .blk[aria-pressed=true] text{fill:var(--acc-ink);font-weight:700;}
+.fig .blk:focus-visible rect{stroke:var(--focus);stroke-width:4;}
+.hint{margin:6px 0 0;padding:8px 10px;border-radius:8px;background:var(--warn-soft);color:var(--warn);font-size:.95rem;line-height:1.45;font-weight:500;}
+.fig.dim{opacity:.45;} .locsum{margin:8px 0 0;min-height:1.5em;font-size:.95rem;color:var(--soft);}
+.locchips{display:flex;flex-wrap:wrap;gap:8px;} .locchips button{min-height:48px;padding:0 14px;border-radius:12px;border:2px solid var(--rule);background:var(--panel);color:var(--ink);font:inherit;font-size:1rem;cursor:pointer;}
+.locchips button[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700;}
+.redblk{margin:12px 0;padding:14px;border:2px solid var(--red);border-radius:14px;background:var(--panel);} .redblk.need{box-shadow:0 0 0 4px var(--red-soft);} .redblk h3{margin:0 0 4px;font-size:1.1rem;} .redblk p{margin:0 0 8px;font-size:.95rem;color:var(--soft);}
+.rr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;margin:8px 0;} .rr b{display:block;font-size:1rem;line-height:1.3;} .rr .seg{margin:0;grid-template-columns:repeat(3,64px);} .rr .seg button{min-height:48px;font-size:1rem;}
+@media (max-width:400px){.rr{grid-template-columns:1fr;} .rr .seg{grid-template-columns:repeat(3,1fr);}}
+.confirm{margin:8px 0 4px;padding:12px;border:2px solid var(--acc);border-radius:14px;background:var(--acc-soft);} .confirm p{margin:0 0 8px;font-weight:700;} .confirm .two{display:grid;grid-template-columns:1fr 1fr;gap:8px;} .confirm .btn{padding:0 10px;font-size:1rem;}
+.rq{margin-left:6px;color:var(--soft);font-weight:400;}
+.qo{grid-template-columns:repeat(2,1fr);margin-top:6px;} .qo button{min-height:52px;font-size:1rem;line-height:1.3;} .qo.q5 button:first-child,.qo.q5 button:last-child{grid-column:auto;}
+.alert{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:var(--red-soft);color:var(--red);font-size:.95rem;line-height:1.5;font-weight:500;}
+.sum{margin:12px 0;padding:14px;border:2px solid var(--rule);border-radius:14px;background:var(--panel);} .sum h3{margin:0 0 6px;font-size:1.05rem;} .sum ul{margin:0;padding-left:1.2rem;} .sum li{margin:2px 0;} .sum .edit{margin-top:8px;min-height:44px;padding:0 14px;border-radius:10px;border:2px solid var(--rule);background:transparent;color:var(--ink);font:inherit;cursor:pointer;}
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:4;background:var(--panel);border-top:1px solid var(--rule);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));}
+.dock .in{max-width:520px;margin:0 auto;display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;}
+.dock .left{display:flex;flex-direction:column;gap:2px;} .dock .remain{font-size:.85rem;color:var(--soft);min-height:1.2em;} .dock .remain.warn{color:var(--red);font-weight:700;}
+.lab{margin-top:26px;padding:14px;border:1px solid var(--rule);border-radius:12px;background:var(--well);font-size:.9rem;color:var(--soft);} .lab b{color:var(--ink);} .lab pre{white-space:pre-wrap;word-break:break-all;font:.8rem var(--mono);margin:8px 0 0;max-height:12rem;overflow:auto;}
+.lab table{border-collapse:collapse;width:100%;margin-top:6px;} .lab td,.lab th{border-bottom:1px solid var(--rule);padding:3px 6px;text-align:left;font-variant-numeric:tabular-nums;}
+.done{margin-top:22px;padding:16px;border-radius:14px;background:var(--acc-soft);} .done h1{margin:0 0 6px;}
+.safe{margin:12px 0;padding:12px 14px;border-left:5px solid var(--red);background:var(--red-soft);border-radius:8px;font-size:.98rem;}
+.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:6;max-width:calc(100% - 32px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:.95rem;}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none;}}
+</style>
+
+<div class="proto">原型（位置版）：疼痛、關節、麻、皮疹、癢、照射部位皮膚答「有」時，會展開「在哪裡？」。不會送出任何資料</div>
+<div class="top" id="top" hidden><div class="l"><span id="stepName"></span><span><b id="stepNo"></b></span></div><div class="bar" aria-hidden="true"><i id="bar"></i></div></div>
+<div class="col" id="app"></div>
+<div class="dock" id="dock" hidden><div class="in"><button class="btn ghost" id="back" type="button">上一步</button><div class="left" style="align-items:stretch"><button class="btn" id="next" type="button">下一步</button><span class="remain" id="remain" aria-live="polite"></span></div></div></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+/* 暫定題目（化療＋放療的病人）。正式版每個「有」會展開現有題庫該症狀的追問題；這裡只放一題嚴重度。 */
+const RED_CORE = [
+ {id:"fever",  n:"發燒",       d:"體溫超過 38 度，或一陣冷一陣熱", red:1, nosev:1,
+  q:{req:1, title:"有量體溫的話，最高量到幾度？", opts:[["none","沒量，只是覺得發燒"],["lt375","37.5 度以下"],["375_379","37.5–37.9 度"],["38_389","38–38.9 度"],["ge39","39 度以上"]]}},
+ {id:"swallow",n:"吞嚥困難",   d:"吞東西會痛、會卡住，連水都吞不下", red:1},
+ {id:"breath", n:"喘或咳嗽",   d:"走一小段路就喘，或咳得比平常多", red:1},
+ {id:"weight", n:"體重掉很多", d:"最近一週變瘦，衣服變鬆", red:1, nosev:1,
+  q:{title:"家裡有磅秤的話，大約掉了幾公斤？（到院時護理會再量一次）", opts:[["none","沒量"],["1_2","1–2 公斤"],["3_4","3–4 公斤"],["5_7","5–7 公斤"],["8_12","8–12 公斤"],["ge13","13 公斤以上"]]}},
+ {id:"blood", n:"血便或黏液便", d:"大便帶血，或有黏液", red:1, nosev:1, page:"diarrhea"},
+ {id:"hemo",  n:"咳血或吐血", d:"咳出或吐出來的東西帶血", red:1, nosev:1, page:"swallow"},
+ {id:"weak",  n:"肌肉沒力", d:"蹲下站不起來、手舉不高", red:1, nosev:1, page:"joint"}];
+const RED_TX = [   // 和這次治療有關的安全列（免疫治療、ADC）：題庫的『今日必處理』紅旗依賴這些題
+ {id:"chest",  n:"胸悶或胸痛", d:"胸口悶、被壓著，或會痛", red:1, nosev:1, tx:["io"], page:"cardiac"},
+ {id:"palp",   n:"心跳很快或不規則", d:"沒在運動卻心跳很快，或跳得很亂", red:1, nosev:1, tx:["io"], page:"cardiac"},
+ {id:"dizzy",  n:"站起來會頭暈、眼前發黑", d:"從坐著或躺著站起來的時候", red:1, nosev:1, tx:["io"], page:"endo"},
+ {id:"eyepain",n:"眼睛痛、很紅或怕光", d:"眼睛會痛、很紅，或看到光不舒服", red:1, nosev:1, tx:["io","adc"], page:["eye_io","eye_adc"]}];
+const GA_ALL = [
+ {id:"fatigue", n:"疲倦、沒力氣", d:"比平常容易累，休息也沒有好轉"},
+ {id:"nausea",  n:"噁心、吃不下", d:"想吐，或只吃得下很少",
+  q:{title:"過去一天吐了幾次？", opts:[["0","沒吐"],["1_2","1–2 次"],["3_5","3–5 次"],["ge6","6 次以上"]]}},
+ {id:"diarrhea",n:"拉肚子", d:"一天解很多次，或是水狀的", nosev:1,
+  q:{req:1, title:"最近最多的一天，比平常多解幾次？", opts:[["0","沒有比平常多"],["1_3","多 1–3 次"],["4_6","多 4–6 次"],["ge7","多 7 次以上"],["unk","說不準，請護理確認"]]}},
+ {id:"constipation",n:"便秘", d:"超過兩天沒有解，或很用力才解得出來", tx:["chemo"]},
+ {id:"dehyd",   n:"口乾、尿很少", d:"一直很渴，或尿量明顯變少"},
+ {id:"pain",    n:"疼痛", d:"胸口、背、肚子、喉嚨、骨頭等處的痛。手腳關節或肌肉的痠痛，請在下一項回答"},
+ {id:"joint",   n:"關節或肌肉痛", d:"手腳關節或肌肉的痠痛，走路、起身或抬手時更明顯"},
+ {id:"coldhot", n:"特別怕冷或怕熱", d:"比平常更怕冷，或一直覺得很熱", tx:["io"], page:"endo"},
+ {id:"thirst",  n:"很容易口渴、一直跑廁所", d:"一直想喝水，尿很多次", tx:["io"], page:"endo"},
+ {id:"swell",   n:"腳腫", d:"腳踝或小腿腫起來", tx:["io"], page:"cardiac"}];
+const GB_ALL = [
+ {id:"rash",   n:"皮膚起疹子", d:"紅疹、小疙瘩，在身體任何地方"},
+ {id:"itch",   n:"皮膚癢", d:"很想抓，影響睡眠或專心"},
+ {id:"skin_rt",n:"照射部位的皮膚", d:"放射線照到的地方變紅、痛、脫皮或破皮", tx:["rt"]},
+ {id:"mouth",  n:"嘴巴破", d:"口腔有破洞、潰瘍，吃東西會痛", tx:["chemo"]},
+ {id:"voice",  n:"聲音沙啞", d:"說話聲音變小、變啞", tx:["rt"]},
+ {id:"neuro",  n:"手腳麻、刺痛", d:"手或腳麻麻的、像針刺，或沒力氣", tx:["chemo"]},
+ {id:"blur",   n:"視力變模糊", d:"看東西模糊，或有重影", tx:["io","adc"], page:["eye_io","eye_adc"]},
+ {id:"dryeye", n:"眼睛乾澀、有異物感", d:"眼睛很乾，像有沙子", tx:["adc"], page:"eye_adc"}];
+const RED = [], GA = [], GB = [], ALL = [], STEPS = [];   // 依治療別重建（applyTx）；RED＝所有紅旗列（檢視頁確認區用）
+const ITEM = Object.fromEntries([...RED_CORE,...RED_TX,...GA_ALL,...GB_ALL].map(x=>[x.id,x]));
+const TXLIST = [["chemo","化療"],["rt","放療"],["io","免疫治療"],["adc","ADC"]];
+const vis = x => !x.tx || x.tx.some(t=>S.tx.has(t));
+function applyTx(){
+  const core = RED_CORE.filter(vis), extra = RED_TX.filter(vis);
+  RED.length = GA.length = GB.length = ALL.length = STEPS.length = 0;
+  RED.push(...core, ...extra); GA.push(...GA_ALL.filter(vis)); GB.push(...GB_ALL.filter(vis)); ALL.push(...RED, ...GA, ...GB);
+  STEPS.push({k:"red", name:"先確認幾件重要的事", items:core, short:false});
+  if (extra.length) STEPS.push({k:"red2", name:"和這次治療有關的重要項目", items:extra, short:false});
+  STEPS.push({k:"A", name:"身體的感覺", items:GA, short:true}, {k:"B", name:"皮膚與其他", items:GB, short:true}, {k:"note", name:"想告訴醫師的話"}, {k:"review", name:"看一下再送出"});
+}
+const LOCABLE = new Set(["pain","joint","neuro","rash","itch","skin_rt"]);   // 這幾項答「有」才問位置
+const BLK = [["head","頭頸",105,4,90,60],["chest","胸",95,70,110,70],["abd","腹",100,146,100,64],["armR","右手臂",30,70,58,150],["armL","左手臂",212,70,58,150],["legR","右腿",82,216,64,110],["legL","左腿",154,216,64,110]];   // 圖上方塊（病人的右邊在畫面左側）
+const LOCX = [["back","背部／腰"],["whole","全身"],["unknown","說不出位置"]];
+const LOCNAME = Object.fromEntries([...BLK.map(b=>[b[0],b[1]]),...LOCX]);
+const BODYK = [...BLK.map(b=>b[0]), "back"];   // 「全身」＝圖上 7 塊＋背部／腰 全部選取（不是獨立狀態，圖和選項永遠一致）
+const isWhole = set => !!set && BODYK.every(x=>set.has(x));
+const SEV = [[1,"輕微","照常過日子"],[2,"有些影響","有些不方便"],[3,"很嚴重","沒辦法做事"]];
+const S = { tx:new Set(["chemo","rt"]), q:{}, i:-1, a:{}, sev:{}, loc:{}, redOk:false, confirmAllNo:false, note:"", t0:performance.now(), lastNav:0, taps:0, tapsByStep:{}, stepMs:{}, enter:performance.now(), needHits:0, done:false };
+applyTx();
+const $ = (q,r=document)=>r.querySelector(q), $$=(q,r=document)=>[...r.querySelectorAll(q)];
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const NAV_GAP = 300;   // 兩次換屏至少隔 0.3 秒，連點不會跳屏
+const key = () => S.i<0 ? "intro" : S.done ? "done" : STEPS[S.i].k;
+const ic = p => `<svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const CHECK = ic('<path d="M5 12.5l4.5 4.5L19 7"/>');
+
+function locHTML(id){
+  const sel = S.loc[id] || new Set(), on = k => k==="whole" ? isWhole(sel) : sel.has(k);
+  const blocks = BLK.map(([k,n,x,y,w,h]) => `<g class="blk" role="button" tabindex="0" data-l="${id}|${k}" aria-pressed="${on(k)}" aria-label="${n}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14"/><text x="${x+w/2}" y="${y+h/2+5}">${n}</text></g>`).join("");
+  return `<div class="loc"><p>在哪裡？（選填，可多選）</p><svg class="fig${sel.has("unknown")?" dim":""}" viewBox="0 0 300 332" role="group" aria-label="身體圖，點選不舒服的部位。畫面左邊是您的右側。">${blocks}</svg>
+    <div class="locchips">${LOCX.map(([k,n])=>`<button type="button" data-l="${id}|${k}" aria-pressed="${on(k)}">${n}</button>`).join("")}</div>
+    <p class="locsum" aria-live="polite">${locSum(id)}</p>${id==="pain"&&["armL","armR","legL","legR"].some(k=>sel.has(k))?`<p class="hint">手臂、腿的關節或肌肉痠痛，請在下一項「關節或肌肉痛」回答。</p>`:""}</div>`;
+}
+const locSum = id => { const s = S.loc[id]; if (!s || !s.size) return "還沒選位置。可以不選。"; if (s.has("unknown")) return "已選：說不出位置"; if (isWhole(s)) return "已選：全身（點一下身體部位，可以取消那一塊）"; return "已選：" + [...s].map(k=>LOCNAME[k]).join("、"); };
+const qTxt = id => { const x = ITEM[id]; if (!x.q || !S.q[id]) return ""; const o = x.q.opts.find(o=>o[0]===S.q[id]); return o ? o[1] : ""; };
+const detail = (x,show) => { if (!show) return ""; const p = []; if (S.sev[x.id]) p.push(SEV[S.sev[x.id]-1][1]); const q = qTxt(x.id); if (q) p.push(q); const l = locTxt(x.id); if (l) p.push(l.slice(1)); return p.length ? `（${p.join("；")}）` : ""; };
+const locTxt = id => S.loc[id] && S.loc[id].size ? "；位置：" + (isWhole(S.loc[id]) ? "全身" : [...S.loc[id]].map(k=>LOCNAME[k]).join("、")) : "";
+function rowHTML(x){
+  const v = S.a[x.id], sv = S.sev[x.id];
+  const btn = (c,val,txt) => `<button type="button" class="${c}" data-a="${x.id}|${val}" aria-pressed="${v===val}">${v===val&&val!=="u"?"✓ ":""}${txt}</button>`;
+  const sevBlock = x.nosev ? "" : `<p>影響日常生活多少？</p><div class="sev">${SEV.map(([n,t,s])=>`<button type="button" data-s="${x.id}|${n}" aria-pressed="${sv===n}">${t}<br><small>${s}</small></button>`).join("")}</div>`;
+  const qBlock = x.q ? `<p>${x.q.title}${x.q.req?"<small class=\"rq\">（請選一個）</small>":""}</p><div class="sev qo q${x.q.opts.length}">${x.q.opts.map(([k,t])=>`<button type="button" data-qa="${x.id}|${k}" aria-pressed="${S.q[x.id]===k}">${t}</button>`).join("")}</div>` : "";
+  return `<div class="row" data-row="${x.id}" role="group" aria-label="${esc(x.n)}">
+    <div class="q"><b>${esc(x.n)}</b><span>${esc(x.d)}</span></div>
+    <div class="seg">${btn("y","y","有")}${btn("n","n","沒有")}${btn("u","u","不確定")}</div>
+    ${x.red&&v==="u"?`<p class="alert">不確定也沒關係，我們會請個管師再向您確認。</p>`:""}
+    ${v==="y" ? `<div class="more">${sevBlock}${qBlock}
+      ${LOCABLE.has(x.id)?locHTML(x.id):""}
+      ${x.red?`<p class="alert">這一項很重要，個管師會優先看到。如果現在很不舒服，請直接聯絡醫院或就近就醫。</p>`:""}</div>`:""}
+  </div>`;
+}
+function unanswered(step){ return (step.items||[]).filter(x=>!S.a[x.id] || (S.a[x.id]==="y" && x.q && x.q.req && !S.q[x.id])); }   // 發燒、腹瀉答「有」要選一格（可選「沒量」「說不準」，護理會再確認）
+function view(){
+  const k = key(), st = STEPS[S.i];
+  if (k==="intro") return `<h1>回診前的症狀紀錄</h1>
+    <p class="lead">讓醫療團隊在您回診前，先知道這一週的狀況。</p>
+    <ul class="list">
+      <li>${ic('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>')}<span>只問<b>最近一週</b>。大多數題目點一下就好，不用打字。</span></li>
+      <li>${ic('<path d="M12 3l8 3v6c0 4.5-3.4 7.7-8 9-4.6-1.3-8-4.5-8-9V6z"/>')}<span>連結上沒有您的姓名。只有醫療團隊看得到答案。</span></li>
+      <li>${ic('<path d="M5 12.5l4.5 4.5L19 7"/>')}<span>不確定的題目可以選「不確定」，隨時可以按「上一步」修改。</span></li>
+    </ul>
+    <div class="field"><label for="birth">請輸入生日的月和日（4 個數字）</label><input id="birth" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="0315" aria-describedby="bh"><small id="bh">例如 3 月 15 日，輸入 0315。這是為了確認是您本人。試用時隨意輸入 4 個數字即可。</small></div>
+    <div class="field"><label>試用設定：這位病人的治療</label><div class="locchips" id="txchips">${TXLIST.map(([k,n])=>`<button type="button" data-tx="${k}" aria-pressed="${S.tx.has(k)}">${n}</button>`).join("")}</div><small>正式版由診間發的連結決定，病人不用選。選不同治療，題目與步數會跟著變。</small></div>
+    <p><button class="btn full" id="go" type="button" disabled>開始，共 ${STEPS.length} 步</button></p>`;
+  if (k==="done") return doneHTML();
+  const head = `<h2>${esc(st.name)}</h2>`;
+  if (st.items){
+    const lead = st.k==="red" ? `這 ${st.items.length} 項最需要知道，請每一項都選。` : st.k==="red2" ? `這 ${st.items.length} 項和這次的治療有關，也很重要，請每一項都選。` : "最近一週，有沒有這些不舒服？每一項都選「有」或「沒有」。";
+    return head + `<p class="lead">${lead}</p>` + (st.short?(S.confirmAllNo===st.k?`<div class="confirm" role="alertdialog" aria-label="確認這一頁都沒有"><p>這一頁沒選的 ${unanswered(st).length} 項，都選「沒有」嗎？</p><div class="two"><button class="btn" id="allno-yes" type="button">對，都沒有</button><button class="btn ghost" id="allno-cancel" type="button">不是，我自己選</button></div></div>`:`<button class="btn ghost full short" id="allno" type="button">這一頁都沒有</button>`):"") + st.items.map(rowHTML).join("");
+  }
+  if (k==="note") return head + `<p class="lead">選填。沒有的話直接按「下一步」。</p><div class="field"><label for="note">還有什麼想讓醫師知道？</label><textarea id="note" placeholder="例如：最近睡不好、擔心某件事、想問的問題">${esc(S.note)}</textarea></div>`;
+  return head + reviewHTML();
+}
+function redBlockHTML(){
+  const seg = x => ["y","n","u"].map(v=>`<button type="button" class="${v}" data-a="${x.id}|${v}" aria-pressed="${S.a[x.id]===v}">${v==="y"?"有":v==="n"?"沒有":"不確定"}</button>`).join("");
+  return `<div class="redblk" id="redblk"><h3>先確認 ${RED.length} 個重要的項目</h3><p>如果有選錯，直接在這裡改。選「不確定」的，我們會請個管師再向您確認。</p>${RED.map(x=>`<div class="rr" role="group" aria-label="${esc(x.n)}"><b>${esc(x.n)}</b><div class="seg">${seg(x)}</div></div>`).join("")}<button type="button" class="btn ${S.redOk?"":"ghost"} full" id="redok" aria-pressed="${S.redOk}">${S.redOk?`✓ 這 ${RED.length} 項都對`:`這 ${RED.length} 項都對`}</button></div>`;
+}
+function reviewHTML(){
+  const grp = (lab,f) => { const L = ALL.filter(x=>S.a[x.id]===f); return L.length ? `<ul>${L.map(x=>`<li>${esc(x.n)}${detail(x,f==="y")}</li>`).join("")}</ul>` : ""; };
+  const y = ALL.filter(x=>S.a[x.id]==="y"), u = ALL.filter(x=>S.a[x.id]==="u"), n = ALL.filter(x=>S.a[x.id]==="n");
+  return redBlockHTML() + `<p class="lead">請看一下，沒問題就按「送出」。</p>
+   <div class="sum"><h3>有的不舒服：${y.length} 項</h3>${y.length?grp("y","y"):"<p style='margin:0;color:var(--soft)'>沒有</p>"}<button class="edit" type="button" data-go="${STEPS.findIndex(x=>x.k==='A')}">修改</button></div>
+   ${u.length?`<div class="sum"><h3>不確定：${u.length} 項</h3>${grp("u","u")}</div>`:""}
+   <div class="sum"><h3>沒有的：${n.length} 項</h3><p style="margin:0;color:var(--soft)">${n.map(x=>esc(x.n)).join("、")||"—"}</p></div>
+   ${S.note?`<div class="sum"><h3>想告訴醫師的話</h3><p style="margin:0">${esc(S.note)}</p></div>`:""}`;
+}
+function doneHTML(){
+  const y = ALL.filter(x=>S.a[x.id]==="y");
+  const rec = research();
+  return `<div class="done"><h1>已送出，謝謝您</h1><p style="margin:0">（原型：沒有真的送出）</p></div>
+   <div class="sum"><h3>您這次回報</h3>${y.length?`<ul>${y.map(x=>`<li>${esc(x.n)}${detail(x,true)}</li>`).join("")}</ul>`:"<p style='margin:0'>這一週沒有不舒服。</p>"}</div>
+   ${ALL.some(x=>S.a[x.id]==="u")?`<div class="sum"><h3>我們會再向您確認</h3><ul>${ALL.filter(x=>S.a[x.id]==="u").map(x=>`<li>${esc(x.n)}</li>`).join("")}</ul></div>`:""}
+   <div class="sum"><h3>接下來</h3><ul><li>回診時，醫師會先看到這份紀錄，不用再從頭問一次。</li><li>下次回診前，我們會再通知您。</li></ul></div>
+   <p class="safe">如果現在很不舒服，例如很喘、發燒超過 38 度、連水都吞不下、血便或一直吐，請不要等回診，直接聯絡醫院或就近就醫。</p>
+   <div class="lab"><b>給研究者：這次試填紀錄</b>（不會送出，只在這個畫面）
+     <table><tr><th>階段</th><th>秒</th><th>點擊</th></tr>${["intro",...STEPS.map(s=>s.k)].map(k=>`<tr><td>${k}</td><td>${((S.stepMs[k]||0)/1000).toFixed(1)}</td><td>${S.tapsByStep[k]||0}</td></tr>`).join("")}
+     <tr><td><b>合計</b></td><td><b>${(rec.totalMs/1000).toFixed(1)}</b></td><td><b>${rec.taps}</b></td></tr></table>
+     <p style="margin:8px 0 0">沒填完就按下一步：${S.needHits} 次。有 ${rec.yes} 項、沒有 ${rec.no} 項、不確定 ${rec.unsure} 項。</p>
+     <button class="btn ghost" id="copy" type="button" style="margin-top:8px;min-height:44px;font-size:1rem">複製結果（JSON）</button><pre id="json">${esc(JSON.stringify(rec))}</pre></div>`;
+}
+function exportPayload(){   // 病人端送出的資料包（格式 prom-flow/1）：只含答案，不含姓名
+  const answers = {}; ALL.forEach(x => { const a = S.a[x.id]; if (!a) return; const o = { a };
+    if (S.sev[x.id]) o.sev = S.sev[x.id]; if (S.q[x.id]) o.q = S.q[x.id]; if (S.loc[x.id] && S.loc[x.id].size) o.loc = isWhole(S.loc[x.id]) ? ["whole"] : [...S.loc[x.id]]; answers[x.id] = o; });
+  return { schema:"prom-flow/1", pid: (location.search.match(/[?&]pid=([A-Za-z0-9-]+)/)||[])[1] || "", tx:[...S.tx], answers, note:S.note, redOk:S.redOk, filledAt:Date.now() };
+}
+function research(){ const c=v=>ALL.filter(x=>S.a[x.id]===v).length; return {totalMs:Math.round(performance.now()-S.t0), taps:S.taps, stepMs:Object.fromEntries(Object.entries(S.stepMs).map(([k,v])=>[k,Math.round(v)])), tapsByStep:S.tapsByStep, needHits:S.needHits, yes:c("y"), no:c("n"), unsure:c("u"), sev:S.sev, noteChars:S.note.length, q:S.q, tx:[...S.tx], redOk:S.redOk, redChangesAtReview:S.redChanges||0, shortcutCancels:S.shortcutCancels||0, flaggedRed:RED.filter(x=>S.a[x.id]==='y'||S.a[x.id]==='u').map(x=>x.id), loc:Object.fromEntries(Object.entries(S.loc).map(([k,v])=>[k,isWhole(v)?["whole"]:[...v]])), vw:innerWidth}; }
+
+function dockState(){
+  const k = key(), st = STEPS[S.i];
+  $("#dock").hidden = (k==="intro"||k==="done"); $("#top").hidden = (k==="intro"||k==="done");
+  if (k==="intro"||k==="done") return;
+  $("#stepName").textContent = st.name; $("#stepNo").textContent = `${S.i+1} / ${STEPS.length}`;
+  $("#bar").style.width = `${((S.i)/STEPS.length)*100 + 100/STEPS.length*0.5}%`;
+  $("#back").disabled = S.i===0; $("#back").style.visibility = S.i===0 ? "hidden" : "visible";
+  $("#next").textContent = k==="review" ? "送出" : "下一步";
+  const un = st.items ? unanswered(st).length : 0, r = $("#remain");
+  r.textContent = un ? `還有 ${un} 項沒選` : (st.items ? "都選好了" : ""); r.classList.remove("warn");
+}
+function render(){ $("#app").innerHTML = view(); dockState(); bindIntro(); }
+function bindIntro(){ const b=$("#birth"), g=$("#go"); if(!b) return; b.addEventListener("input",()=>{ b.value=b.value.replace(/\D/g,"").slice(0,4); g.disabled = b.value.length!==4; }); g.addEventListener("click",()=>go(0)); }
+function leave(){ const k=key(); S.stepMs[k]=(S.stepMs[k]||0)+(performance.now()-S.enter); S.enter=performance.now(); }
+function go(i){ const n=performance.now(); if (n-S.lastNav<NAV_GAP) return false; S.lastNav=n; leave(); S.i=i; S.confirmAllNo=false; render(); window.scrollTo(0,0); return true; }
+function toast(t){ const el=$("#toast"); el.textContent=t; el.hidden=false; clearTimeout(toast.h); toast.h=setTimeout(()=>el.hidden=true,2200); }
+
+function toggleLoc(id,k){
+  const set = S.loc[id] || (S.loc[id] = new Set());
+  if (k==="whole"){ const w = isWhole(set); set.clear(); if (!w) BODYK.forEach(x=>set.add(x)); return; }     // 全身＝全部選取，再按一次全部取消
+  if (k==="unknown"){ const u = set.has("unknown"); set.clear(); if (!u) set.add("unknown"); return; }       // 說不出位置：獨立，會清掉其他選取
+  set.delete("unknown"); if (set.has(k)) set.delete(k); else set.add(k);
+}
+document.addEventListener("click", e => {
+  const gl = e.target.closest("[data-l]");
+  if (gl){ S.taps++; const kk=key(); S.tapsByStep[kk]=(S.tapsByStep[kk]||0)+1; const [id,k]=gl.dataset.l.split("|"); toggleLoc(id,k); const y=scrollY; render(); scrollTo(0,y); return; }
+  const b = e.target.closest("button"); if (!b) return;
+  if (!b.closest(".lab")) { S.taps++; const k=key(); S.tapsByStep[k]=(S.tapsByStep[k]||0)+1; }
+  if (b.dataset.tx){ const k=b.dataset.tx; if (S.tx.has(k)){ if (S.tx.size>1) S.tx.delete(k); } else S.tx.add(k); applyTx(); const bv=$("#birth")&&$("#birth").value; render(); if (bv&&$("#birth")){ $("#birth").value=bv; $("#birth").dispatchEvent(new Event("input",{bubbles:true})); } return; }
+  if (b.dataset.a){ const [id,v]=b.dataset.a.split("|"); S.a[id]=v; if(v!=="y"){ delete S.sev[id]; delete S.q[id]; } if (RED.some(x=>x.id===id)){ S.redOk=false; if (key()==="review") S.redChanges=(S.redChanges||0)+1; } const y=scrollY; render(); scrollTo(0,y); return; }
+  if (b.dataset.qa){ const [id,k]=b.dataset.qa.split("|"); S.q[id]=k; const y=scrollY; render(); scrollTo(0,y); return; }
+  if (b.dataset.s){ const [id,n]=b.dataset.s.split("|"); S.sev[id]=+n; const y=scrollY; render(); scrollTo(0,y); return; }
+  if (b.id==="allno"){ S.confirmAllNo = STEPS[S.i].k; const y=scrollY; render(); scrollTo(0,y); return; }
+  if (b.id==="allno-cancel"){ S.shortcutCancels=(S.shortcutCancels||0)+1; S.confirmAllNo = false; const y=scrollY; render(); scrollTo(0,y); return; }
+  if (b.id==="allno-yes"){ const st=STEPS[S.i]; unanswered(st).forEach(x=>S.a[x.id]="n"); S.confirmAllNo = false; const y=scrollY; render(); scrollTo(0,y); toast("已把沒選的都標成「沒有」，可以再改"); return; }
+  if (b.id==="redok"){ S.redOk = true; const y=scrollY; render(); scrollTo(0,y); return; }
+  if (b.dataset.go){ go(+b.dataset.go); return; }
+  if (b.id==="back"){ if (S.i>0) go(S.i-1); return; }
+  if (b.id==="next"){
+    if (S.done || performance.now()-S.lastNav<NAV_GAP) return;   // 連點只算一次；送出後不再動作
+    const k=key(), st=STEPS[S.i];
+    if (st.items){ const un=unanswered(st); if(un.length){ S.needHits++; $$(".row").forEach(r=>r.classList.toggle("need", un.some(x=>x.id===r.dataset.row))); const f=$(`.row[data-row="${un[0].id}"]`); f.scrollIntoView({block:"center",behavior:"smooth"}); const r=$("#remain"); r.textContent=`還有 ${un.length} 項沒選，已標出來`; r.classList.add("warn"); return; } }
+    if (k==="review"){ if (performance.now()-S.lastNav<NAV_GAP) return; if (!S.redOk){ S.needHits++; const bl=$("#redblk"); if(bl){ bl.classList.add("need"); bl.scrollIntoView({block:"center",behavior:"smooth"}); } const r=$("#remain"); r.textContent=`請先確認上面 ${RED.length} 個重要項目`; r.classList.add("warn"); return; } leave(); S.done=true; render(); window.scrollTo(0,0); try{ parent.postMessage({type:"submit", payload:exportPayload()}, "*"); }catch(e){} return; }
+    go(S.i+1); return; }
+  if (b.id==="copy"){ try{ navigator.clipboard.writeText($("#json").textContent).then(()=>b.textContent="已複製",()=>b.textContent="請手動選取下方文字"); }catch(x){ b.textContent="請手動選取下方文字"; } }
+});
+document.addEventListener("keydown", e => { const g = e.target.closest && e.target.closest("g[data-l]"); if (g && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); const [id,k]=g.dataset.l.split("|"); toggleLoc(id,k); const y=scrollY; render(); scrollTo(0,y); } });
+document.addEventListener("input", e => { if (e.target.id==="note") S.note = e.target.value; });
+render();
+</script>
