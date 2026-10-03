@@ -18,11 +18,26 @@ html{font-size:16px;} body{margin:0;background:var(--bg);color:var(--ink);font-f
 .head{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;} .head .code{font-family:var(--mono);font-size:1.15rem;font-weight:500;} .head span{color:var(--soft);font-size:.92rem;}
 ul.fl{margin:0;padding:0;list-style:none;display:grid;gap:8px;} .fi{padding:8px 10px;border-radius:10px;background:var(--today-soft);} .fi.act{background:var(--act-soft);} .fi.read{background:var(--read-soft);} .fi b{font-size:.98rem;} .fi small{display:block;color:var(--soft);font-size:.86rem;}
 .btn{min-height:42px;padding:0 16px;border-radius:10px;border:2px solid var(--acc);background:var(--acc);color:var(--acc-ink);font:inherit;font-size:.98rem;font-weight:700;cursor:pointer;} .btn[disabled]{opacity:.55;cursor:default;}
+.imp{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px;} .imp input{flex:1 1 280px;min-width:0;min-height:40px;padding:0 10px;border:1px solid var(--rule);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;}
 .kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:0;} .kv dt{color:var(--soft);font-size:.9rem;} .kv dd{margin:0;font-family:var(--mono);font-size:.92rem;} .mini{color:var(--soft);font-size:.88rem;margin:4px 0 0;}
 </style>
 <div class="proto">原型：病人與資料都是虛構的，不會連到正式系統</div>
-<div class="wrap"><header><h1>醫師回診前確認</h1><div class="sl" id="sl" aria-live="polite"></div></header><div class="cols"><nav aria-label="待確認的病人"><ul class="q" id="queue"></ul></nav><main class="pane" id="pane"></main></div></div>
+<div class="wrap"><header><h1>醫師回診前確認</h1><div class="sl" id="sl" aria-live="polite"></div></header>
+<div class="imp"><input id="imp" type="text" placeholder="貼上個管師給的連結，按匯入" aria-label="匯入"><button class="btn" id="impgo" type="button" style="min-height:40px">匯入</button><span id="impmsg" class="mini" aria-live="polite"></span></div><div class="cols"><nav aria-label="待確認的病人"><ul class="q" id="queue"></ul></nav><main class="pane" id="pane"></main></div></div>
 <script>
+/* ---- 連結交接（不需伺服器）：資料包 gzip 後放在網址的 #d= 後面；沒有 CompressionStream 時用未壓縮 ---- */
+const b64u = u8 => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+const unb64u = t => { t = t.replace(/-/g, "+").replace(/_/g, "/"); while (t.length % 4) t += "="; const s = atob(t), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
+async function pack(obj) { const j = new TextEncoder().encode(JSON.stringify(obj));
+  if (window.CompressionStream) { try { const cs = new CompressionStream("gzip"), w = cs.writable.getWriter(); w.write(j); w.close(); return "z." + b64u(new Uint8Array(await new Response(cs.readable).arrayBuffer())); } catch (e) {} }
+  return "j." + b64u(j); }
+async function unpack(s) { s = String(s).trim(); const m = s.match(/#d=([A-Za-z0-9_.\-]+)/); if (m) s = m[1]; else if (s[0] === "{") return JSON.parse(s);
+  const u = unb64u(s.slice(2)); if (s[0] === "z") { const ds = new DecompressionStream("gzip"), w = ds.writable.getWriter(); w.write(u); w.close(); return JSON.parse(new TextDecoder().decode(await new Response(ds.readable).arrayBuffer())); }
+  return JSON.parse(new TextDecoder().decode(u)); }
+const linkTo = async (page, obj) => new URL(page, location.href).origin + new URL(page, location.href).pathname + "#d=" + await pack(obj);
+const copyText = (t, btn) => { const ok = () => { if (btn) btn.textContent = "已複製"; }, fb = () => { const ta = document.querySelector("#lk, #dl"); if (ta) { ta.focus(); ta.select(); } if (btn) btn.textContent = "已選取，請手動複製"; };
+  try { navigator.clipboard.writeText(t).then(ok, fb); } catch (e) { fb(); } };
+
 const NAME = {fever:"發燒",swallow:"吞嚥困難",breath:"喘或咳嗽",weight:"體重掉很多",blood:"血便或黏液便",hemo:"咳血或吐血",weak:"肌肉沒力",chest:"胸悶或胸痛",palp:"心跳很快或不規則",dizzy:"站起來頭暈、眼前發黑",eyepain:"眼睛痛、很紅或怕光",fatigue:"疲倦、沒力氣",nausea:"噁心、吃不下",diarrhea:"拉肚子",pain:"疼痛",joint:"關節或肌肉痛"};
 const TXN = {chemo:"化療",rt:"放療",io:"免疫治療",adc:"ADC"}, txs = a => (a || []).map(t => TXN[t] || t).join("＋");
 const R = [];   // 收到的紀錄（個管師初審完）
@@ -54,9 +69,14 @@ function render() {
 document.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.i != null) { CUR = +b.dataset.i; return render(); }
   if (b.id === "l3") { const r = R[CUR]; L3[r.code] = Date.now(); try { parent.postMessage({ type: "l3done", code: r.code, urgent: urgent(r).map(f => f.id), routine: routine(r).map(f => f.id) }, "*"); } catch (x) {} render(); } });
+function receive(rec) { const dup = R.findIndex(x => x.code === rec.code) >= 0; if (dup) DUPES++; else R.push(rec); return dup; }   // 用 code 去重
 window.addEventListener("message", ev => { const m = ev.data; if (!m || m.type !== "l2done") return;
-  const rec = m.record, i = R.findIndex(x => x.code === rec.code), dup = i >= 0; if (dup) DUPES++; else R.push(rec);
+  const rec = m.record, dup = receive(rec);
   try { ev.source.postMessage({ type: "received", code: rec.code, dup }, "*"); } catch (x) {} render(); });
+async function importFrom(text) { const rec = await unpack(text); if (!rec || !rec.flags) throw new Error("不是個管師端的紀錄"); const dup = receive(rec); CUR = R.findIndex(x => x.code === rec.code); render(); return { code: rec.code, dup }; }
+async function importBox() { const msg = $("#impmsg"), inp = $("#imp"); try { const r = await importFrom(inp.value); msg.textContent = r.dup ? `${r.code} 已經匯入過了` : `已匯入 ${r.code}`; inp.value = ""; } catch (e) { msg.textContent = "匯入失敗：" + String(e.message || e).slice(0, 80); } }
+document.addEventListener("click", e => { if (e.target.id === "impgo") importBox(); });
+(async () => { if (/^#d=/.test(location.hash)) { try { await importFrom(location.hash); history.replaceState(null, "", location.pathname + location.search); } catch (e) { const m = $("#impmsg"); if (m) m.textContent = "連結無法讀取：" + String(e.message || e).slice(0, 80); } } })();
 window.__state = () => ({ records: R.map(r => ({ code: r.code, urgent: urgent(r).map(f => f.id), routine: routine(r).map(f => f.id), flags: r.flags.map(f => ({ id: f.id, level: f.level, resp: f.resp })), l3: !!L3[r.code] })), dupes: DUPES });
 render();
 </script>

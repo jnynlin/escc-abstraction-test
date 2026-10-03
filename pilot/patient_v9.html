@@ -89,6 +89,21 @@ textarea{font-size:1.05rem;min-height:9rem;resize:vertical;}
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>
+/* ---- 連結交接（不需伺服器）：資料包 gzip 後放在網址的 #d= 後面；沒有 CompressionStream 時用未壓縮 ---- */
+const b64u = u8 => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+const unb64u = t => { t = t.replace(/-/g, "+").replace(/_/g, "/"); while (t.length % 4) t += "="; const s = atob(t), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
+async function pack(obj) { const j = new TextEncoder().encode(JSON.stringify(obj));
+  if (window.CompressionStream) { try { const cs = new CompressionStream("gzip"), w = cs.writable.getWriter(); w.write(j); w.close(); return "z." + b64u(new Uint8Array(await new Response(cs.readable).arrayBuffer())); } catch (e) {} }
+  return "j." + b64u(j); }
+async function unpack(s) { s = String(s).trim(); const m = s.match(/#d=([A-Za-z0-9_.\-]+)/); if (m) s = m[1]; else if (s[0] === "{") return JSON.parse(s);
+  const u = unb64u(s.slice(2)); if (s[0] === "z") { const ds = new DecompressionStream("gzip"), w = ds.writable.getWriter(); w.write(u); w.close(); return JSON.parse(new TextDecoder().decode(await new Response(ds.readable).arrayBuffer())); }
+  return JSON.parse(new TextDecoder().decode(u)); }
+const linkTo = async (page, obj) => new URL(page, location.href).origin + new URL(page, location.href).pathname + "#d=" + await pack(obj);
+const copyText = (t, btn) => { const ok = () => { if (btn) btn.textContent = "已複製"; }, fb = () => { const ta = document.querySelector("#lk, #dl"); if (ta) { ta.focus(); ta.select(); } if (btn) btn.textContent = "已選取，請手動複製"; };
+  try { navigator.clipboard.writeText(t).then(ok, fb); } catch (e) { fb(); } };
+
+const QS = new URLSearchParams(location.search);
+const META = { p: QS.get('p') || '', card: QS.get('card') || '', pid0: QS.get('pid') || '', seed: QS.get('seed') === '1', rand: Math.random().toString(36).slice(2, 6).toUpperCase() };   // 試行用：參與者代號、情境卡、是否在檢視頁翻轉一個紅旗答案（量 q）
 /* 暫定題目（化療＋放療的病人）。正式版每個「有」會展開現有題庫該症狀的追問題；這裡只放一題嚴重度。 */
 const RED_CORE = [
  {id:"fever",  n:"發燒",       d:"體溫超過 38 度，或一陣冷一陣熱", red:1, nosev:1,
@@ -192,6 +207,7 @@ function view(){
     </ul>
     <div class="field"><label for="birth">請輸入生日的月和日（4 個數字）</label><input id="birth" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="0315" aria-describedby="bh"><small id="bh">例如 3 月 15 日，輸入 0315。這是為了確認是您本人。試用時隨意輸入 4 個數字即可。</small></div>
     <div class="field"><label>試用設定：這位病人的治療</label><div class="locchips" id="txchips">${TXLIST.map(([k,n])=>`<button type="button" data-tx="${k}" aria-pressed="${S.tx.has(k)}">${n}</button>`).join("")}</div><small>正式版由診間發的連結決定，病人不用選。選不同治療，題目與步數會跟著變。</small></div>
+    <div class="field"><label>試行用（觀察員填）</label><div class="locchips" style="gap:10px"><input id="mp" type="text" placeholder="參與者代號 P01" value="${esc(META.p)}" style="font-size:1rem;min-height:44px;width:9.5rem;letter-spacing:0;font-family:inherit"><input id="mc" type="text" placeholder="情境卡 C3" value="${esc(META.card)}" style="font-size:1rem;min-height:44px;width:8rem;letter-spacing:0;font-family:inherit"></div></div>
     <p><button class="btn full" id="go" type="button" disabled>開始，共 ${STEPS.length} 步</button></p>`;
   if (k==="done") return doneHTML();
   const head = `<h2>${esc(st.name)}</h2>`;
@@ -223,18 +239,20 @@ function doneHTML(){
    ${ALL.some(x=>S.a[x.id]==="u")?`<div class="sum"><h3>我們會再向您確認</h3><ul>${ALL.filter(x=>S.a[x.id]==="u").map(x=>`<li>${esc(x.n)}</li>`).join("")}</ul></div>`:""}
    <div class="sum"><h3>接下來</h3><ul><li>回診時，醫師會先看到這份紀錄，不用再從頭問一次。</li><li>下次回診前，我們會再通知您。</li></ul></div>
    <p class="safe">如果現在很不舒服，例如很喘、發燒超過 38 度、連水都吞不下、血便或一直吐，請不要等回診，直接聯絡醫院或就近就醫。</p>
+   <div class="sum"><h3>交給個管師端</h3><p style="margin:0 0 8px">請把這條連結傳給個管師，個管師打開就會收到這份紀錄。</p><div class="locchips"><button type="button" id="cplink">複製連結</button><button type="button" id="shlink" hidden>分享…</button></div><textarea id="lk" readonly rows="3" style="width:100%;margin-top:8px;font:12px/1.4 ui-monospace,Consolas,monospace;padding:8px;border:1px solid var(--rule);border-radius:8px;background:var(--panel);color:var(--ink)">產生連結中…</textarea></div>
    <div class="lab"><b>給研究者：這次試填紀錄</b>（不會送出，只在這個畫面）
      <table><tr><th>階段</th><th>秒</th><th>點擊</th></tr>${["intro",...STEPS.map(s=>s.k)].map(k=>`<tr><td>${k}</td><td>${((S.stepMs[k]||0)/1000).toFixed(1)}</td><td>${S.tapsByStep[k]||0}</td></tr>`).join("")}
      <tr><td><b>合計</b></td><td><b>${(rec.totalMs/1000).toFixed(1)}</b></td><td><b>${rec.taps}</b></td></tr></table>
      <p style="margin:8px 0 0">沒填完就按下一步：${S.needHits} 次。有 ${rec.yes} 項、沒有 ${rec.no} 項、不確定 ${rec.unsure} 項。</p>
      <button class="btn ghost" id="copy" type="button" style="margin-top:8px;min-height:44px;font-size:1rem">複製結果（JSON）</button><pre id="json">${esc(JSON.stringify(rec))}</pre></div>`;
 }
+const myPid = () => META.pid0 || (META.p ? META.p + (META.card ? "-" + META.card : "") : "X" + META.rand);
 function exportPayload(){   // 病人端送出的資料包（格式 prom-flow/1）：只含答案，不含姓名
   const answers = {}; ALL.forEach(x => { const a = S.a[x.id]; if (!a) return; const o = { a };
     if (S.sev[x.id]) o.sev = S.sev[x.id]; if (S.q[x.id]) o.q = S.q[x.id]; if (S.loc[x.id] && S.loc[x.id].size) o.loc = isWhole(S.loc[x.id]) ? ["whole"] : [...S.loc[x.id]]; answers[x.id] = o; });
-  return { schema:"prom-flow/1", pid: (location.search.match(/[?&]pid=([A-Za-z0-9-]+)/)||[])[1] || "", tx:[...S.tx], answers, note:S.note, redOk:S.redOk, filledAt:Date.now() };
+  return { schema:"prom-flow/1", pid: myPid(), participant: META.p, card: META.card, tx:[...S.tx], answers, note:S.note, redOk:S.redOk, seed: S.seed ? { id: S.seed.id, noticed: S.seed.id ? S.a[S.seed.id] === "y" : null } : null, filledAt:Date.now() };
 }
-function research(){ const c=v=>ALL.filter(x=>S.a[x.id]===v).length; return {totalMs:Math.round(performance.now()-S.t0), taps:S.taps, stepMs:Object.fromEntries(Object.entries(S.stepMs).map(([k,v])=>[k,Math.round(v)])), tapsByStep:S.tapsByStep, needHits:S.needHits, yes:c("y"), no:c("n"), unsure:c("u"), sev:S.sev, noteChars:S.note.length, q:S.q, tx:[...S.tx], redOk:S.redOk, redChangesAtReview:S.redChanges||0, shortcutCancels:S.shortcutCancels||0, flaggedRed:RED.filter(x=>S.a[x.id]==='y'||S.a[x.id]==='u').map(x=>x.id), loc:Object.fromEntries(Object.entries(S.loc).map(([k,v])=>[k,isWhole(v)?["whole"]:[...v]])), vw:innerWidth}; }
+function research(){ const c=v=>ALL.filter(x=>S.a[x.id]===v).length; return {totalMs:Math.round(performance.now()-S.t0), taps:S.taps, stepMs:Object.fromEntries(Object.entries(S.stepMs).map(([k,v])=>[k,Math.round(v)])), tapsByStep:S.tapsByStep, needHits:S.needHits, yes:c("y"), no:c("n"), unsure:c("u"), sev:S.sev, noteChars:S.note.length, pid:myPid(), participant:META.p, card:META.card, seed:S.seed ? { id:S.seed.id, noticed:S.seed.id ? S.a[S.seed.id]==="y" : null } : null, q:S.q, tx:[...S.tx], redOk:S.redOk, redChangesAtReview:S.redChanges||0, shortcutCancels:S.shortcutCancels||0, flaggedRed:RED.filter(x=>S.a[x.id]==='y'||S.a[x.id]==='u').map(x=>x.id), loc:Object.fromEntries(Object.entries(S.loc).map(([k,v])=>[k,isWhole(v)?["whole"]:[...v]])), vw:innerWidth}; }
 
 function dockState(){
   const k = key(), st = STEPS[S.i];
@@ -247,10 +265,12 @@ function dockState(){
   const un = st.items ? unanswered(st).length : 0, r = $("#remain");
   r.textContent = un ? `還有 ${un} 項沒選` : (st.items ? "都選好了" : ""); r.classList.remove("warn");
 }
-function render(){ $("#app").innerHTML = view(); dockState(); bindIntro(); }
+function render(){ $("#app").innerHTML = view(); dockState(); bindIntro(); if (S.done) fillLink(); }
+async function fillLink(){ const el = $("#lk"); if (!el) return; const url = await linkTo("nurse_v2.html", { ...exportPayload(), chart: { base_kg: 60, usual: 1 } }); el.value = url; window.__link = url; const sh = $("#shlink"); if (sh && navigator.share) sh.hidden = false; }
 function bindIntro(){ const b=$("#birth"), g=$("#go"); if(!b) return; b.addEventListener("input",()=>{ b.value=b.value.replace(/\D/g,"").slice(0,4); g.disabled = b.value.length!==4; }); g.addEventListener("click",()=>go(0)); }
 function leave(){ const k=key(); S.stepMs[k]=(S.stepMs[k]||0)+(performance.now()-S.enter); S.enter=performance.now(); }
-function go(i){ const n=performance.now(); if (n-S.lastNav<NAV_GAP) return false; S.lastNav=n; leave(); S.i=i; S.confirmAllNo=false; render(); window.scrollTo(0,0); return true; }
+function seedFlip(){ if (S.seed) return; const r = RED.find(x => S.a[x.id]==="y"); if (r) { S.a[r.id] = "n"; S.redOk = false; S.seed = { id: r.id }; } else S.seed = { id: null }; }
+function go(i){ const n=performance.now(); if (n-S.lastNav<NAV_GAP) return false; S.lastNav=n; leave(); S.i=i; S.confirmAllNo=false; if (META.seed && STEPS[i] && STEPS[i].k==="review") seedFlip(); render(); window.scrollTo(0,0); return true; }
 function toast(t){ const el=$("#toast"); el.textContent=t; el.hidden=false; clearTimeout(toast.h); toast.h=setTimeout(()=>el.hidden=true,2200); }
 
 function toggleLoc(id,k){
@@ -280,9 +300,11 @@ document.addEventListener("click", e => {
     if (st.items){ const un=unanswered(st); if(un.length){ S.needHits++; $$(".row").forEach(r=>r.classList.toggle("need", un.some(x=>x.id===r.dataset.row))); const f=$(`.row[data-row="${un[0].id}"]`); f.scrollIntoView({block:"center",behavior:"smooth"}); const r=$("#remain"); r.textContent=`還有 ${un.length} 項沒選，已標出來`; r.classList.add("warn"); return; } }
     if (k==="review"){ if (performance.now()-S.lastNav<NAV_GAP) return; if (!S.redOk){ S.needHits++; const bl=$("#redblk"); if(bl){ bl.classList.add("need"); bl.scrollIntoView({block:"center",behavior:"smooth"}); } const r=$("#remain"); r.textContent=`請先確認上面 ${RED.length} 個重要項目`; r.classList.add("warn"); return; } leave(); S.done=true; render(); window.scrollTo(0,0); try{ parent.postMessage({type:"submit", payload:exportPayload()}, "*"); }catch(e){} return; }
     go(S.i+1); return; }
+  if (b.id==="cplink"){ copyText($("#lk").value, b); return; }
+  if (b.id==="shlink"){ try{ navigator.share({ title:"ePRO 試行紀錄", url:$("#lk").value }); }catch(x){} return; }
   if (b.id==="copy"){ try{ navigator.clipboard.writeText($("#json").textContent).then(()=>b.textContent="已複製",()=>b.textContent="請手動選取下方文字"); }catch(x){ b.textContent="請手動選取下方文字"; } }
 });
 document.addEventListener("keydown", e => { const g = e.target.closest && e.target.closest("g[data-l]"); if (g && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); const [id,k]=g.dataset.l.split("|"); toggleLoc(id,k); const y=scrollY; render(); scrollTo(0,y); } });
-document.addEventListener("input", e => { if (e.target.id==="note") S.note = e.target.value; });
+document.addEventListener("input", e => { if (e.target.id==="note") S.note = e.target.value; if (e.target.id==="mp") META.p = e.target.value.trim(); if (e.target.id==="mc") META.card = e.target.value.trim().toUpperCase(); });
 render();
 </script>

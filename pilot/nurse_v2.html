@@ -26,6 +26,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line
 .proto{margin:0 -16px;padding:6px 16px;background:var(--well);color:var(--soft);font-size:.82rem;text-align:center;}
 header{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline;padding-block:14px 8px;}
 h1{margin:0;font-size:1.3rem;} .sl{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.92rem;color:var(--soft);} .sl b{color:var(--ink);font-family:var(--mono);font-variant-numeric:tabular-nums;} .sl b.t{color:var(--today);}
+.imp{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px;} .imp input{flex:1 1 280px;min-width:0;min-height:40px;padding:0 10px;border:1px solid var(--rule);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;}
 .reset{margin-left:auto;min-height:36px;padding:0 12px;border:1px solid var(--rule);border-radius:8px;background:transparent;color:var(--ink);font:inherit;font-size:.88rem;cursor:pointer;}
 .cols{display:grid;grid-template-columns:minmax(260px,320px) minmax(0,1fr);gap:16px;align-items:start;}
 @media (max-width:820px){.cols{grid-template-columns:1fr;}}
@@ -61,10 +62,24 @@ details summary{cursor:pointer;color:var(--soft);font-size:.9rem;min-height:32px
 <div class="proto">原型：病人與資料都是虛構的，不會連到正式系統</div>
 <div class="wrap">
   <header><h1>回診前確認</h1><div class="sl" id="sl" aria-live="polite"></div><button class="reset" id="reset" type="button">重設試用資料</button></header>
+  <div class="imp"><input id="imp" type="text" placeholder="貼上病人端產生的連結（或資料包），按匯入" aria-label="匯入"><button class="btn ghost" id="impgo" type="button">匯入</button><span id="impmsg" class="mini" aria-live="polite"></span></div>
   <div class="cols"><nav aria-label="今天的病人"><ul class="q" id="queue"></ul></nav><main class="pane" id="pane"></main></div>
 </div>
 
 <script>
+/* ---- 連結交接（不需伺服器）：資料包 gzip 後放在網址的 #d= 後面；沒有 CompressionStream 時用未壓縮 ---- */
+const b64u = u8 => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+const unb64u = t => { t = t.replace(/-/g, "+").replace(/_/g, "/"); while (t.length % 4) t += "="; const s = atob(t), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
+async function pack(obj) { const j = new TextEncoder().encode(JSON.stringify(obj));
+  if (window.CompressionStream) { try { const cs = new CompressionStream("gzip"), w = cs.writable.getWriter(); w.write(j); w.close(); return "z." + b64u(new Uint8Array(await new Response(cs.readable).arrayBuffer())); } catch (e) {} }
+  return "j." + b64u(j); }
+async function unpack(s) { s = String(s).trim(); const m = s.match(/#d=([A-Za-z0-9_.\-]+)/); if (m) s = m[1]; else if (s[0] === "{") return JSON.parse(s);
+  const u = unb64u(s.slice(2)); if (s[0] === "z") { const ds = new DecompressionStream("gzip"), w = ds.writable.getWriter(); w.write(u); w.close(); return JSON.parse(new TextDecoder().decode(await new Response(ds.readable).arrayBuffer())); }
+  return JSON.parse(new TextDecoder().decode(u)); }
+const linkTo = async (page, obj) => new URL(page, location.href).origin + new URL(page, location.href).pathname + "#d=" + await pack(obj);
+const copyText = (t, btn) => { const ok = () => { if (btn) btn.textContent = "已複製"; }, fb = () => { const ta = document.querySelector("#lk, #dl"); if (ta) { ta.focus(); ta.select(); } if (btn) btn.textContent = "已選取，請手動複製"; };
+  try { navigator.clipboard.writeText(t).then(ok, fb); } catch (e) { fb(); } };
+
 /* ---- 項目名稱與量題選項（和病人端 v9 一致）---- */
 const NAME = {fever:"發燒",swallow:"吞嚥困難",breath:"喘或咳嗽",weight:"體重掉很多",blood:"血便或黏液便",hemo:"咳血或吐血",weak:"肌肉沒力",chest:"胸悶或胸痛",palp:"心跳很快或不規則",dizzy:"站起來頭暈、眼前發黑",eyepain:"眼睛痛、很紅或怕光",
   fatigue:"疲倦、沒力氣",nausea:"噁心、吃不下",diarrhea:"拉肚子",constipation:"便秘",dehyd:"口乾、尿很少",pain:"疼痛",joint:"關節或肌肉痛",rash:"皮膚起疹子",itch:"皮膚癢",skin_rt:"照射部位的皮膚",mouth:"嘴巴破",voice:"聲音沙啞",neuro:"手腳麻、刺痛",coldhot:"特別怕冷或怕熱",thirst:"很容易口渴、一直跑廁所",swell:"腳腫",blur:"視力變模糊",dryeye:"眼睛乾澀、有異物感"};
@@ -149,28 +164,30 @@ function render() {
   const p = P[CUR], e = EV[CUR];
   const today = e.F.filter(f => f.level === "today"), act = e.F.filter(f => f.level === "act"), read = e.F.filter(f => f.level === "read");
   const flagRow = f => `<li class="fi ${f.level === "today" ? "" : f.level}${f.acked ? " done" : ""}"><span><b>${E(f.text)}</b><small>依據：${f.why}</small></span>${f.level === "today" ? (f.acked ? `<span class="chip c-ok">${E(p.ack[f.id])}</span>` : `<span class="acts"><button class="btn" type="button" data-ack="${f.id}|看診時處理">看診時處理</button><button class="btn ghost" type="button" data-ack="${f.id}|通知醫師">通知醫師</button></span>`) : ""}</li>`;
-  let h = `<section class="card"><div class="head"><span class="code">${p.code}</span><span>${p.age}</span><span>${p.tx}</span><span>${p.visit}</span><span class="chip c-${p.l2 ? "ok" : e.level}">${p.l2 ? "已初審" : TOD(e.level)}</span></div></section>`;
+  let h = `<section class="card"><div class="head"><span class="code">${p.code}</span>${p.card ? `<span>卡 ${E(p.card)}</span>` : ""}<span>${p.age}</span><span>${p.tx}</span><span>${p.visit}</span><span class="chip c-${p.l2 ? "ok" : e.level}">${p.l2 ? "已初審" : TOD(e.level)}</span></div></section>`;
   h += today.length ? `<section class="card today"><h2>今日處理 <small>${today.length} 項；每一項要回覆「看診時處理」或「通知醫師」</small></h2><ul class="fl">${today.map(flagRow).join("")}</ul></section>` : `<section class="card"><h2>今日處理 <small>沒有</small></h2></section>`;
   if (act.length || read.length) h += `<section class="card"><h2>建議處理與閱讀</h2><ul class="fl">${[...act, ...read].map(f => `<li class="fi ${f.level}"><span><b>${E(f.text)}</b><small>依據：${f.why}${f.id === "note" ? `　「${E(p.note)}」` : ""}</small></span><span class="chip c-${f.level}">${TOD(f.level)}</span></li>`).join("")}</ul></section>`;
   // 待確認清單
-  const cs = e.C.slice().sort((a, b) => b.red - a.red), doneC = Object.keys(p.conf).filter(id => p.conf[id].res === "y" || p.conf[id].res === "n" || p.conf[id].val != null);
+  const cs = e.C.slice().sort((a, b) => b.red - a.red), doneC = Object.keys(p.conf).filter(id => ["y", "n", "escalate"].includes(p.conf[id].res) || p.conf[id].val != null);
   h += `<section class="card ${cs.some(c => c.red) ? "todo" : ""}"><h2>待確認清單 <small>病人選了「不確定」「沒量」「說不準」的項目。沒有確認，不能算沒症狀</small></h2>`;
   h += cs.length ? `<div class="pane" style="gap:8px">${cs.map(c => confirmCard(p, c)).join("")}</div>` : `<p class="mini">沒有待確認的項目。</p>`;
-  if (doneC.length) h += `<details style="margin-top:8px"><summary>已確認 ${doneC.length} 項</summary><ul class="log">${doneC.map(id => `<li>${E(NAME[id] || id)}：${p.conf[id].val != null ? `實測 ${p.conf[id].val}` : p.conf[id].res === "y" ? "電話確認：有" : "電話確認：沒有"}${p.conf[id].note ? `（${E(p.conf[id].note)}）` : ""}</li>`).join("")}</ul></details>`;
+  if (doneC.length) h += `<details style="margin-top:8px"><summary>已確認 ${doneC.length} 項</summary><ul class="log">${doneC.map(id => `<li>${E(NAME[id] || id)}：${p.conf[id].val != null ? `實測 ${p.conf[id].val}` : p.conf[id].res === "escalate" ? "聯絡不到，交給醫師" : p.conf[id].res === "y" ? "電話確認：有" : "電話確認：沒有"}${p.conf[id].note ? `（${E(p.conf[id].note)}）` : ""} <button class="btn ghost" type="button" data-undo="${id}" style="min-height:32px;padding:0 10px;font-size:.85rem" ${p.l2 ? "disabled" : ""}>復原</button></li>`).join("")}</ul></details>`;
   h += `</section>`;
   // 實測欄位
-  const S = p.staff, pct = S.weight != null ? ((S.base_kg - S.weight) / S.base_kg * 100) : null;
+  const S = p.staff, pct = S.weight != null && S.base_kg ? ((S.base_kg - S.weight) / S.base_kg * 100) : null;
   h += `<section class="card"><h2>個管師填寫 <small>實測值以這裡為準；系統自動計算</small></h2><div class="pane" style="gap:10px">
-   <div class="num"><label for="w">當日體重（診間磅秤）</label><input id="w" type="text" inputmode="decimal" value="${S.weight ?? ""}" placeholder="kg" data-field="weight"><button class="btn ghost" type="button" data-save="weight">儲存</button><span class="mini">治療前 ${S.base_kg} kg（預填）</span></div>
+   <div class="num"><label for="w">當日體重（診間磅秤）</label><input id="w" type="text" inputmode="decimal" value="${S.weight ?? ""}" placeholder="kg" data-field="weight"><button class="btn ghost" type="button" data-save="weight">儲存</button></div>
+   <div class="num"><label for="bk">治療前體重</label><input id="bk" type="text" inputmode="decimal" value="${S.base_kg ?? ""}" placeholder="kg"><button class="btn ghost" type="button" data-save="base_kg">儲存</button><span class="mini">病歷帶入，可改</span></div>
+   <div class="num"><label for="us">平常大便次數</label><input id="us" type="text" inputmode="decimal" value="${S.usual ?? ""}" placeholder="次／天"><button class="btn ghost" type="button" data-save="usual">儲存</button></div>
    <div class="num"><label for="t">院內體溫</label><input id="t" type="text" inputmode="decimal" value="${S.temp ?? ""}" placeholder="°C" data-field="temp"><button class="btn ghost" type="button" data-save="temp">儲存</button></div>
-   <dl class="kv"><dt>體重變化</dt><dd class="calc">${pct == null ? "—（尚未實測）" : `${S.weight} kg，比治療前 ${pct >= 0 ? "少" : "多"} ${Math.abs(pct).toFixed(1)}%${pct >= 20 ? "　⚠ 達兩成" : ""}`}</dd><dt>平常大便次數</dt><dd class="calc">${S.usual} 次／天（預填，可改）</dd></dl></div></section>`;
+   <dl class="kv"><dt>體重變化</dt><dd class="calc">${pct == null ? "—（尚未實測）" : `${S.weight} kg，比治療前 ${pct >= 0 ? "少" : "多"} ${Math.abs(pct).toFixed(1)}%${pct >= 20 ? "　⚠ 達兩成" : ""}`}</dd><dt>平常大便次數</dt><dd class="calc">${S.usual ?? "—"} 次／天</dd></dl></div></section>`;
   // 病人回報
   const ids = Object.keys(p.ans).sort((a, b) => (REDIDS.includes(b) - REDIDS.includes(a)) || 0);
   h += `<section class="card"><h2>病人回報 <small>紅色題在前</small></h2><table class="rep"><tr><th>項目</th><th>答案</th><th>程度／數量</th><th>位置</th></tr>${ids.map(id => { const a = p.ans[id], c = p.conf[id]; const ans = c && (c.res === "y" || c.res === "n") ? `${ANS[c.res]}（電話確認）` : ANS[a.a]; const q = a.q && QL[id] ? QL[id][a.q] : ""; return `<tr class="${a.a === "u" && !c ? "u" : ""} ${REDIDS.includes(id) ? "r" : ""}"><td>${E(NAME[id])}</td><td>${ans}</td><td>${[a.sev ? SEVN[a.sev] : "", q].filter(Boolean).join("；") || "—"}</td><td>${(a.loc || []).map(k => LOCN[k]).join("、") || "—"}</td></tr>`; }).join("")}</table>
     ${e.unfilled.length ? `<details><summary>沒填的題目 ${e.unfilled.length} 項（未填不等於沒症狀）</summary><p class="mini">${e.unfilled.map(id => NAME[id]).join("、")}</p></details>` : ""}</section>`;
   // 初審
   const can = !e.blockers.length && !p.l2;
-  h += `<section class="card"><h2>第二層　個管師初審</h2><div class="sign"><button class="btn" id="sign" type="button" ${can ? "" : "disabled"}>${p.l2 ? "已完成初審" : "完成初審，送交醫師"}</button>${p.l2 ? `<span class="chip c-ok">${E(p.l2)}</span>` : e.blockers.length ? `<span class="why">還不能送出：${E(e.blockers.slice(0, 3).join("、"))}${e.blockers.length > 3 ? `等 ${e.blockers.length} 項` : ""}</span>` : `<span class="mini">所有紅旗相關項目都已處理。</span>`}</div><p class="mini">第三層由醫師確認。這個原型只做到第二層。</p></section>`;
+  h += `<section class="card"><h2>第二層　個管師初審</h2><div class="sign"><button class="btn" id="sign" type="button" ${can ? "" : "disabled"}>${p.l2 ? "已完成初審" : "完成初審，送交醫師"}</button>${p.l2 ? `<span class="chip c-ok">${E(p.l2)}</span><div style="flex-basis:100%"><b>交給醫師端</b>：把這條連結傳給醫師，醫師打開就會收到。<div class="acts" style="margin-top:6px"><button class="btn ghost" id="cpdl" type="button">複製連結</button></div><textarea id="dl" readonly rows="3" style="width:100%;margin-top:6px;font:12px/1.4 ui-monospace,Consolas,monospace;padding:8px;border:1px solid var(--rule);border-radius:8px;background:var(--panel);color:var(--ink)">產生連結中…</textarea></div>` : e.blockers.length ? `<span class="why">還不能送出：${E(e.blockers.slice(0, 3).join("、"))}${e.blockers.length > 3 ? `等 ${e.blockers.length} 項` : ""}</span>` : `<span class="mini">所有紅旗相關項目都已處理。</span>`}</div><p class="mini">第三層由醫師確認。這個原型只做到第二層。</p></section>`;
   h += `<details class="card"><summary>操作紀錄（原型，只存在這個畫面）</summary><ol class="log">${LOG.map(l => `<li>${E(l)}</li>`).join("") || "<li>尚無</li>"}</ol></details>`;
   $("#pane").innerHTML = h;
 }
@@ -188,26 +205,40 @@ document.addEventListener("click", e => {
   if (b.id === "reset") { P = SEED(); P.forEach(q => { q.conf = {}; q.ack = {}; q.l2 = null; }); LOG.length = 0; CUR = 0; return render(); }
   if (b.dataset.ack) { const [id, how] = b.dataset.ack.split("|"); p.ack[id] = how; log(`${p.code}　今日處理「${id}」→ ${how}`); return render(); }
   if (b.dataset.conf) { const [id, res] = b.dataset.conf.split("|"), n = $(`#n-${id}`); p.conf[id] = { res, note: n ? n.value.trim() : "" }; log(`${p.code}　電話確認「${NAME[id]}」→ ${ANS[res]}`); return render(); }
-  if (b.dataset.bin) { const [id, k] = b.dataset.bin.split("|"); p.ans[id].q = k; p.conf[id] = { res: k === "0" ? "n" : "y", note: QL[id][k] }; log(`${p.code}　電話確認「${NAME[id]}」→ ${QL[id][k]}`); return render(); }
+  if (b.dataset.bin) { const [id, k] = b.dataset.bin.split("|"), orig = p.ans[id].q; p.ans[id].q = k; p.conf[id] = { res: k === "0" ? "n" : "y", note: QL[id][k], orig }; log(`${p.code}　電話確認「${NAME[id]}」→ ${QL[id][k]}`); return render(); }
+  if (b.dataset.undo) { const id = b.dataset.undo, c = p.conf[id]; if (!c || p.l2) return;
+    if (c.res === "measured") { if (id === "fever") p.staff.temp = null; if (id === "weight") p.staff.weight = null; }
+    if (c.orig !== undefined && p.ans[id]) p.ans[id].q = c.orig;
+    delete p.conf[id]; log(`${p.code}　復原「${NAME[id] || id}」的確認`); return render(); }
+  if (b.id === "impgo") { importBox(); return; }
+  if (b.id === "cpdl") { copyText($("#dl").value, b); return; }
   if (b.dataset.esc) { const id = b.dataset.esc; p.conf[id] = { res: "escalate" }; log(`${p.code}　「${NAME[id]}」聯絡不到，交給醫師處理`); return render(); }
   if (b.dataset.nc) { const id = b.dataset.nc; p.conf[id] = { res: "nc" }; log(`${p.code}　「${NAME[id]}」聯絡不到`); return render(); }
   if (b.dataset.measure) { const [id, f] = b.dataset.measure.split("|"), inp = $(`#m-${id}`), v = parseFloat(inp.value); if (!isFinite(v)) { inp.focus(); return; } p.staff[f] = v; p.conf[id] = { res: "measured", val: v + (f === "temp" ? "°C" : " kg") }; log(`${p.code}　${f === "temp" ? "體溫" : "體重"}實測 ${v}`); return render(); }
-  if (b.dataset.save) { const f = b.dataset.save, inp = $(f === "weight" ? "#w" : "#t"), v = parseFloat(inp.value); p.staff[f] = isFinite(v) ? v : null; log(`${p.code}　${f === "weight" ? "當日體重" : "院內體溫"} ${isFinite(v) ? v : "清除"}`); return render(); }
-  if (b.id === "sign") { const ev = evaluate(p); if (ev.blockers.length) return; p.l2 = `${now()} 已送交醫師`; log(`${p.code}　完成第二層初審`); sendL2(p, ev); return render(); }
+  if (b.dataset.save) { const f = b.dataset.save, inp = $({ weight: "#w", temp: "#t", base_kg: "#bk", usual: "#us" }[f]), v = parseFloat(inp.value); p.staff[f] = isFinite(v) ? v : null; log(`${p.code}　${{ weight: "當日體重", temp: "院內體溫", base_kg: "治療前體重", usual: "平常大便次數" }[f]} ${isFinite(v) ? v : "清除"}`); return render(); }
+  if (b.id === "sign") { const ev = evaluate(p); if (ev.blockers.length) return; p.l2 = `${now()} 已送交醫師`; log(`${p.code}　完成第二層初審`); sendL2(p, ev); render(); fillDl(p); return; }
 });
 function sendL2(p, ev) {   // 第二層完成 → 把整理好的紀錄交給醫師端
   const rec = { schema: "prom-flow/1", code: p.code, age: p.age, tx: p.txList || [], signedAt: Date.now(),
     flags: ev.F.map(f => ({ id: f.id, level: f.level, text: f.text, why: f.why, resp: p.ack[f.id] || null })),
     conf: Object.entries(p.conf).map(([id, c]) => ({ id, res: c.res, note: c.note || c.val || "" })), staff: { ...p.staff }, note: p.note, ans: p.ans };
-  try { parent.postMessage({ type: "l2done", record: rec }, "*"); } catch (e) {}
+  p.rec = rec; try { parent.postMessage({ type: "l2done", record: rec }, "*"); } catch (e) {}
 }
+async function fillDl(p) { const el = $("#dl"); if (!el || !p.rec) return; const { ans, ...slim } = p.rec; el.value = await linkTo("doctor_v1.html", slim); window.__dlink = el.value; }
 const TXN = { chemo: "化療", rt: "放療", io: "免疫治療", adc: "ADC" };
-window.addEventListener("message", ev => {   // 收件：病人端資料包。用 pid 去重（重送不會重複）
+function addPatient(pl, ch) {   // 收件（訊息或連結共用）；用 pid 去重，重送不會重複
+  ch = ch || pl.chart || {}; const dup = P.some(x => x.code === pl.pid);
+  if (!dup) { P.push({ code: pl.pid, card: pl.card || "", participant: pl.participant || "", age: ch.age || "", tx: (pl.tx || []).map(t => TXN[t]).join("＋"), txList: pl.tx || [], visit: "今天", staff: { base_kg: ch.base_kg, usual: ch.usual, weight: null, temp: null }, note: pl.note || "", ans: pl.answers, conf: {}, ack: {}, l2: null });
+    log(`${pl.pid}　收到病人資料${pl.seed ? `（觀察員用：翻轉測試 ${pl.seed.id ? NAME[pl.seed.id] + "→" + (pl.seed.noticed ? "病人已改回" : "病人沒發現") : "沒有可翻的紅旗"}）` : ""}`); render(); }
+  return dup; }
+window.addEventListener("message", ev => {
   const m = ev.data; if (!m || m.type !== "ingest") return;
-  const pl = m.payload, ch = m.chart || {}; let dup = P.some(x => x.code === pl.pid);
-  let err = ""; try { if (!dup) { P.push({ code: pl.pid, age: ch.age || "", tx: (pl.tx || []).map(t => TXN[t]).join("＋"), txList: pl.tx || [], visit: "今天", staff: { base_kg: ch.base_kg, usual: ch.usual, weight: null, temp: null }, note: pl.note || "", ans: pl.answers, conf: {}, ack: {}, l2: null }); log(`${pl.pid}　收到病人資料`); render(); } } catch (e) { err = String(e && e.stack || e).slice(0, 300); }
+  const pl = m.payload; let dup = false, err = ""; try { dup = addPatient(pl, m.chart); } catch (e) { err = String(e && e.stack || e).slice(0, 300); }
   try { ev.source.postMessage({ type: "ingested", pid: pl.pid, dup, err }, "*"); } catch (e) {}
 });
+async function importFrom(text) { const pl = await unpack(text); if (!pl || !pl.answers) throw new Error("不是病人端的資料包"); const dup = addPatient(pl, pl.chart); CUR = P.findIndex(x => x.code === pl.pid); render(); return { pid: pl.pid, dup }; }
+async function importBox() { const msg = $("#impmsg"), inp = $("#imp"); try { const r = await importFrom(inp.value); msg.textContent = r.dup ? `${r.pid} 已經匯入過了` : `已匯入 ${r.pid}`; inp.value = ""; } catch (e) { msg.textContent = "匯入失敗：" + String(e.message || e).slice(0, 80); } }
+(async () => { if (/^#d=/.test(location.hash)) { try { await importFrom(location.hash); history.replaceState(null, "", location.pathname + location.search); } catch (e) { const m = $("#impmsg"); if (m) m.textContent = "連結無法讀取：" + String(e.message || e).slice(0, 80); } } })();
 window.__state = () => ({ patients: P.map(p => { const e = evaluate(p); return { code: p.code, level: e.level, flags: e.F.map(f => ({ id: f.id, level: f.level, acked: f.acked })), confirms: e.C.map(c => ({ id: c.id, red: c.red, nc: c.nc })), blockers: e.blockers, staff: { ...p.staff }, l2: p.l2, conf: JSON.parse(JSON.stringify(p.conf)) }; }), cur: CUR });
 render();
 </script>
