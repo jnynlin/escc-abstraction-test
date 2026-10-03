@@ -258,6 +258,7 @@ h3{font-size:1rem;color:var(--ink);}
 .prom .box{border:1px solid var(--rule);border-radius:8px;padding:10px 13px;margin:0 0 10px;background:var(--sheet);} .prom .box h3{margin:0 0 6px;font-size:.92rem;} .prom .box ul{margin:0;padding-left:18px;} .prom .box li{margin:2px 0;font-size:.88rem;}
 .prom .b-red{background:var(--err-soft);border-color:var(--err-soft);border-left:6px solid var(--err);} .prom .b-red h3{color:var(--err);} .prom .b-cc{border-left:4px solid #6b4fbb;} .prom .b-cc h3{color:#6b4fbb;} .prom .b-amb h3{color:#7a4b06;} .prom .b-grey h3{color:var(--soft);} .prom .b-ok{border-left:4px solid var(--done);} .prom .b-ok h3{color:var(--done);}
 .prom .ccq{font-size:1.05rem;line-height:1.6;margin:0;padding:8px 10px;background:#f4f0fb;border-radius:6px;color:var(--ink);}
+.prom .ccd{margin:8px 0 0;font-size:.9rem;color:var(--ink);} .prom .ccd-h{font-size:.78rem;color:var(--soft);} .prom .ccd ul{margin:2px 0 0;padding-left:18px;} .prom .pm-ccdstat{padding:8px 4px 0;line-height:1.5;}
 .prom .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:.86rem;} .prom .kv dt{color:var(--soft);} .prom .kv dd{margin:0;}
 .prom details.more{margin:6px 0 10px;} .prom details.more summary{cursor:pointer;color:var(--soft);font-size:.86rem;}
 .prom .mini{font-size:.8rem;color:var(--soft);margin:0 0 8px;} .prom .ph4{margin:14px 0 4px;font-size:.92rem;}
@@ -295,10 +296,59 @@ h3{font-size:1rem;color:var(--ink);}
 .drafth{margin:2px 0 8px;font-size:.9rem;font-weight:600;color:var(--iodine);}
 .inst.draft{border-style:dashed;}
 .dflags{margin:4px 0 6px 18px;font-size:.84rem;color:var(--iodine);}
+
+/* ---- UX 改版層（2026-10-03）：護眼＋少點擊。只用 token，放在所有 PROM 規則之後覆寫。
+   情境：個管師／醫師在診前連續處理一排病人、整個上午盯著螢幕、部分人老花；隱喻：檢傷看板（一次只看一位、主按鈕固定不動）；
+   主角：被選中那位病人的「為什麼要看」＋黏底的送出鈕。強調色只有一個（青綠 --acc），紅／琥珀只表示嚴重度。 ---- */
+:root{--acc:var(--done);--acc-ink:#fff;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--acc-ink:#0E1714;}}
+:root[data-theme="dark"]{--acc-ink:#0E1714;}
+/* 全站只有一個強調色（--acc＝--done 青綠）：原本同時有 #0D6468 與 #1F6B5C 兩種青綠 */
+.btn.go,.prom .fbtn.on,.prom .gb.on,#queues button.on,.qb.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);} .prom .gb:hover{border-color:var(--acc);}
+/* 字級地板：內文 1rem(17px)、次要 .92rem(≈15.6px)，不再有 15px 以下的字 */
+.prom .why1,.prom .box li,.prom .kv,.prom .soch,.prom .tname,.prom .fbtn,.prom .pm-scope,.prom .actbar input[type=text],.prom .actbar input:not([type]),.prom .actbar select,.prom .box h3,.prom .ph4{font-size:1rem;}
+.prom .m,.prom .age,.prom .why,.prom .said,.prom .kbd,.prom .tag,.prom .g,.prom .cnt,.prom .mini,.prom .chip,.prom .rng,.prom .det,.prom .det code,.prom .tname small,.prom .soch .n,.prom tr.pgrp td,.prom .t-dc,.prom .ccd-h,.prom .pmscript ol,.prom details.more summary,.prom .pm-ccdstat,.prom .ccd,.pmtk-m,.pmtk-h .t-dc,.pmtk-h .st-ok,.pmtk-h .st-off,.sync,.chip,#chip{font-size:.92rem;}
+.prom .ccq{font-size:1.2rem;line-height:1.55;background:var(--well);} .prom .why1{line-height:1.45;} .prom .mono{font-size:1rem;}
+.prom tr.pgrp td{letter-spacing:.02em;font-weight:600;}
+/* 點擊目標 ≥ 32px，主按鈕 44px */
+.prom .gb{width:40px;height:38px;} .prom .info{width:34px;height:34px;} .prom .chip{min-height:32px;padding:4px 12px;} .prom .fbtn{min-height:36px;} .prom .pm-scope{min-height:36px;} .prom .btn,.prom summary.btn{min-height:38px;}
+#pmRevNext,#pmOk{min-height:44px;font-size:1.05rem;padding:0 20px;}
+.pm-shell{grid-template-columns:minmax(300px,26rem) minmax(0,1fr);} @media (max-width:880px){.pm-shell{grid-template-columns:1fr;}}
+/* 工具列：一個常用鈕＋字級＋「更多」選單；帳號相關收進「帳號」選單 */
+.pm-more{position:relative;display:inline-block;} .pm-more>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;} .pm-more>summary::-webkit-details-marker{display:none;}
+.pm-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:60;min-width:210px;display:flex;flex-direction:column;gap:2px;padding:6px;background:var(--sheet);border:1px solid var(--rule);border-radius:8px;box-shadow:0 6px 18px rgba(16,24,40,.14);}
+.pm-menu .btn{justify-content:flex-start;text-align:left;border-color:transparent;background:transparent;width:100%;min-height:42px;white-space:nowrap;} .pm-menu .btn:hover{background:var(--well);}
+.pm-more[open]>summary{background:var(--well);}
+#bProm.on{background:var(--acc,#0D6468);border-color:var(--acc,#0D6468);color:var(--acc-ink,#fff);}
+/* 四張等重 KPI 卡 → 一行：只有「優先處理」是主角 */
+.pm-sumline{display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline;margin:0 0 12px;font-size:1rem;color:var(--soft);} .pm-sumline b{color:var(--ink);font-size:1.1rem;font-variant-numeric:tabular-nums;}
+.pm-sumline .sl-main{color:var(--ink);font-size:1.15rem;font-weight:600;} .pm-sumline .sl-main b{font-size:1.9rem;line-height:1;margin-right:4px;} .pm-sumline b.red{color:var(--err);}
+/* 單一強調色：去掉紫色；純資訊標籤扁平 */
+.prom .said{color:var(--ink);} .prom .d-read{background:var(--soft);} .prom .b-cc{border-left-color:var(--acc);} .prom .b-cc h3{color:var(--acc);}
+.prom .g-vio,.prom .t-vio{background:var(--well);color:var(--ink);} .prom .g-grey{border:0;background:transparent;padding-left:0;}
+.prom .gb.sugg{border-color:var(--acc);color:var(--acc);} .prom .chip.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);} .prom .pmscript{border:1px solid var(--rule);} .prom .kpi.vio b{color:var(--ink);}
+.prom .gist{background:transparent;padding:0 0 8px;border-bottom:1px solid var(--rule);border-radius:0;}
+.prom .ccd ul{padding-left:20px;}
+/* 深色：主按鈕原本是「深字壓深青底」(2.64:1)；同步狀態字太暗 */
+.sync{color:var(--done);} .sync.off{color:var(--iodine);} .sync.bad{color:var(--err);}
+.prom details.pm-terms{margin:10px 0;} .prom details.pm-terms .chips{margin-top:8px;}
+.prom-view main,.prom-only main{max-width:min(1500px,100%);} .prom table,.prom .report table{font-size:1rem;}
+.prom .why1{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.pm-menu.up{top:auto;bottom:calc(100% + 4px);right:auto;left:0;} .pm-menu label{display:flex;gap:8px;align-items:center;padding:8px 10px;font-size:1rem;white-space:nowrap;} .pm-menu label select{min-height:36px;}
+.prom .pm-foot .actbar{margin:0;padding:8px 10px;flex-wrap:wrap;} .prom .pm-foot .actbar input:not([type]){flex:1 1 160px;min-width:120px;} .prom .pm-tail{margin:14px 0 0;background:transparent;padding:0;}
+@media (max-width:1250px){.prom .pm-foot .actbar input:not([type]){order:9;flex-basis:100%;}}
+.prom summary.btn{font-weight:600;}
+/* 主按鈕放在黏底列最左（離清單最近，指標少移動）；DOM 順序不變，只用 order */
+.prom .pm-foot .actbar #pmRevNext,.prom .pm-foot .actbar #pmOk{order:-2;} .prom .pm-foot .actbar #pmRev,.prom .pm-foot .actbar #pmChart{order:-1;}
+label.mf>span,label.mf span{font-size:.95rem;}
+/* 摘錄側欄與共用按鈕的字級地板（CSS 層，不動 ESCC 摘錄流程）；佇列徽章的數字繼承按鈕文字色（原本 on 狀態下 1.28:1） */
+.btn,button.btn,summary.btn{font-size:.95rem;} #queues button,.qb{font-size:.95rem;min-height:34px;} #queues button span,.qb span{font-size:inherit;color:inherit;opacity:.9;}
+p.small,.small{font-size:.92rem;} .legend,.legend span{font-size:.92rem;} #m1,#m2,#m1 b,#m2 b{font-size:.95rem;}
+.prom details.more>summary,.prom details.pm-terms>summary{min-height:34px;display:flex;align-items:center;}
 </style>
 </head>
 <body>
-<div style="background:#F7EAD2;color:#7a4b06;padding:6px 16px;font-size:.85rem;text-align:center">測試版：只能輸入假資料，請勿輸入真實病人資料</div>
+<div style="background:#F7EAD2;color:#7a4b06;padding:6px 16px;font-size:.92rem;text-align:center">測試版：只能輸入假資料，請勿輸入真實病人資料</div>
 <div id="bkbar" class="bkbar" hidden><span id="bkmsg"></span> <button class="btn go" type="button" id="bkgo">立即下載加密備份</button> <span class="bkhint">存到 J:\escc_cmuh\cloud_backups\</span></div>
 <div class="bar">
   <h1>ESCC 病歷摘錄工作台</h1>
@@ -5216,6 +5266,7 @@ var qrcode = function() {
 var PROM=(function(){
 var X=null,PK=null,RECS={},ORDER=[],LOADED=false,SEL=null,FILT="todo",SCOPE="active",PICK={},TERMS=[],FOCUS=0,WINDOW_H=48,VIEW=false,LASTC=null,NOTES=[],INBOX_KEEP_DAYS=30,INBOX_WARN_DAYS=7;
 var enc=new TextEncoder(),dec=new TextDecoder();
+var FSV=[0,19,21.5],FSN=["標準","大","特大"],FSI=0,NOAUTO=false,AUTODRAW=false;try{FSI=Math.max(0,Math.min(2,parseInt(localStorage.getItem("promFs")||"0",10)||0));}catch(e){}
 var LVORD={red:0,act:1,read:2,skip:3},DC={io:"IO",adc:"ADC",both:"IO+ADC"};
 var URG={urgent:"緊急",priority:"優先",routine:"常規"},SIG={"":"未判定",real:"真實事件",false_alarm:"誤報／技術問題"};
 G.init(PROM_CTCAE,PROM_PANEL);
@@ -5227,6 +5278,7 @@ function canReview(){return role()==="nurse"||role()==="manager";}
 function canConfirm(){return role()==="doctor"||role()==="manager";}
 function meUid(){var s=S();return s?s.uid:"";}
 function meName(){var s=S();return s?s.name:"";}
+function applyFs(){document.documentElement.style.fontSize=FSV[FSI]?FSV[FSI]+"px":"";}
 function p2(n){return (n<10?"0":"")+n;}
 function tsText(ms){if(!ms)return "";var d=new Date(ms);return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate())+" "+p2(d.getHours())+":"+p2(d.getMinutes());}
 function E(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
@@ -5238,6 +5290,73 @@ function applies(it,b){if(b.treatments&&b.treatments.length!==undefined){var a=i
 function unfilledOf(b){var ev=b.answers||{};
   return PROM_PANEL.items.filter(function(it){if(!applies(it,b))return false;var sub=ev[it.id]||{};
     return !(it.q||[]).some(function(q){if(q.staff)return false;var v=sub[q.id];return v!==undefined&&v!==null&&v!=="";});}).map(function(it){return it.label;});}
+/* ---------- 主訴 vs 題目答案 對照（2026-10-03；只提醒，不進分流、不寫回紀錄、不改病人端）----------
+   開放主訴講到某症狀、對應題目卻答「沒有」＝可能誤解題意或漏答；醫護端給一行軟提示，並可統計比率。
+   說法含糊（「痛」「吃不下」）的規則對應多題：任一題陽性就算一致，全部陰性才算矛盾。
+   規則依序比對，先到先佔：較具體的規則放前面，同一段字不會被籠統的規則重複計。 */
+var CC_KW_VER=1;
+var CC_RULES=[
+ {id:"hemoptysis",re:/咳血|吐血|咳出血|痰(?:裡|中)?有血/,items:["swallow","breath"]},
+ {id:"fever",re:/發燒|發熱|高燒|低燒|微燒|體溫(?:偏)?高/,items:["fever"]},
+ {id:"diarrhea",re:/拉肚子|腹瀉|拉稀|水瀉|水便|稀便|軟便|一直跑廁所|大便(?:很|太)?(?:多次|稀|水)/,items:["diarrhea"]},
+ {id:"constipation",re:/便秘|解不出來|大便(?:很|太)?(?:硬|乾)|幾天沒(?:大便|解便)/,items:["constipation"]},
+ {id:"swallow",re:/吞不下|吞嚥|吞東西|吞藥|吞口水|吞水|吞飯|卡住|喉嚨卡|胸口卡|哽|噎|嗆到|嗆咳|只能喝(?:湯|流質|牛奶)|食道/,items:["swallow"]},
+ {id:"cant_eat",re:/吃不下|吃不了|不想吃/,items:["nausea","swallow"]},
+ {id:"nausea",re:/噁心|想吐|嘔吐|反胃|沒胃口|食慾(?:不振|差)|胃口(?:不好|差)/,items:["nausea"]},
+ {id:"breath",re:/呼吸(?:困難|不順|急促)|氣促|氣喘|喘|咳嗽|咳/,vetoAfter:/^血/,items:["breath"]},
+ {id:"cardiac",re:/胸悶|胸痛|胸口(?:痛|悶|緊)|心悸|心跳(?:很)?快|心臟(?:不舒服|痛)/,items:["cardiac","pain"]},
+ {id:"endo",re:/怕冷|怕熱|頭暈|暈眩|頭昏|冒冷汗|畏寒/,items:["endo"]},
+ {id:"eye",re:/眼睛(?:痛|乾|癢|紅|糊)|畏光|怕光|視力(?:模糊|變差)|看不清|看東西(?:有點)?糊|眼乾/,items:["eye_io","eye_adc"]},
+ {id:"neuro",re:/麻木|發麻|手麻|腳麻|手腳麻|指麻|刺痛|不靈活|扣釦子|手腳(?:沒力|無力)|走路不穩/,items:["neuro"]},
+ {id:"mouth",re:/嘴(?:巴)?破|口腔潰瘍|口破|嘴巴(?:痛|潰瘍)/,items:["mouth"]},
+ {id:"skin_rt",re:/照射(?:處|部位|的)?(?:皮膚|紅|破|痛)|放射.{0,3}皮膚|皮膚(?:很)?(?:紅|黑|破皮|脫皮)/,items:["skin_rt","rash"]},
+ {id:"rash",re:/疹子|起疹|紅疹|皮疹|水泡|起泡|脫皮/,items:["rash","skin_rt"]},
+ {id:"itch",re:/癢/,items:["itch"]},
+ {id:"voice",re:/聲音(?:沙啞|啞|嘶啞|變)|沙啞|失聲|嘶啞/,items:["voice"]},
+ {id:"dehyd",re:/口乾|口渴|尿(?:很)?少|脫水|尿量(?:減少|變少)/,items:["dehyd"]},
+ {id:"weight",re:/體重|變瘦|瘦了|消瘦|掉(?:了)?\d*(?:公斤|kg)/,items:["weight"]},
+ {id:"joint",re:/關節|肌肉(?:痛|酸|痠)|筋骨/,items:["joint"]},
+ {id:"fatigue",re:/疲倦|疲勞|很累|好累|太累|容易累|累了|沒力氣|沒有力氣|沒力|沒精神|沒有精神|沒體力|虛弱|乏力|無力/,veto:/[手腳腿]$/,items:["fatigue"]},
+ {id:"ache",re:/痠痛|酸痛|痛/,items:["pain","joint","swallow","cardiac","eye_io","mouth"]}
+];
+var CC_SPLIT=/[，。,.;；、！!？?\s]/,CC_NEG=/(?:沒有|沒再|沒|無|不會|不太|不怎麼|不是|不|未|並無|從沒|都沒)/,CC_DONE=/^(?:已經|已)?(?:好了|好多了|沒事|改善了|不會了|沒有了|沒了|消失了|退了|不見了|還好)/;
+/* 一題在這位病人身上的狀態：not_asked＝這個治療別沒有問；yes＝任一題有肯定答案或等級≥1；no＝有答、全否定；blank＝沒填 */
+function ccItemState(it,b,fm){if(!applies(it,b))return "not_asked";var sub=(b.answers||{})[it.id]||{},answered=false,pos=false;
+  (it.q||[]).forEach(function(q){if(q.staff)return;var v=sub[q.id];if(v===undefined||v===null||v==="")return;answered=true;
+    if(q.type==="yesno"){if(v===1||v===true||v==="1")pos=true;}else if(q.type==="choice"){if(Number(v)>0)pos=true;}});
+  [it.term].concat(it.also||[]).forEach(function(t){if((fm[t]||0)>=1)pos=true;});
+  return pos?"yes":(answered?"no":"blank");}
+/* 主訴文字裡「確實在講有這個症狀」的說法（排除否定句與已好轉） */
+function ccMentions(text){var out=[],claimed=[],seen={};
+  CC_RULES.forEach(function(r){var re=new RegExp(r.re.source,"g"),m;
+    while((m=re.exec(text))){var s0=m.index,e0=s0+m[0].length;if(m[0].length===0){re.lastIndex++;continue;}
+      if(claimed.some(function(c){return s0>=c[0]&&e0<=c[1];}))continue;claimed.push([s0,e0]);
+      if(r.veto&&r.veto.test(text.slice(Math.max(0,s0-1),s0)))continue;
+      if(r.vetoAfter&&r.vetoAfter.test(text.slice(e0,e0+1)))continue;
+      var before=text.slice(0,s0).split(CC_SPLIT).pop(),after=text.slice(e0).split(CC_SPLIT)[0];
+      if(CC_NEG.test(before.slice(-3)))continue;if(CC_DONE.test(after))continue;
+      if(!seen[r.id]){seen[r.id]=1;out.push({id:r.id,kw:m[0],items:r.items});}}});
+  return out;}
+/* 回傳 {text,audio,audioOnly,items:[{rule,kw,kind:agree|discord|blank|notAsked,states:[{id,label,state}]}]}；純函式，不改 b */
+function ccDiscord(b){var cc=b.cc||{},text=String(cc.text||"").trim(),out={ver:CC_KW_VER,text:!!text,audio:!!cc.audio,audioOnly:!text&&!!cc.audio,items:[]};
+  if(!text)return out;var fm=floors(G.summary(evOf(b))),byId={};PROM_PANEL.items.forEach(function(it){byId[it.id]=it;});
+  ccMentions(text).forEach(function(m){var st=m.items.filter(function(id){return byId[id];}).map(function(id){return {id:id,label:byId[id].label,state:ccItemState(byId[id],b,fm)};});
+    var asked=st.filter(function(z){return z.state!=="not_asked";}),kind=st.some(function(z){return z.state==="yes";})?"agree":!asked.length?"notAsked":asked.every(function(z){return z.state==="no";})?"discord":"blank";
+    out.items.push({rule:m.id,kw:m.kw,kind:kind,states:st});});
+  return out;}
+/* 一批紀錄的對照統計（不寫回；關鍵字表改版後可重算） */
+function ccStats(bodies){var s={ver:CC_KW_VER,n:bodies.length,withText:0,audioOnly:0,hit:0,agree:0,discord:0,blank:0,notAsked:0,noHit:0};
+  bodies.forEach(function(b){var d=ccDiscord(b);if(d.audioOnly){s.audioOnly++;return;}if(!d.text)return;s.withText++;if(!d.items.length){s.noHit++;return;}s.hit++;
+    var k={};d.items.forEach(function(z){k[z.kind]=1;});if(k.discord)s.discord++;if(k.blank)s.blank++;if(k.notAsked)s.notAsked++;if(k.agree&&!k.discord&&!k.blank&&!k.notAsked)s.agree++;});
+  s.discordRate=s.hit?s.discord/s.hit:0;return s;}
+function ccNoteHtml(b){var d=ccDiscord(b),L=[];
+  d.items.forEach(function(z){var lab=z.states.map(function(q){return "「"+E(q.label)+"」";}).join("或"),kw="「"+E(z.kw)+"」";
+    if(z.kind==="discord")L.push("<li>主訴提到"+kw+"，但"+lab+"題答了「沒有」——請向病人確認。</li>");
+    else if(z.kind==="blank")L.push("<li>主訴提到"+kw+"，"+lab+"題沒填。</li>");
+    else if(z.kind==="notAsked")L.push("<li>主訴提到"+kw+"，這位病人的治療別沒有問"+lab+"這題。</li>");});
+  return L.length?'<div class="ccd"><div class="ccd-h">對照題目答案（只是提醒，不影響分流）</div><ul>'+L.join("")+"</ul></div>":"";}
+function drawCcdStat(){var h=$("#pmCcdStat");if(!h)return;var s=ccStats(ORDER.filter(function(id){return inScope(RECS[id]);}).map(function(id){return RECS[id].body;}));
+  h.textContent=s.withText||s.audioOnly?("主訴對照（目前清單 "+s.n+" 份）：有文字主訴 "+s.withText+" 份，提到症狀 "+s.hit+" 份，其中與題目答案矛盾 "+s.discord+" 份、題目沒填 "+s.blank+" 份、沒問到 "+s.notAsked+" 份；沒對到關鍵字 "+s.noHit+" 份；只有錄音 "+s.audioOnly+" 份（無法對照）。關鍵字表 v"+s.ver+"。"):"";}
 function floors(e){var m={};e.determinable.concat(e.floor_only).forEach(function(z){m[z.term]=z.floor;});return m;}
 function deltasOf(e,pe){var pm=floors(pe),out=[];e.determinable.concat(e.floor_only).forEach(function(z){var was=pm[z.term];
   if(was!==undefined&&was!==z.floor)out.push({term:z.term,was:was,now:z.floor});else if(was===undefined&&z.floor>0)out.push({term:z.term,was:0,now:z.floor});});return out;}
@@ -5385,6 +5504,48 @@ function openTokMgr(){
       disarm();b.disabled=true;revokeToken(tid).then(function(){toast("已撤銷");return load();}).catch(function(e){b.disabled=false;toast(e.message||x().cErr(e));});}};
   pr.then(disarm);
   return load();}
+
+/* ---------- 清除測試資料（2026-10-03，主持人）----------
+   測試站與正式站共用同一個 Firebase 專案，測試站發的假權杖、載入的示範紀錄會留在真研究空間。
+   流程：掃描 → 預覽（可取消勾選）→ 輸入確認字 → 刪除。只動 prom／tokens／prom_inbox；不碰 meta（金鑰、收件人名冊）、成員與摘錄病歷。
+   判定刻意保守：研究編號 ESCC9xxx（示範／E2E 區段）或 ESCC1234（手動測試），或紀錄來源是 demo／test，或權杖標籤是 e2e／ux／test；
+   收件匣只刪「屬於這些測試權杖」的。單次刪除上限 300 筆，超過視為判定異常而中止。 */
+var TEST_PID=/^(ESCC9\d{3}|ESCC1234)$/i,TEST_LABEL=/^(e2e|ux|test|測試)$/i,CLEAN_MAX=300;
+function testCandidates(recs,tokens,inbox){var out={prom:[],tokens:[],inbox:[]},tt={};
+  (recs||[]).forEach(function(r){var m=r.meta||{},b=r.body||{},pid=b.pid||m.pid||"",why=[];if(m.source==="demo"||m.source==="test")why.push("來源＝"+m.source);if(TEST_PID.test(String(pid).trim()))why.push("測試編號");
+    if(why.length)out.prom.push({id:r.id,pid:pid,visit:b.visit||m.visit||"",why:why.join("、")});});
+  (tokens||[]).forEach(function(t){var why=[];if(TEST_PID.test(String(t.pid||"").trim()))why.push("測試編號");if(t.label&&TEST_LABEL.test(String(t.label).trim()))why.push("標籤＝"+t.label);
+    if(why.length){tt[t.tid]=1;out.tokens.push({id:t.tid,pid:t.pid,kind:t.kind,label:t.label||"",why:why.join("、")});}});
+  (inbox||[]).forEach(function(i){if(tt[i.tid])out.inbox.push({id:i.id,tid:i.tid,consumed:!!i.consumed});});
+  return out;}
+function cleanScan(){if(!x().isAdmin())return Promise.reject(new Error("只有主持人可以清除測試資料"));
+  return (LOADED?Promise.resolve():loadAll()).then(function(){var recs=ORDER.map(function(id){return RECS[id];});
+    return Promise.all([listTokens(),x().col("prom_inbox").get()]).then(function(a){var ib=[];a[1].forEach(function(d){var v=d.data();ib.push({id:d.id,tid:v.tid,consumed:!!v.consumed});});return testCandidates(recs,a[0],ib);});});}
+function cleanApply(sel){if(!x().isAdmin())return Promise.reject(new Error("只有主持人可以清除測試資料"));
+  sel={prom:(sel&&sel.prom)||[],tokens:(sel&&sel.tokens)||[],inbox:(sel&&sel.inbox)||[]};var total=sel.prom.length+sel.tokens.length+sel.inbox.length;
+  if(total>CLEAN_MAX)return Promise.reject(new Error("筆數異常（"+total+" 筆，上限 "+CLEAN_MAX+"），已中止；請檢查清單"));
+  var n={prom:0,tokens:0,inbox:0},err=[];
+  function seq(list,fn){return list.reduce(function(p,id){return p.then(function(){return fn(id).then(function(){},function(e){err.push(id+"："+(e&&e.message||x().cErr(e)));});});},Promise.resolve());}
+  return seq(sel.inbox,function(id){return x().col("prom_inbox").doc(id).delete().then(function(){n.inbox++;});})
+    .then(function(){return seq(sel.prom,function(id){return x().col("prom").doc(id).delete().then(function(){n.prom++;delete RECS[id];});});})
+    .then(function(){return seq(sel.tokens,function(id){return x().col("tokens").doc(id).delete().then(function(){n.tokens++;});});})
+    .then(function(){sortOrder();SEL=null;SEC.secLog("清除 PROM 測試資料：紀錄 "+n.prom+"、權杖 "+n.tokens+"、收件 "+n.inbox+(err.length?"，失敗 "+err.length:""));return {n:n,errors:err};});}
+function openCleanTest(){
+  var pr=dialog({title:"清除測試資料",msg:"只會刪 PROM 的測試紀錄、測試權杖和這些權杖的收件匣（研究編號 ESCC9xxx 或 ESCC1234，或來源是示範／測試）。不會動金鑰、收件人名冊、成員、摘錄病歷和其他研究編號。刪除後無法復原。",fields:[{k:"c",label:"確認：請輸入「清除測試資料」",req:1}],ok:"刪除所選"});
+  var box=$("#mBody"),wrap=document.createElement("div"),SC=null,ON={prom:{},tokens:{},inbox:{}};wrap.className="pmtk";wrap.innerHTML='<p class="mini">掃描中…</p>';box.insertBefore(wrap,box.querySelector("label.mf")||$("#mErr"));
+  function sect(key,title,rows,line){if(!rows.length)return "";return '<h4 class="ph4">'+E(title)+'（'+rows.length+'）</h4>'+rows.map(function(r){return '<label class="ck"><input type="checkbox" data-k="'+key+'" data-id="'+E(r.id)+'" checked> <span>'+line(r)+'</span></label>';}).join("");}
+  function paint(sc){SC=sc;["prom","tokens","inbox"].forEach(function(k){sc[k].forEach(function(r){ON[k][r.id]=true;});});var tot=sc.prom.length+sc.tokens.length+sc.inbox.length;
+    if(!tot){wrap.innerHTML='<p class="mini">沒有符合的測試資料。</p>';return;}
+    wrap.innerHTML='<p class="mini">共 '+tot+' 筆，預設全選；不要刪的請取消勾選。</p>'+
+      sect("prom","測試紀錄",sc.prom,function(r){return '<b class="mono">'+E(r.pid)+'</b> '+E(r.visit)+'　<span class="desc">'+E(r.why)+'</span>';})+
+      sect("tokens","測試權杖",sc.tokens,function(r){return '<b class="mono">'+E(r.pid)+'</b> '+E(TOKKIND[r.kind]||r.kind)+(r.label?'・'+E(r.label):"")+'　<span class="desc">'+E(r.why)+'</span>';})+
+      sect("inbox","測試權杖的收件匣",sc.inbox,function(r){return '收件 '+E(r.id.slice(0,8))+'…　<span class="desc">'+(r.consumed?"已收件":"未收件")+'</span>';});}
+  wrap.addEventListener("change",function(ev){var c=ev.target;if(c&&c.dataset&&c.dataset.k)ON[c.dataset.k][c.dataset.id]=c.checked;});
+  cleanScan().then(paint).catch(function(e){wrap.innerHTML='<p class="mini">掃描失敗：'+E(e.message||x().cErr(e))+'</p>';});
+  pr.then(function(v){if(!v||!SC)return;if(String(v.c||"").trim()!=="清除測試資料"){toast("確認字不符，未刪除");return;}
+    var sel={};["prom","tokens","inbox"].forEach(function(k){sel[k]=SC[k].filter(function(r){return ON[k][r.id];}).map(function(r){return r.id;});});
+    if(!sel.prom.length&&!sel.tokens.length&&!sel.inbox.length){toast("沒有勾選任何項目");return;}
+    cleanApply(sel).then(function(r){toast("已清除：紀錄 "+r.n.prom+"、權杖 "+r.n.tokens+"、收件 "+r.n.inbox+(r.errors.length?"；"+r.errors.length+" 筆失敗":""));if(r.errors.length)console.warn(r.errors);return loadAll();}).then(render).catch(function(e){toast(e.message||x().cErr(e));});});}
 /* 收件：解開病人匿名寫入的收件匣 → 建 PROM 紀錄(source token) → 標 consumed。只有持 PROM 金鑰的人(主持人/個管師/醫師)解得開。 */
 function consumeInbox(){if(!PK)return Promise.reject(new Error("PROM 金鑰未載入"));var uid=meUid(),n=0,skipped=0,errs=[];
   return x().col("prom_inbox").get().then(function(qs){var docs=[];qs.forEach(function(d){if(!d.data().consumed)docs.push(d);});
@@ -5438,10 +5599,9 @@ function counts(){var c={active:0,open:0,all:ORDER.length};ORDER.forEach(functio
 function ago(ms){if(!ms)return "";var h=(Date.now()-ms)/36e5;return h<1?"剛剛":h<24?Math.floor(h)+" 小時前":h<48?"昨天":Math.floor(h/24)+" 天前";}
 function render(){VIEW=true;document.body.classList.add("prom-view");if(typeof cur!=="undefined")cur=null;var dk=$("#dock");if(dk)dk.hidden=true;EN=ens();
   var m=$("#main"),s=S(),r=role(),rn={manager:"主持人",nurse:"個管師",doctor:"醫師"}[r]||r;
-  m.innerHTML='<section class="sheet report prom"><div class="phead"><h3>PROM 症狀清單・'+E(s.studyName||s.sid)+'</h3><span class="kbd">'+E(rn)+'　'+E(s.name)+'　CTCAE '+E(PROM_PANEL.ctcae_version)+'・題庫 v'+E(PROM_PANEL.version)+'</span>'+
-    '<span class="sp"></span>'+(s.offline?'<span class="kbd">離線備份檢視・唯讀</span>':'<button class="btn" type="button" id="pmRef">重新整理</button>'+(canConfirm()||canReview()?'<button class="btn" type="button" id="pmInbox">再收件一次</button><button class="btn" type="button" id="pmQr">貼上交接碼</button>':'')+'<button class="btn" type="button" id="pmTok">發權杖給病人</button><button class="btn" type="button" id="pmTokMgr">權杖管理</button>')+
-    (x().isAdmin()?'<button class="btn" type="button" id="pmDemo">載入示範資料（合成）</button>':'')+'</div>'+
-    (r==="nurse"?'<div class="kpis" id="pmKpi"></div>':'')+'<div class="pm-shell"><div class="pm-rail"><div class="lbar" id="pmBar"></div><div class="pm-list"><table id="pmTbl"></table></div></div><div class="pm-main" id="pmDet"></div></div></section>';
+  m.innerHTML='<section class="sheet report prom"><div class="phead"><h3 title="'+E(rn+'　'+s.name+'　CTCAE '+PROM_PANEL.ctcae_version+'・題庫 v'+PROM_PANEL.version)+'">PROM 症狀清單・'+E(s.studyName||s.sid)+'</h3>'+
+    '<span class="sp"></span>'+(s.offline?'<span class="kbd">離線備份檢視・唯讀</span>':'<button class="btn" type="button" id="pmTok">發權杖給病人</button><button class="btn" type="button" id="pmFont" title="切換字級：標準／大／特大">字級 <b>'+FSN[FSI]+'</b></button><details class="pm-more" id="pmMoreBox"><summary class="btn" id="pmMore">更多 ▾</summary><div class="pm-menu"><button class="btn" type="button" id="pmTokMgr">權杖管理</button>'+(canConfirm()||canReview()?'<button class="btn" type="button" id="pmQr">貼上交接碼</button><button class="btn" type="button" id="pmInbox">再收件一次</button>':'')+'<button class="btn" type="button" id="pmRef">重新整理</button>'+(x().isAdmin()?'<button class="btn" type="button" id="pmDemo">載入示範資料（合成）</button><button class="btn" type="button" id="pmClean">清除測試資料…</button>':'')+'</div></details>')+'</div>'+
+    '<div class="pm-sumline" id="pmKpi"></div>'+'<div class="pm-shell"><div class="pm-rail"><div class="lbar" id="pmBar"></div><div class="pm-list"><table id="pmTbl"></table></div><div class="kbd pm-ccdstat" id="pmCcdStat"></div></div><div class="pm-main" id="pmDet"></div></div></section>';
   var rf=$("#pmRef");if(rf)rf.onclick=function(){$("#pmDet").innerHTML="";SEL=null;loadAll().then(render,function(e){toast(x().cErr(e));});};
   var q=$("#pmQr");if(q)q.onclick=function(){dialog({title:"貼上交接碼",msg:"病人手機顯示的 QR 用桌上條碼機掃進這個框（掃描器等於鍵盤）。",fields:[{k:"s",label:"交接碼",type:"textarea",req:1}],ok:"登錄"}).then(function(v){if(!v)return;
     importPayload(v.s).then(function(id){if(id){toast("已登錄 "+id);render();}}).catch(function(e){toast(e.message||x().cErr(e));});});};
@@ -5454,71 +5614,78 @@ function render(){VIEW=true;document.body.classList.add("prom-view");if(typeof c
   var tm=$("#pmTokMgr");if(tm)tm.onclick=openTokMgr;
   var d=$("#pmDemo");if(d)d.onclick=function(){ask("載入 12 筆合成示範紀錄（研究編號 ESCC9001–9011，明顯虛構；後三筆為 v3 食道癌題目）？").then(function(ok){if(!ok)return;loadDemo().then(function(n){toast("已載入 "+n+" 筆");render();}).catch(function(e){toast(e.message||x().cErr(e));});});};
   if(NOTES.length){toast(NOTES.join("；"));NOTES=[];}
+  var cln=$("#pmClean");if(cln)cln.onclick=openCleanTest;
+  var fb=$("#pmFont");if(fb)fb.onclick=function(){FSI=(FSI+1)%FSV.length;try{localStorage.setItem("promFs",String(FSI));}catch(e){}applyFs();fb.innerHTML='字級 <b>'+FSN[FSI]+'</b>';};
+  $$("#pmMoreBox .pm-menu button").forEach(function(bt){bt.addEventListener("click",function(){var bx=$("#pmMoreBox");if(bx)bx.removeAttribute("open");});});
+  var pbt=$("#bProm");if(pbt)pbt.classList.add("on");applyFs();NOAUTO=false;
   drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);else $("#pmDet").innerHTML='<p class="pm-empty">從左側清單選一位病人；紅點先看。<br><span class="kbd"><b>j</b>/<b>k</b> 換病人</span></p>';}
 function drawKpi(){var h=$("#pmKpi");if(!h)return;var ids=ORDER.filter(function(id){return inScope(RECS[id]);});
   var red=0,open=0,cc=0,un=0;ids.forEach(function(id){var e=EN[id];if(e.flags.today.length)red++;if(!e.reviewed)open++;if(e.hasText)cc++;if(e.unfilled.length)un++;});
-  h.innerHTML='<div class="kpi red"><b>'+red+'</b><span>看診時優先處理</span></div><div class="kpi vio"><b>'+open+'</b><span>待初審</span></div><div class="kpi amb"><b>'+cc+'</b><span>病人有話要說</span></div><div class="kpi"><b>'+un+'</b><span>有題目沒填</span></div>';}
-function drawList(){var n={red:0,act:0,read:0,skip:0},sc=ORDER.filter(function(id){return inScope(RECS[id]);});sc.forEach(function(id){n[lv(EN[id])]++;});var c=counts();
+  h.innerHTML='<span class="sl-main"><b class="'+(red?"red":"")+'">'+red+'</b> 位看診時優先處理</span><span>待初審 <b>'+open+'</b></span><span>病人有話要說 <b>'+cc+'</b></span><span>有題目沒填 <b>'+un+'</b></span>';}
+function drawList(){drawCcdStat();var n={red:0,act:0,read:0,skip:0},sc=ORDER.filter(function(id){return inScope(RECS[id]);});sc.forEach(function(id){n[lv(EN[id])]++;});var c=counts();
   $("#pmBar").innerHTML='<span class="seg"><button class="fbtn'+(FILT==="todo"?" on":"")+'" data-f="todo">需要處理 <b>'+(n.red+n.act)+'</b></button><button class="fbtn'+(FILT==="read"?" on":"")+'" data-f="read">只需讀一行 <b>'+n.read+'</b></button>'+
     '<button class="fbtn'+(FILT==="all"?" on":"")+'" data-f="all">全部 <b>'+sc.length+'</b></button></span>'+
     '<select class="pm-scope" id="pmScope"><option value="active"'+(SCOPE==="active"?" selected":"")+'>這一診（'+WINDOW_H+' 小時內未結案）'+c.active+'</option><option value="open"'+(SCOPE==="open"?" selected":"")+'>所有未結案 '+c.open+'</option><option value="all"'+(SCOPE==="all"?" selected":"")+'>含已結案 '+c.all+'</option></select>'+
     '<span class="kbd pm-skip">免開 '+n.skip+' 位（'+Math.round(n.skip/Math.max(1,sc.length)*100)+'%）不需要您點開</span>';
   var ids=listIds(),h="",GN={red:"看診時優先處理",act:"建議安排檢查",read:"只需讀一行",skip:"免開"},grp=null;
+  if(!NOAUTO&&(!SEL||ids.indexOf(SEL)<0)){SEL=ids[0]||null;PICK={};TERMS=[];AUTODRAW=true;}
   if(!ids.length)h+='<tr><td class="desc" style="padding:18px 8px">'+(FILT==="todo"?"這一診目前沒有需要處理的病人。":"沒有符合的項目。")+'</td></tr>';
   ids.forEach(function(id){var r=RECS[id],e=EN[id],L=lv(e),t=e.triage||{},why="";
     if(L!==grp){grp=L;h+='<tr class="pgrp"><td colspan="3">'+GN[L]+' · '+ids.filter(function(z){return lv(EN[z])===L;}).length+'</td></tr>';}
     if(L==="red")why='<b>'+E((t.why||[]).slice(0,2).join("；"))+'</b>'+((t.why||[]).length>2?" 等 "+t.why.length+" 項":"");else if(L==="act")why=E((t.why||[]).join("；"));else if(L==="read")why="—";else why='<span class="desc">無須處理</span>';
-    var said=e.cc_brief?'<span class="said">「'+E(e.cc_brief)+(e.cc_brief.length>=40?"…":"")+'」</span>':"";var meta=(r.body.filledBy==="family"?"家屬代填":"本人填")+(e.unfilled.length?'・<span class="why">未填 '+e.unfilled.length+' 題</span>':"");
+    var said=e.cc_brief?'<span class="said">「'+E(e.cc_brief)+(e.cc_brief.length>=40?"…":"")+'」</span>':"";var meta=(r.body.filledBy==="family"?"家屬代填":"")+(r.body.filledBy==="family"&&e.unfilled.length?"・":"")+(e.unfilled.length?'<span class="why">未填 '+e.unfilled.length+' 題</span>':"");
     var l2=lastReview(r.body);
-    h+='<tr class="prow lv-'+L+(r.meta.closed?" done":"")+(id===SEL?" on":"")+'" data-id="'+E(id)+'" title="'+E(tsText(r.body.filledAt))+'"><td><span class="dot d-'+L+'"></span></td><td><b class="mono">'+E(r.body.pid)+'</b> <span class="tag t-dc">'+(DC[r.body.drugClass]||"")+'</span><div class="why1">'+why+'</div>'+said+'<div class="m">'+meta+'</div></td>'+
-      '<td class="c3"><span class="age">'+E(ago(r.body.filledAt))+'</span><br>'+(r.meta.closed?'<span class="tag t-ok">已結案</span>':l2?'<span class="tag t-vio">'+E(l2.name)+'</span>':'<span class="tag t-grey">未初審</span>')+'</td></tr>';});
+    h+='<tr class="prow lv-'+L+(r.meta.closed?" done":"")+(id===SEL?" on":"")+'" data-id="'+E(id)+'" title="'+E(tsText(r.body.filledAt))+'"><td><span class="dot d-'+L+'"></span></td><td><b class="mono">'+E(r.body.pid)+'</b> <span class="tag t-dc">'+(DC[r.body.drugClass]||"")+'</span><div class="why1" title="'+E((t.why||[]).join("；"))+'">'+why+'</div>'+said+''+(meta?'<div class="m">'+meta+'</div>':"")+'</td>'+
+      '<td class="c3"><span class="age">'+E(ago(r.body.filledAt))+'</span><br>'+(r.meta.closed?'<span class="tag t-ok">已結案</span>':l2?'<span class="tag t-vio">初審 '+E(l2.name)+'</span>':'')+'</td></tr>';});
   $("#pmTbl").innerHTML=h;
-  $$("#pmBar .fbtn").forEach(function(b){b.onclick=function(){FILT=b.dataset.f;drawKpi();drawList();};});
-  var scp=$("#pmScope");if(scp)scp.onchange=function(){SCOPE=scp.value;SEL=null;$("#pmDet").innerHTML="";drawKpi();drawList();};
-  $$("#pmTbl tr.prow").forEach(function(tr){tr.onclick=function(){SEL=tr.dataset.id;PICK={};TERMS=[];$$("#pmTbl tr.prow").forEach(function(z){z.classList.toggle("on",z===tr);});drawDetail(SEL);var d=$("#pmDet");if(d)d.scrollTop=0;};});}
+  $$("#pmBar .fbtn").forEach(function(b){b.onclick=function(){FILT=b.dataset.f;NOAUTO=false;drawKpi();drawList();};});
+  var scp=$("#pmScope");if(scp)scp.onchange=function(){SCOPE=scp.value;SEL=null;NOAUTO=false;$("#pmDet").innerHTML="";drawKpi();drawList();};
+  if(AUTODRAW){AUTODRAW=false;if(SEL)drawDetail(SEL);else $("#pmDet").innerHTML='<p class="pm-empty">這個範圍目前沒有病人。</p>';}
+  $$("#pmTbl tr.prow").forEach(function(tr){tr.onclick=function(){SEL=tr.dataset.id;NOAUTO=false;PICK={};TERMS=[];$$("#pmTbl tr.prow").forEach(function(z){z.classList.toggle("on",z===tr);});drawDetail(SEL);var d=$("#pmDet");if(d)d.scrollTop=0;};});}
 function item(id){return PROM_PANEL.items.filter(function(i){return i.id===id;})[0];}
 function drawDetail(id){var r=RECS[id];if(!r){$("#pmDet").innerHTML="";return;}var b=r.body,en=EN[id]||enrich(b,prevBody(b.pid,b.filledAt,id)),e=en.envelope,cc=b.cc||{},l2=lastReview(b);
   var chg=(en.prev&&en.prev.deltas)?en.prev.deltas.filter(function(d){return d.now>d.was;}):[];
   if(l2&&canReview()&&!Object.keys(PICK).length){PICK=Object.assign({},l2.suggest||{});TERMS=(l2.terms||[]).slice();}
-  var gist='<div class="gist"><b>'+E(b.pid)+'　'+E(b.visit)+'</b><span class="g g-grey">'+(DC[b.drugClass]||"")+'</span><span class="g g-grey">'+(b.filledBy==="family"?"家屬代填":"本人填")+'</span>';
+  var gist='<div class="gist"><b>'+E(b.pid)+'　'+E(b.visit)+'</b><span class="g g-grey">'+(DC[b.drugClass]||"")+'</span>'+(b.filledBy==="family"?'<span class="g g-grey">家屬代填</span>':"");
   if(en.flags.today.length)gist+='<span class="g g-red">優先處理 <b>'+en.flags.today.length+'</b></span>';if(en.hasText)gist+='<span class="g g-vio">有話要說</span>';
   if(chg.length)gist+='<span class="g g-amb">惡化 <b>'+chg.length+'</b></span>';if(en.unfilled.length)gist+='<span class="g g-grey">未填 <b>'+en.unfilled.length+'</b></span>';
   if(!en.flags.today.length&&!en.hasText&&!chg.length)gist+='<span class="g g-ok">無須今日處理</span>';
-  gist+='<span class="g '+(l2?"g-vio":"g-grey")+'">'+(l2?"初審 "+E(l2.name)+(b.layer2.length>1?"（共 "+b.layer2.length+" 次）":""):"未初審")+'</span>'+(r.meta.closed?'<span class="g g-ok">已結案 '+E(b.layer3?b.layer3.name:"")+'</span>':"")+
+  gist+=(l2?'<span class="g g-vio">初審 '+E(l2.name)+(b.layer2.length>1?"（共 "+b.layer2.length+" 次）":"")+'</span>':"")+(r.meta.closed?'<span class="g g-ok">已結案 '+E(b.layer3?b.layer3.name:"")+'</span>':"")+
     '<span style="margin-left:auto" class="kbd">填寫 '+E(tsText(b.filledAt))+'　CTCAE '+E(b.ctcaeV)+'　v'+E(r.meta.ver||1)+'</span></div>';
   var L="",L2="",wt=(b.answers||{}).weight||{},wtx=(wt.baseline_kg&&wt.now_kg)?"（"+wt.baseline_kg+" → "+wt.now_kg+" kg，"+Math.round((wt.now_kg-wt.baseline_kg)/wt.baseline_kg*100)+"%）":"";
   if(en.flags.today.length)L+='<div class="box b-red"><h3>看診時優先處理</h3><ul>'+en.flags.today.map(function(f){return "<li>"+E(f.text)+(/體重/.test(f.text)?E(wtx):"")+"</li>";}).join("")+'</ul></div>';
-  if(en.hasText){L+='<div class="box b-cc"><h3>病人自己說的話</h3>';if(String(cc.text||"").trim())L+='<p class="ccq">'+E(cc.text)+'</p>';if((b.mediaFailed||[]).indexOf("audio")>=0)L+='<p class="msg" style="color:var(--err)">⚠️ 病人錄了音但檔案沒存成功，請直接聯絡病人。</p>';L+='</div>';}
+  if(en.hasText){L+='<div class="box b-cc"><h3>病人自己說的話</h3>';if(String(cc.text||"").trim())L+='<p class="ccq">'+E(cc.text)+'</p>'+ccNoteHtml(b);if((b.mediaFailed||[]).indexOf("audio")>=0)L+='<p class="msg" style="color:var(--err)">⚠️ 病人錄了音但檔案沒存成功，請直接聯絡病人。</p>';L+='</div>';}
   if(chg.length)L+='<div class="box b-amb"><h3>比上次惡化（'+E(tsText(en.prev.filledAt))+'）</h3><ul>'+chg.map(function(d){return "<li>"+E(d.term)+"　"+d.was+" → <b>"+d.now+"</b></li>";}).join("")+'</ul></div>';
   if(e.triggers.length)L2+='<div class="box b-amb"><h3>建議安排的檢查</h3><ul>'+e.triggers.map(function(t){return "<li>"+E(t)+"</li>";}).join("")+'</ul></div>';
-  var unk=[];if(en.unfilled.length)unk.push("未填："+en.unfilled.join("、"));if(en.flags.unknown.length)unk.push("資料不足："+en.flags.unknown.map(function(f){return f.text;}).join("；"));
-  if(unk.length)L2+='<div class="box b-grey"><h3>判不出來（未填 ≠ 沒症狀）</h3><ul>'+unk.map(function(u){return "<li>"+E(u)+"</li>";}).join("")+'</ul></div>';
+  var unkL=[];if(en.unfilled.length)unkL.push("未填："+en.unfilled.join("、"));en.flags.unknown.forEach(function(f){unkL.push("資料不足："+f.text);});
+  if(unkL.length){var uh=unkL.slice(0,2).map(function(u){return "<li>"+E(u)+"</li>";}).join(""),ut=unkL.slice(2);
+    L2+='<div class="box b-grey"><h3>判不出來（未填 ≠ 沒症狀）</h3><ul>'+uh+'</ul>'+(ut.length?'<details class="more"><summary>其餘 '+ut.length+' 項</summary><ul>'+ut.map(function(u){return "<li>"+E(u)+"</li>";}).join("")+'</ul></details>':"")+'</div>';}
   var L3="";(b.layer2||[]).forEach(function(l,i){L3+='<div class="box b-cc"><h3>第二層　個管師初審'+(b.layer2.length>1?"（第 "+(i+1)+" 次）":"")+'</h3><div class="kv"><dt>初審</dt><dd>'+E(l.name)+'　'+E(tsText(l.at))+'</dd><dt>緊急度</dt><dd>'+E(URG[l.urgency]||l.urgency)+'　'+(l.contacted?"已電聯":"未電聯")+(l.signal?"　"+E(SIG[l.signal]||l.signal):"")+'</dd>'+
     (l.terms&&l.terms.length?'<dt>對應詞條</dt><dd>'+E(l.terms.join("、"))+'</dd>':"")+(l.note?'<dt>加註</dt><dd>'+E(l.note)+'</dd>':"")+'</div></div>';});
   if(b.layer3)L3+='<div class="box b-ok"><h3>第三層　醫師確認</h3><div class="kv"><dt>確認</dt><dd>'+E(b.layer3.name)+'　'+E(tsText(b.layer3.at))+'</dd><dt>等級</dt><dd>'+E(Object.keys(b.layer3.grades).sort().map(function(k){return k+" G"+b.layer3.grades[k];}).join("、")||"—")+'</dd>'+(b.layer3.plan?'<dt>處置</dt><dd>'+E(b.layer3.plan)+'</dd>':"")+'</div></div>';
   L3+='<details class="more"><summary>第一層　病人填答全文（唯讀，任何人都不可改寫）</summary>'+rawAnswers(b)+'</details>';
   var all=e.determinable.concat(e.floor_only,e.cannot_grade),act=all.filter(function(z){return z.actionable;}),rest=all.filter(function(z){return !z.actionable;});
-  var R='<p class="mini"><b>下面不是分級，是證據。</b>最終等級要醫師點過才成立；虛線框尚未確認，不會進入任何申請或通報。</p>'+byOrgan(act,b)+(rest.length?'<details class="more"><summary>另有 '+rest.length+' 項無相關回報（依定義仍不能排除）</summary>'+byOrgan(rest,b)+'</details>':"");
-  if(canReview()&&!r.meta.closed)R+='<h4 class="ph4">病人說的話對應到哪些詞條</h4><input id="pmTf" class="q" placeholder="輸入關鍵字篩選，例如 myas / hepat"><div class="chips" id="pmChips"></div>';
+  var R='<p class="mini"><b>以下是證據，不是分級</b>・等級由醫師確認（虛線框＝尚未確認）</p>'+byOrgan(act,b)+(rest.length?'<details class="more"><summary>另有 '+rest.length+' 項無相關回報（依定義仍不能排除）</summary>'+byOrgan(rest,b)+'</details>':"");
+  if(canReview()&&!r.meta.closed)R+='<details class="more pm-terms"><summary>對應詞條（選填）'+(TERMS.length?'・已選 '+TERMS.length:"")+'</summary><input id="pmTf" class="q" placeholder="輸入關鍵字篩選，例如 myas / hepat"><div class="chips" id="pmChips"></div></details>';
   var bar='';
-  if(canReview()&&!r.meta.closed)bar+='<details class="more pmscript"><summary>標準化追蹤腳本（電話補問四步，來自 prom_v2）</summary><ol>'+
+  var scr='';if(canReview()&&!r.meta.closed)scr+='<details class="more pmscript"><summary>標準化追蹤腳本（電話補問四步，來自 prom_v2）</summary><ol>'+
     '<li><b>訊號驗證</b>「您好，我是個管師。您前幾天用手機填的紀錄裡提到'+E((en.triage.why||[]).slice(0,2).join("、")||"一些不舒服")+'，現在還是這樣嗎？」→ 下方「訊號」選真實或誤報（填錯、家屬代填理解不同）。</li>'+
     '<li><b>功能評估</b>「這個不舒服有沒有影響到您煮飯、買菜、打電話？洗澡、穿衣、吃飯、上廁所呢？」→ 對應 ADL 兩題（工具性／自我照顧），紀錄裡若沒填請補問。</li>'+
     '<li><b>支持盤點</b>「這幾天家裡有人陪嗎？藥有在吃嗎？下次回診是哪天？」→ 寫在加註。</li>'+
-    '<li><b>行動</b>常規＝看診時再談；優先＝請提早回診或先安排檢查；緊急＝請直接就醫或急診，並在「緊急度」選緊急（清單會升為紅色）。</li></ol></details>'+
-    '<div class="actbar"><span class="kbd">第二層</span><select id="pmUrg">'+["routine","priority","urgent"].map(function(v){return '<option value="'+v+'"'+((l2||{}).urgency===v?" selected":"")+'>'+URG[v]+'</option>';}).join("")+'</select>'+
-    '<select id="pmSig">'+["","real","false_alarm"].map(function(v){return '<option value="'+v+'"'+((l2||{}).signal===v?" selected":"")+'>'+SIG[v]+'</option>';}).join("")+'</select><label><input type="checkbox" id="pmCt"'+((l2||{}).contacted?" checked":"")+'> 已電聯</label>'+
-    '<input id="pmNote" placeholder="加註（例如電話補問到什麼）"><button class="btn" type="button" id="pmRev">送出初審</button><button class="btn go" type="button" id="pmRevNext">送出初審 → 下一位</button></div>';
+    '<li><b>行動</b>常規＝看診時再談；優先＝請提早回診或先安排檢查；緊急＝請直接就醫或急診，並在「緊急度」選緊急（清單會升為紅色）。</li></ol></details>';
+  if(canReview()&&!r.meta.closed)bar+='<div class="actbar"><span class="kbd">初審</span><select id="pmUrg">'+["routine","priority","urgent"].map(function(v){return '<option value="'+v+'"'+((l2||{}).urgency===v?" selected":"")+'>'+URG[v]+'</option>';}).join("")+'</select>'+
+    '<details class="pm-more" id="pmOptBox"><summary class="btn">訊號／電聯</summary><div class="pm-menu up"><label>訊號　<select id="pmSig">'+["","real","false_alarm"].map(function(v){return '<option value="'+v+'"'+((l2||{}).signal===v?" selected":"")+'>'+SIG[v]+'</option>';}).join("")+'</select></label><label><input type="checkbox" id="pmCt"'+((l2||{}).contacted?" checked":"")+'> 已電聯</label></div></details>'+
+    '<input id="pmNote" placeholder="加註（例如電話補問到什麼）"><button class="btn" type="button" id="pmRev">送出初審</button><button class="btn go" type="button" id="pmRevNext" title="快捷鍵：Enter">送出初審 → 下一位</button></div>';
   if(canConfirm()&&!r.meta.closed)bar+='<div class="actbar"><span class="kbd">第三層</span><span class="cnt" id="pmCnt">尚未點選任何等級</span><input id="pmPlan" placeholder="處置（選填）"><button class="btn go" type="button" id="pmOk">確認並結案</button><button class="btn" type="button" id="pmChart">複製到病歷</button></div>';
   if(r.meta.closed)bar+='<div class="actbar"><span class="kbd">已結案</span><button class="btn" type="button" id="pmChart">複製到病歷</button>'+(x().isAdmin()?'<button class="btn warn" type="button" id="pmReopen">重開（主持人）</button>':"")+'</div>';
-  bar+='<div class="actbar"><button class="btn" type="button" id="pmClose">關閉</button>'+(x().isAdmin()?'<button class="btn warn" type="button" id="pmDel">刪除紀錄（主持人）</button>':"")+'<span class="kbd"><b>j</b>/<b>k</b> 換病人　<b>↑</b>/<b>↓</b> 換項目　<b>0</b>–<b>4</b> 給級　<b>i</b> 原文　<b>Enter</b> 確認</span></div>';
-  $("#pmDet").innerHTML=gist+'<div class="pm-sum"><div>'+(L||'<div class="box b-ok"><h3>無須今日處理</h3><p class="mini">沒有紅旗、沒有病人留言、沒有惡化。</p></div>')+'</div><div>'+L2+'</div></div><div class="pm-ev">'+R+'</div>'+(L3?'<details class="more pm-hist"><summary>紀錄：初審／醫師確認／病人填答全文</summary>'+L3+'</details>':"")+'<div class="pm-foot">'+bar+'</div>';FOCUS=0;drawChips();wire(r,en);paintFocus();}
+  var tail='<div class="actbar pm-tail"><button class="btn" type="button" id="pmClose">關閉</button>'+(x().isAdmin()?'<button class="btn warn" type="button" id="pmDel">刪除紀錄（主持人）</button>':"")+'<span class="kbd"><b>j</b>/<b>k</b> 換病人　<b>↑</b>/<b>↓</b> 換項目　<b>0</b>–<b>4</b> 給級　<b>i</b> 原文　<b>Enter</b> '+(canConfirm()?"確認並結案":"送出初審 → 下一位")+'</span></div>';
+  $("#pmDet").innerHTML=gist+'<div class="pm-sum"><div>'+(L||'<div class="box b-ok"><h3>無須今日處理</h3><p class="mini">沒有紅旗、沒有病人留言、沒有惡化。</p></div>')+'</div><div>'+L2+'</div></div><div class="pm-ev">'+R+'</div>'+scr+(L3?'<details class="more pm-hist"><summary>紀錄：初審／醫師確認／病人填答全文</summary>'+L3+'</details>':"")+tail+'<div class="pm-foot">'+bar+'</div>';FOCUS=0;drawChips();wire(r,en);paintFocus();}
 function byOrgan(list,b){if(!list.length)return '<p class="mini">（無）</p>';var g={};list.forEach(function(z){(g[z.soc]=g[z.soc]||[]).push(z);});
   var order=["肺","心臟","腸胃","肝膽","內分泌","神經","腎臟","皮膚","眼睛","肌肉骨骼","血液","代謝營養","全身","其他"],h="";
   order.forEach(function(soc){if(!g[soc])return;h+='<div class="soc"><div class="soch">'+E(soc)+'<span class="n">'+g[soc].length+' 項</span></div>';g[soc].forEach(function(z){h+=termRow(z,b);});h+='</div>';});return h;}
 function termRow(z,b){var conf=((b.layer3||{}).grades||{})[z.term],l2=lastReview(b),sug=((l2||{}).suggest||{})[z.term],mine=PICK[z.term];
   var brief=z.missing.length?("缺 "+z.missing.length+" 項"):(z.floor===z.ceiling?"證據已足":"");
-  var h='<div class="trow" data-term="'+E(z.term)+'"><span class="tname">'+E(z.term)+(brief?'<small>'+E(brief)+(z.note?"・"+E(z.note.slice(0,42))+(z.note.length>42?"…":""):"")+'</small>':"")+'</span>'+
+  var h='<div class="trow" data-term="'+E(z.term)+'"><span class="tname">'+E(ZH[z.term]||z.term)+(function(){var zh=ZH[z.term],sub=(zh?z.term:"")+(zh&&brief?"・":"")+(brief?brief+(z.note?"・"+z.note.slice(0,42)+(z.note.length>42?"…":""):""):"");return sub?'<small>'+E(sub)+'</small>':"";})()+'</span>'+
     '<span class="rng">'+(z.floor===z.ceiling?("G"+z.floor):("G"+z.floor+"–G"+z.ceiling))+'</span>'+(sug!=null?'<span class="g g-vio">個管 '+E(sug)+'</span>':"")+(conf!=null?'<span class="g g-ok">確認 '+E(conf)+'</span>':"")+
     '<span class="grades">'+[0,1,2,3,4].map(function(gg){if(gg>z.ceiling)return "";return '<button type="button" class="gb'+((mine!=null&&String(mine)===String(gg))?" on":"")+((sug!=null&&String(sug)===String(gg))?" sugg":"")+'" data-g="'+gg+'">'+gg+'</button>';}).join("")+'</span>'+
     '<button type="button" class="info" title="原文與缺口">ⓘ</button></div>';
@@ -5527,8 +5694,9 @@ function termRow(z,b){var conf=((b.layer3||{}).grades||{})[z.term],l2=lastReview
 function rawAnswers(b){var h='<div class="kv" style="margin-top:8px">';PROM_PANEL.items.forEach(function(it){var s=(b.answers||{})[it.id]||{},p=[];(it.q||[]).forEach(function(q){var v=s[q.id];if(v===undefined||v===null||v==="")return;
     p.push(q.text.replace(/[？?].*$/,"")+"＝"+(q.type==="choice"?(q.opts||[])[v]:q.type==="yesno"?(v?"有":"沒有"):v+(q.unit||"")));});if(s.bsa!=null)p.push("體表面積約 "+s.bsa+"%");if(p.length)h+="<dt>"+(it.icon||"")+" "+E(it.label)+"</dt><dd>"+E(p.join("；"))+"</dd>";});
   var a=b.answers||{};h+="<dt>🏠 日常活動</dt><dd>工具性："+(a.adl_i===1?"有做不來的":a.adl_i===0?"都做得來":"未填")+"　自我照顧："+(a.adl_s===1?"有做不來的":a.adl_s===0?"都做得來":"未填")+"</dd></div>";return h;}
+var ZH={"Fatigue":"疲倦","Fever":"發燒","Diarrhea":"腹瀉","Colitis":"結腸炎","Dyspnea":"呼吸困難","Cough":"咳嗽","Pneumonitis":"肺臟炎","Rash maculo-papular":"皮疹","Pruritus":"搔癢","Nausea":"噁心","Vomiting":"嘔吐","Anorexia":"食慾不振","Arthralgia":"關節痛","Myalgia":"肌肉痛","Myositis":"肌炎","Thyroiditis":"甲狀腺炎","Hypothyroidism":"甲狀腺功能低下","Hyperthyroidism":"甲狀腺功能亢進","Adrenal insufficiency":"腎上腺功能不足","Hypophysitis":"腦下垂體炎","Myocarditis":"心肌炎","Uveitis":"葡萄膜炎","Peripheral sensory neuropathy":"周邊感覺神經病變","Peripheral motor neuropathy":"周邊運動神經病變","Dry eye":"乾眼","Blurred vision":"視力模糊","Keratitis":"角膜炎","Mucositis oral":"口腔黏膜炎","Dysphagia":"吞嚥困難","Aspiration":"吸入（嗆咳）","Esophageal pain":"食道痛","Esophagitis":"食道炎","Weight loss":"體重減輕","Pain":"疼痛","Dehydration":"脫水","Dermatitis radiation":"放射性皮膚炎","Hoarseness":"聲音沙啞","Constipation":"便秘","Hepatitis":"肝炎"};
 var EXTRA=["Myocarditis","Myositis","Uveitis","Encephalitis","Meningoencephalitis","Myasthenia gravis","Guillain-Barre syndrome","Hepatitis","Thyroiditis","Hypophysitis","Adrenal insufficiency","Tubulointerstitial nephritis","Glomerulonephritis","Dysphagia","Esophagitis","Weight loss","Dehydration","Immune system disorders - Other, specify"];
-function drawChips(){var host=$("#pmChips");if(!host)return;var q=(($("#pmTf")||{}).value||"").toLowerCase(),seen={},list=[];
+function drawChips(){var host=$("#pmChips");if(!host)return;var sm=$(".pm-terms summary");if(sm)sm.textContent="對應詞條（選填）"+(TERMS.length?"・已選 "+TERMS.length:"");var q=(($("#pmTf")||{}).value||"").toLowerCase(),seen={},list=[];
   TERMS.forEach(function(t){if(!seen[t]){seen[t]=1;list.push(t);}});PROM_PANEL.items.forEach(function(i){if(!seen[i.term]){seen[i.term]=1;list.push(i.term);}});EXTRA.forEach(function(t){if(!seen[t]){seen[t]=1;list.push(t);}});
   var show=list.filter(function(t){return !q||t.toLowerCase().indexOf(q)>=0;}),head=show.slice(0,10),tail=show.slice(10);
   function chip(t){return '<button type="button" class="chip'+(TERMS.indexOf(t)>=0?" on":"")+'" data-t="'+E(t)+'">'+E(t)+'</button>';}
@@ -5539,7 +5707,7 @@ function paintFocus(){var rs=rowsEl();rs.forEach(function(el,i){el.classList.tog
 function updCnt(){var n=Object.keys(PICK).length,el=$("#pmCnt");if(el)el.textContent=n?("已點選 "+n+" 項等級"):"尚未點選任何等級";}
 function wire(r,en){rowsEl().forEach(function(row){var term=row.dataset.term;$$(".gb",row).forEach(function(bt){bt.onclick=function(){$$(".gb",row).forEach(function(z){z.classList.remove("on");});bt.classList.add("on");PICK[term]=parseInt(bt.dataset.g,10);updCnt();};});
     var inf=$(".info",row);if(inf)inf.onclick=function(){row.nextElementSibling.classList.toggle("hid");};row.onclick=function(ev){if(ev.target.closest(".gb")||ev.target.closest(".info"))return;FOCUS=rowsEl().indexOf(row);paintFocus();};});
-  var tf=$("#pmTf");if(tf)tf.oninput=drawChips;$("#pmClose").onclick=function(){SEL=null;$("#pmDet").innerHTML="";PICK={};TERMS=[];};
+  var tf=$("#pmTf");if(tf)tf.oninput=drawChips;$("#pmClose").onclick=function(){SEL=null;NOAUTO=true;$("#pmDet").innerHTML="";PICK={};TERMS=[];$$("#pmTbl tr.prow").forEach(function(z){z.classList.remove("on");});};
   var rv=$("#pmRev");if(rv)rv.onclick=function(){review(r.id,{note:$("#pmNote").value,contacted:$("#pmCt").checked,urgency:$("#pmUrg").value,signal:$("#pmSig").value,terms:TERMS,suggest:PICK}).then(function(){toast("已初審（第二層疊加一筆），初審者 "+meName());PICK={};TERMS=[];EN=ens();drawKpi();drawList();drawDetail(r.id);}).catch(function(e){toast(e.message||x().cErr(e));});};
   var rn=$("#pmRevNext");if(rn)rn.onclick=function(){var ids=listIds(),i=ids.indexOf(r.id),nx=ids[i+1]||ids[i-1]||null;
     review(r.id,{note:$("#pmNote").value,contacted:$("#pmCt").checked,urgency:$("#pmUrg").value,signal:$("#pmSig").value,terms:TERMS,suggest:PICK}).then(function(){toast("已初審，下一位 "+(nx?RECS[nx].body.pid:"（沒有了）"));PICK={};TERMS=[];EN=ens();SEL=nx;drawKpi();drawList();if(nx)drawDetail(nx);else $("#pmDet").innerHTML='<p class="pm-empty">這一診的病人都看完了。</p>';}).catch(function(e){toast(e.message||x().cErr(e));});};
@@ -5558,15 +5726,21 @@ document.addEventListener("keydown",function(ev){if(!VIEW||!S())return;if(/^(INP
   var rs=rowsEl();if(!rs.length)return;if(ev.key==="ArrowDown"){ev.preventDefault();FOCUS=Math.min(FOCUS+1,rs.length-1);paintFocus();return;}if(ev.key==="ArrowUp"){ev.preventDefault();FOCUS=Math.max(FOCUS-1,0);paintFocus();return;}
   if(ev.key==="i"){ev.preventDefault();var d=rs[FOCUS].nextElementSibling;if(d)d.classList.toggle("hid");return;}
   if(/^[0-4]$/.test(ev.key)){var bt=$('.gb[data-g="'+ev.key+'"]',rs[FOCUS]);if(bt){ev.preventDefault();bt.click();}return;}
-  if(ev.key==="Enter"){var o=$("#pmOk");if(o){ev.preventDefault();o.click();}}});
-function ensureButton(){if($("#bProm"))return;var b=document.createElement("button");b.className="btn";b.type="button";b.id="bProm";b.textContent="PROM 症狀";var u=$("#bUsers");u.parentNode.insertBefore(b,u);
+  if(ev.key==="Enter"){if(/^(BUTTON|A|SUMMARY)$/.test(ev.target.tagName||""))return;var o=$("#pmOk")||$("#pmRevNext");if(o){ev.preventDefault();o.click();}}});
+document.addEventListener("keydown",function(ev){if(ev.key==="Escape")$$("details.pm-more[open]").forEach(function(d){d.removeAttribute("open");});});
+document.addEventListener("click",function(ev){$$("details.pm-more[open]").forEach(function(d){if(!d.contains(ev.target))d.removeAttribute("open");});});
+function ensureButton(){if($("#bProm"))return;var b=document.createElement("button");b.className="btn";b.type="button";b.id="bProm";b.textContent="PROM 症狀";var u=$("#acctBox")||$("#bUsers");u.parentNode.insertBefore(b,u);
   b.onclick=function(){if(S()&&S().offline){render();return;}$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取 PROM 中…</p></section>';loadAll().then(function(){return regrantStale();}).then(function(n){return revokeStale().then(function(g){if(g)toast("已收回 "+g+" 位已離開／改角色成員的 PROM 金鑰");return n;});}).then(function(n){if(n)toast("已自動把 PROM 金鑰重新授權給 "+n+" 位更新過金鑰的成員");render();},function(e){toast(e.message||x().cErr(e));});};}
-function onSession(){var s=S();if(!s)return;VIEW=false;if(clin()){document.body.classList.add("prom-only");render();}else{document.body.classList.remove("prom-only");if(x().isAdmin())ensureButton();var b=$("#bProm");if(b)b.hidden=!x().isAdmin()||(!!s.offline&&!LOADED);}}
-function onLeave(){VIEW=false;document.body.classList.remove("prom-view");}
-function onLock(){VIEW=false;LOADED=false;PK=null;RECS={};ORDER=[];SEL=null;document.body.classList.remove("prom-only");var b=$("#bProm");if(b)b.hidden=true;}
+function tidyHeader(){var lk=$("#bLock");if(!lk||$("#acctBox"))return;var items=["#bUsers","#bRec","#bPw"].map(function(q){return $(q);}).filter(Boolean);if(items.length<2)return;
+  var d=document.createElement("details");d.className="pm-more";d.id="acctBox";d.innerHTML='<summary class="btn" id="acctSum">帳號 ▾</summary><div class="pm-menu"></div>';lk.parentNode.insertBefore(d,lk);var m=d.querySelector(".pm-menu");items.forEach(function(b){m.appendChild(b);b.addEventListener("click",function(){d.removeAttribute("open");});});}
+function onSession(){var s=S();if(!s)return;VIEW=false;var h1=document.querySelector("h1");if(h1){if(!h1.dataset.orig)h1.dataset.orig=h1.textContent;h1.textContent=clin()?"PROM 症狀":h1.dataset.orig;}
+  if(x().isAdmin())tidyHeader();
+  if(clin()){document.body.classList.add("prom-only");render();}else{document.body.classList.remove("prom-only");if(x().isAdmin())ensureButton();var b=$("#bProm");if(b)b.hidden=!x().isAdmin()||(!!s.offline&&!LOADED);}}
+function onLeave(){VIEW=false;document.body.classList.remove("prom-view");document.documentElement.style.fontSize="";var pb=$("#bProm");if(pb)pb.classList.remove("on");}
+function onLock(){VIEW=false;LOADED=false;PK=null;RECS={};ORDER=[];SEL=null;document.documentElement.style.fontSize="";document.body.classList.remove("prom-only");var h1=document.querySelector("h1");if(h1&&h1.dataset.orig)h1.textContent=h1.dataset.orig;var b=$("#bProm");if(b)b.hidden=true;}
 return {loadAll:loadAll,render:render,onSession:onSession,onLock:onLock,onLeave:onLeave,grant:grant,revoke:revoke,regrantStale:regrantStale,revokeStale:revokeStale,loadDemo:loadDemo,importPayload:importPayload,review:review,confirm:confirm,reopen:reopen,remove:remove,create:create,
-  issueToken:issueToken,revokeToken:revokeToken,listTokens:listTokens,tokLink:tokLink,consumeInbox:consumeInbox,writeRecipients:writeRecipients,lastConsume:lastConsume,purgeInbox:purgeInbox,loadFromBackup:loadFromBackup,qrSvg:qrSvg,
-  core:{enrich:enrich,applyReview:applyReview,applyConfirm:applyConfirm,newBody:newBody,chartText:chartText,inScope:inScope,unfilledOf:unfilledOf,deltasOf:deltasOf,demoBodies:demoBodies,lastReview:lastReview},
+  issueToken:issueToken,revokeToken:revokeToken,cleanScan:cleanScan,cleanApply:cleanApply,openCleanTest:openCleanTest,listTokens:listTokens,tokLink:tokLink,consumeInbox:consumeInbox,writeRecipients:writeRecipients,lastConsume:lastConsume,purgeInbox:purgeInbox,loadFromBackup:loadFromBackup,qrSvg:qrSvg,
+  core:{testCandidates:testCandidates,ccDiscord:ccDiscord,ccStats:ccStats,ccMentions:ccMentions,CC_RULES:CC_RULES,enrich:enrich,applyReview:applyReview,applyConfirm:applyConfirm,newBody:newBody,chartText:chartText,inScope:inScope,unfilledOf:unfilledOf,deltasOf:deltasOf,demoBodies:demoBodies,lastReview:lastReview},
   _t:{staleKeyUids:staleKeyUids,seal:seal,openCt:openCt,setKey:function(k){PK=k;},recs:function(){return RECS;},order:function(){return ORDER;},setScope:function(s){SCOPE=s;},setFilt:function(f){FILT=f;},listIds:function(){EN=ens();return listIds();}}};
 })();
 
