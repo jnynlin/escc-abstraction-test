@@ -123,6 +123,30 @@ input.f:focus{outline:none;border-color:var(--teal)}
    那是 WCAG 2.4.7 的違反。改用 :focus-visible 保留滑鼠時的乾淨外觀。 */
 :focus-visible{outline:3px solid var(--teal);outline-offset:2px;border-radius:4px}
 button:focus-visible,.opt:focus-visible,.chip:focus-visible{outline-offset:3px}
+
+/* ---- 清單流程（P12） ---- */
+.lh{font-size:26px;margin:6px 0 4px}
+.lrow{margin:14px 0;padding:16px;border:2px solid var(--edge);border-radius:14px;background:var(--card);scroll-margin-top:96px}
+.lrow.need{border-color:var(--red);box-shadow:0 0 0 3px var(--red-bg)}
+.lq b{display:block;font-size:22px;line-height:1.35}.lq span{display:block;color:var(--ink2);font-size:17px;line-height:1.5;margin-top:2px}
+.lseg{display:grid;grid-template-columns:1fr 1fr .9fr;gap:10px;margin-top:12px}
+.lseg button{min-height:60px;border-radius:12px;border:2px solid var(--edge);background:var(--card);color:var(--ink);font:inherit;font-size:21px;cursor:pointer}
+.lseg button.u{font-size:18px;border-style:dashed}
+.lseg button[aria-pressed=true].y{background:var(--teal);border-color:var(--teal);color:#fffdfa;font-weight:700}
+.lseg button[aria-pressed=true].n{background:#3f3b36;border-color:#3f3b36;color:#fffdfa;font-weight:700}
+.lseg button[aria-pressed=true].u{background:var(--amber-bg);border-color:var(--amber);color:var(--amber);font-weight:700}
+.lalert{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:var(--red-bg);color:var(--red);font-size:17px;line-height:1.5}
+.lalert.u{background:var(--amber-bg);color:var(--amber)}
+.lall{display:block;width:100%;min-height:56px;margin:8px 0 4px;border-radius:12px;border:2px dashed var(--teal);background:var(--card);color:var(--teal-d);font:inherit;font-size:19px;font-weight:700;cursor:pointer}
+.lconfirm{margin:8px 0 4px;padding:14px;border:2px solid var(--teal);border-radius:14px;background:var(--teal-bg)}.lconfirm p{margin:0 0 10px;font-weight:700}
+.lconfirm .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.lconfirm .btn{font-size:19px;min-height:56px}.lconfirm .btn.ghost{flex:1}
+.redblk{margin:12px 0;padding:16px;border:2px solid var(--red);border-radius:14px;background:var(--card)}.redblk.need{box-shadow:0 0 0 4px var(--red-bg)}
+.redblk h3{margin:0 0 4px;font-size:22px}.redblk p{margin:0 0 8px;font-size:17px;color:var(--ink2)}
+.rr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin:10px 0}.rr b{display:block;font-size:19px;line-height:1.3}
+.rr .lseg{margin:0;grid-template-columns:repeat(3,76px)}.rr .lseg button{min-height:52px;font-size:19px}
+@media (max-width:440px){.rr{grid-template-columns:1fr}.rr .lseg{grid-template-columns:repeat(3,1fr)}}
+.lsum{margin:12px 0;padding:14px 16px;border:2px solid var(--line);border-radius:14px}.lsum h3{margin:0 0 6px;font-size:20px}
+.lsum ul{margin:0;padding-left:1.2em}.lsum li{margin:3px 0}.lsum li small{display:block;color:var(--ink2);font-size:16px}.lsum p{margin:0;color:var(--ink2)}
 </style></head><body>
 
 <div id="top" class="hid"><div id="bar"><div id="fill"></div></div>
@@ -271,6 +295,7 @@ radios($('#dclass'),[{v:'io',t:'免疫治療（IO）'},{v:'adc',t:'抗體藥物�
 
 /* ---------- 建立題目流程 ---------- */
 function buildSteps(){
+  if(LISTFLOW){STEPS=buildListSteps();return;}
   STEPS=[{kind:'cc'}];
   PANEL.items.forEach(function(it){
     if(applies(it))
@@ -282,7 +307,7 @@ function buildSteps(){
 /* ---------- 取值/存值 ---------- */
 function val(item,q){return (A[item]||{})[q]}
 function setv(item,q,v){ (A[item]=A[item]||{})[q]=v; save(); }
-function save(){ if(TOKEN) LS.set('prom.draft.'+TOKEN,{A:A,i:I,login:LOGIN,visit:VISIT,at:Date.now()}); }
+function save(){ if(TOKEN) LS.set('prom.draft.'+TOKEN,{A:A,i:I,login:LOGIN,visit:VISIT,LA:LA,RO:REDOK,at:Date.now()}); }
 
 function visible(it,q){
   if(!q.when) return true;
@@ -304,6 +329,7 @@ function render(){
   $('#back').disabled=(I===0);
   $('#next').textContent=(I===STEPS.length-1)?'看一下再送出':'下一步';
   st.innerHTML='';
+  if(LISTFLOW){listHeader(s);FUROOT=null;if(s.kind==='list'){renderList(st,s);window.scrollTo(0,0);return;}if(s.kind==='fu'){renderFU(st,s);window.scrollTo(0,0);return;}}
   if(s.kind==='cc') return renderCC(st);
   if(s.kind==='adl') return renderADL(st);
   renderItem(st,s.item);
@@ -359,7 +385,7 @@ function renderItem(st,it){
 }
 
 function paint(it,q){
-  var host=document.querySelector('[data-q="'+q.id+'"]');
+  var host=((typeof FUROOT!=='undefined'&&FUROOT&&FUROOT[it.id])||document).querySelector('[data-q="'+q.id+'"]');
   if(!host) return;
   if(!visible(it,q)){host.innerHTML='';host.classList.add('hid');return}
   host.classList.remove('hid');
@@ -547,6 +573,7 @@ function symptomsPresent(){
 
 /* ---------- 確認頁 ---------- */
 function renderReview(){
+  if(LISTFLOW) return renderListReview();
   var h='', cc=(A.cc||{}).text||'';
   if(cc||MEDIA.audio){
     h+='<div class="rvrow"><span class="rvq">您自己說的</span><span class="rva">'+
@@ -585,16 +612,17 @@ function renderReview(){
 
 /* ---------- 送出 ---------- */
 function buildBody(){
-  var answers=JSON.parse(JSON.stringify(A)); delete answers.cc;
+  var answers=LISTFLOW?listAnswers():JSON.parse(JSON.stringify(A)); delete answers.cc;
   var mediaFailed=[], audio=MEDIA.audio||'';
   if(audio&&audio.length>500000){ mediaFailed.push('audio'); audio=''; }   /* 收件匣密文上限 900k 字元；錄音太長就放棄錄音但作答照送 */
-  if(MEDIA.photo){ var pi=MEDIA.photoItem||'rash'; if(MEDIA.photo.length<=400000){ answers[pi]=answers[pi]||{}; answers[pi].photo=MEDIA.photo; } else mediaFailed.push('photo'); }
+  if(MEDIA.photo&&(!LISTFLOW||LA[MEDIA.photoItem||'rash']==='y')){ var pi=MEDIA.photoItem||'rash'; if(MEDIA.photo.length<=400000){ answers[pi]=answers[pi]||{}; answers[pi].photo=MEDIA.photo; } else mediaFailed.push('photo'); }
   return {filledBy:LOGIN.filled_by, drugClass:TREAT.indexOf('adc')>=0?'adc':'io', treatments:TREAT.slice(), visit:VISIT,
           cc:{text:(A.cc||{}).text||'', audio:audio||undefined, audioSec:MEDIA.audioSec||undefined}, answers:answers, mediaFailed:mediaFailed,
-          panelV:String(PROM_PANEL.version), ctcaeV:String(PROM_PANEL.ctcae_version)};
+          panelV:String(PROM_PANEL.version), ctcaeV:String(PROM_PANEL.ctcae_version), list:LISTFLOW?listMeta():undefined};
 }
 function sendBody(body){ return PROM_PATIENT.submit({sid:SID,tid:TOKEN,birth4:BIRTH,body:body,emu:PROM_EMU,options:PROM_OPTS}); }
 function doSubmit(){
+  if(LISTFLOW&&!listSubmitGate()) return;
   var body=buildBody();
   $('#next').disabled=true;$('#next').textContent='送出中…';
   sendBody(body).then(function(){ if(TOKEN) LS.del('prom.draft.'+TOKEN); VISIT=null; showDone(false); })
@@ -628,22 +656,283 @@ function showDone(offline,j){
   var h=(WATCH==='monitored')
     ? '醫療團隊會在您進診間前看到。'
     : '<b>醫師看診時會看到這份紀錄。</b>';
-  h+='<br>如果等一下想到還有別的，可以再填一次。';
+  h+='<br>如果等一下想到還有別的，可以再填一次。'; h+=(typeof listDoneNote==='function'?listDoneNote():'');
   h+='<div class="note" style="text-align:left;margin-top:18px;font-size:18px">'+
      esc(SAFETY.text)+
      '<div style="font-size:22px;font-weight:700;margin-top:8px">'+esc(SAFETY.phone)+'</div></div>';
   $('#donemsg').innerHTML=h;
 }
 
+/* ---- LISTMAP（list_map.js，建置時內嵌） ---- */
+/* 清單式問卷 → 正式題庫答案格式（P12 第 2 階段，2026-10-04）
+   原型（patient_v9）每一列只問「有／沒有／不確定」；這支把它翻成正式 body.answers（item→qid→值），
+   之後的分流、CTCAE 證據、紅旗、個管師／醫師畫面全部沿用現有程式，一行都不用改。
+   原則：
+   ・題目內容不動。答「有」之後問的是題庫原本的追問題（原文），不是新題目。
+   ・「沒有」只寫入「確實代表沒有」的欄位（gate 與 zero 清單）；數字題、工作人員欄位、不代表沒有的題（如 tube）不寫。
+   ・「不確定」什麼都不寫（= null = 判不出來），另記在 unsure；絕不寫成 0。
+   ・答「沒有／不確定」後，先前填過的追問答案一律捨棄（不留殘值）。
+   純函式、無 DOM；瀏覽器與 node 測試共用。 */
+var LISTMAP=(function(){
+  /* 列：id、顯示字（n 名稱、d 說明）、red=紅旗列、grp=原型分頁、tx=只在這些治療別出現、
+        gate=「有／沒有」直接對應的題（有→1、沒有→0）、own=答「有」之後要問的追問題、zero=答「沒有」時一併寫 0 的題。
+        by=依治療別走不同題組（eye_io／eye_adc）。 */
+  var ROWS=[
+   {id:"fever",grp:"red",red:1,n:"發燒",d:"體溫超過 38 度，或一陣冷一陣熱",item:"fever",gate:"present",own:["temp","over24"],zero:[]},
+   {id:"swallow",grp:"red",red:1,n:"吞嚥困難",d:"吞東西會痛、會卡住，連水都吞不下",item:"swallow",gate:"present",own:["diet","tube","pain_swallow","pain_sev","choke"],zero:[]},
+   {id:"breath",grp:"red",red:1,n:"喘或咳嗽",d:"走一小段路就喘，或咳得比平常多",item:"breath",gate:null,own:["exertion","cough","new_worse"],zero:["exertion","cough","new_worse"]},
+   {id:"weight",grp:"red",red:1,n:"體重掉很多",d:"最近一週變瘦，衣服變鬆",item:"weight",gate:null,own:["now_kg"],zero:[]},
+   {id:"blood",grp:"red",red:1,n:"血便或黏液便",d:"大便帶血，或有黏液",item:"diarrhea",gate:"blood",own:[],zero:[]},
+   {id:"hemo",grp:"red",red:1,n:"咳血或吐血",d:"咳出或吐出來的東西帶血",item:"swallow",gate:"hemoptysis",own:[],zero:[]},
+   {id:"weak",grp:"red",red:1,n:"肌肉沒力",d:"蹲下站不起來、手舉不高",item:"joint",gate:"weak",own:[],zero:[]},
+   {id:"chest",grp:"red2",red:1,n:"胸悶或胸痛",d:"胸口悶、被壓著，或會痛",tx:["io"],item:"cardiac",gate:"chest",own:[],zero:[]},
+   {id:"palp",grp:"red2",red:1,n:"心跳很快或不規則",d:"沒在運動卻心跳很快，或跳得很亂",tx:["io"],item:"cardiac",gate:"palpitation",own:[],zero:[]},
+   {id:"dizzy",grp:"red2",red:1,n:"站起來會頭暈、眼前發黑",d:"從坐著或躺著站起來的時候",tx:["io"],item:"endo",gate:"dizzy",own:[],zero:[]},
+   {id:"eyepain",grp:"red2",red:1,n:"眼睛痛、很紅或怕光",d:"眼睛會痛、很紅，或看到光不舒服",tx:["io","adc"],by:{io:{item:"eye_io",gate:null,own:["pain","photophobia"],zero:["pain","photophobia"]},adc:{item:"eye_adc",gate:null,own:["pain"],zero:["pain"]}}},
+   {id:"fatigue",grp:"A",n:"疲倦、沒力氣",d:"比平常容易累，休息也沒有好轉",item:"fatigue",gate:"present",own:["rest"],zero:[]},
+   {id:"nausea",grp:"A",n:"噁心、吃不下",d:"想吐，或只吃得下很少",item:"nausea",gate:null,own:["appetite","nausea","vomit"],zero:["appetite","nausea"]},
+   {id:"diarrhea",grp:"A",n:"拉肚子",d:"一天解很多次，或是水狀的",item:"diarrhea",gate:null,own:["baseline","now","consistency","abd_pain"],zero:["consistency","abd_pain"]},
+   {id:"constipation",grp:"A",n:"便秘",d:"超過兩天沒有解，或很用力才解得出來",tx:["chemo"],item:"constipation",gate:null,own:["sev"],zero:["sev"]},
+   {id:"dehyd",grp:"A",n:"口乾、尿很少",d:"一直很渴，或尿量明顯變少",item:"dehyd",gate:null,own:["dry_mouth","low_urine"],zero:["dry_mouth","low_urine"]},
+   {id:"pain",grp:"A",n:"疼痛",d:"胸口、背、肚子、喉嚨、骨頭等處的痛。手腳關節或肌肉的痠痛，請在下一項回答",item:"pain",gate:"present",own:["site","sev","analgesic","sleep"],zero:[]},
+   {id:"joint",grp:"A",n:"關節或肌肉痛",d:"手腳關節或肌肉的痠痛，走路、起身或抬手時更明顯",item:"joint",gate:null,own:["joint","muscle"],zero:["joint","muscle"]},
+   {id:"coldhot",grp:"A",n:"特別怕冷或怕熱",d:"比平常更怕冷，或一直覺得很熱",tx:["io"],item:"endo",gate:null,own:["cold_heat"],zero:["cold_heat"]},
+   {id:"thirst",grp:"A",n:"很容易口渴、一直跑廁所",d:"一直想喝水，尿很多次",tx:["io"],item:"endo",gate:"thirst",own:[],zero:[]},
+   {id:"swell",grp:"A",n:"腳腫",d:"腳踝或小腿腫起來",tx:["io"],item:"cardiac",gate:"swelling",own:[],zero:[]},
+   {id:"rash",grp:"B",n:"皮膚起疹子",d:"紅疹、小疙瘩，在身體任何地方",item:"rash",gate:"present",own:["symptom","extent","blister","photo"],zero:[]},
+   {id:"itch",grp:"B",n:"皮膚癢",d:"很想抓，影響睡眠或專心",item:"itch",gate:"present",own:["spread","constant","scratch_change","sleep"],zero:[]},
+   {id:"skin_rt",grp:"B",n:"照射部位的皮膚",d:"放射線照到的地方變紅、痛、脫皮或破皮",tx:["rt"],item:"skin_rt",gate:null,own:["look","photo"],zero:["look"]},
+   {id:"mouth",grp:"B",n:"嘴巴破",d:"口腔有破洞、潰瘍，吃東西會痛",tx:["chemo"],item:"mouth",gate:null,own:["sore"],zero:["sore"]},
+   {id:"voice",grp:"B",n:"聲音沙啞",d:"說話聲音變小、變啞",tx:["rt"],item:"voice",gate:null,own:["level"],zero:["level"]},
+   {id:"neuro",grp:"B",n:"手腳麻、刺痛",d:"手或腳麻麻的、像針刺，或沒力氣",tx:["chemo"],item:"neuro",gate:null,own:["sensory","button","walk","motor"],zero:["sensory","button","walk","motor"]},
+   {id:"blur",grp:"B",n:"視力變模糊",d:"看東西模糊，或有重影",tx:["io","adc"],by:{io:{item:"eye_io",gate:"vision",own:[],zero:[]},adc:{item:"eye_adc",gate:"blur",own:[],zero:[]}}},
+   {id:"dryeye",grp:"B",n:"眼睛乾澀、有異物感",d:"眼睛很乾，像有沙子",tx:["adc"],item:"eye_adc",gate:null,own:["dry"],zero:["dry"]},
+   {id:"adl_i",grp:"adl",n:"家事、買菜、打電話、管錢",d:"這些最近有沒有做不來",adl:"adl_i",own:[],zero:[]},
+   {id:"adl_s",grp:"adl",red:1,n:"洗澡、穿衣、吃飯、上廁所、吃藥",d:"這些最近有沒有做不來",adl:"adl_s",own:[],zero:[]}
+  ];
+  var BSAKEYS=["head","chestF","backB","armL","armR","legL","legR","groin"];   // 與病人頁 BSA 表同一組鍵
+  var ADDON_OF_TX=function(row,tx){return !row.tx||row.tx.some(function(t){return tx.indexOf(t)>=0;});};
+  function make(panel){
+    var PI={};panel.items.forEach(function(it){PI[it.id]=it;});
+    function Q(item,qid){var it=PI[item];if(!it)return null;for(var i=0;i<it.q.length;i++)if(it.q[i].id===qid)return it.q[i];return null;}
+    /* 這列在這個治療別下實際寫哪些（item／gate／own／zero）；by 型依治療別展開，可能不只一組 */
+    function targets(r,tx){
+      if(r.adl)return [{adl:r.adl,own:[],zero:[]}];
+      if(r.by)return Object.keys(r.by).filter(function(t){return tx.indexOf(t)>=0;}).map(function(t){return r.by[t];});
+      return [r];
+    }
+    function rowsFor(tx){tx=tx||[];return ROWS.filter(function(r){return ADDON_OF_TX(r,tx);});}
+    /* 與病人端 patient.html 的 visible() 同一套：追問題的 when 條件 */
+    function visibleQ(q,sub){
+      if(!q.when)return true;
+      var m=q.when.match(/^(\w+)(>=|<=|==|>|<)?(-?[\d.]+)?$/);if(!m)return true;
+      var v=(sub||{})[m[1]];if(v===undefined||v===null||v==='')return false;
+      if(!m[2])return !!v;var n=parseFloat(m[3]);
+      return m[2]==='>='?v>=n:m[2]==='<='?v<=n:m[2]==='=='?v==n:m[2]==='>'?v>n:v<n;
+    }
+    /* 答「有」(y) 的列要追問的題庫原題，依列序、題序；UI 再用 visibleQ 決定當下要不要出現 */
+    function askFor(L){var tx=L.tx||[],out=[];
+      rowsFor(tx).forEach(function(r){if(((L.a||{})[r.id])!=="y")return;
+        targets(r,tx).forEach(function(t){if(t.adl)return;(t.own||[]).forEach(function(qid){out.push({row:r.id,item:t.item,qid:qid,q:Q(t.item,qid)});});});});
+      return out;}
+    function okVal(q,v){
+      if(!q)return false;
+      if(q.type==="yesno")return v===0||v===1;
+      if(q.type==="choice")return Number.isInteger(v)&&v>=0&&v<(q.opts||[]).length;
+      if(q.type==="number")return typeof v==="number"&&isFinite(v)&&(q.min===undefined||v>=q.min)&&(q.max===undefined||v<=q.max);
+      return false;   // photo / bodymap 等非計分題不經這裡
+    }
+    /* L = {tx:[...], a:{列id:'y'|'n'|'u'}, fu:{item:{qid:值}}, adl_by:{adl_i:[item…],adl_s:[…]}}
+       回 {answers, unsure, dropped}：answers 就是 body.answers 的形狀 */
+    function toAnswers(L){
+      var tx=L.tx||[],A=L.a||{},FU=L.fu||{},ans={},unsure=[],dropped=[];
+      function sub(item){return ans[item]||(ans[item]={});}
+      rowsFor(tx).forEach(function(r){var st=A[r.id];if(!st)return;if(st==="u"){unsure.push(r.id);return;}if(st!=="y"&&st!=="n")return;
+        targets(r,tx).forEach(function(t){var v=st==="y"?1:0;
+          if(t.adl){ans[t.adl]=v;if(v===1&&L.adl_by&&Array.isArray(L.adl_by[t.adl]))ans[t.adl+"_by"]=L.adl_by[t.adl].slice();else if(v===0)ans[t.adl+"_by"]=[];return;}
+          if(t.gate)sub(t.item)[t.gate]=v;
+          if(v===0)(t.zero||[]).forEach(function(qid){sub(t.item)[qid]=0;});
+          else (t.own||[]).forEach(function(qid){var q=Q(t.item,qid);if(q&&q.type==="photo")return;   // 照片走 MEDIA，不在 answers 計分欄位裡
+            if(q&&q.type==="bodymap"){var f=FU[t.item]||{};   // 皮疹範圍：存的是 regions（區塊）與 bsa（體表面積 %），不是 q.id
+              if(Array.isArray(f.regions)&&f.regions.every(function(k){return BSAKEYS.indexOf(k)>=0;})&&typeof f.bsa==="number"&&f.bsa>=0&&f.bsa<=100&&visibleQ(q,ans[t.item])){sub(t.item).regions=f.regions.slice();sub(t.item).bsa=f.bsa;}
+              return;}
+            var x=(FU[t.item]||{})[qid];if(x===undefined||x===null||x==="")return;
+            if(!okVal(q,x))dropped.push(t.item+"."+qid);
+            else if(!visibleQ(q,ans[t.item]))dropped.push("hidden:"+t.item+"."+qid);   // 前面的答案改了，這題已不該出現：不留殘值
+            else sub(t.item)[qid]=x;});});});
+      return {answers:ans,unsure:unsure,dropped:dropped};
+    }
+    /* 逐條紅旗回答「證據欄位從哪來」：這是結構性保險，題庫改了、規則改了，這張表會跟著變，沒來源的會被測試抓到 */
+    function coverage(tx){tx=tx||["chemo","rt","io","adc"];
+      var src={};   // "item.qid" → [{row,how}]
+      rowsFor(tx).forEach(function(r){targets(r,tx).forEach(function(t){
+        if(t.adl){src[t.adl]=(src[t.adl]||[]).concat([{row:r.id,how:"gate"}]);return;}
+        if(t.gate)(src[t.item+"."+t.gate]=src[t.item+"."+t.gate]||[]).push({row:r.id,how:"gate"});
+        (t.own||[]).forEach(function(qid){(src[t.item+"."+qid]=src[t.item+"."+qid]||[]).push({row:r.id,how:"followup"});});});});
+      src["cc.nonempty"]=[{row:"(主訴步驟)",how:"cc"}];
+      PI.weight&&(src["weight.baseline_kg"]=[{row:"(工作人員)",how:"staff"}]);
+      return panel.hard_red_flags.map(function(f){
+        var refs={};(f.when.match(/[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?/g)||[]).forEach(function(s){refs[s]=1;});
+        var fields=Object.keys(refs).map(function(s){var key=s;
+          if(s==="diarrhea.delta")return {ref:s,from:["diarrhea.baseline","diarrhea.now"].map(function(k){return {k:k,src:src[k]||[]};})};
+          if(s==="weight.pct")return {ref:s,from:["weight.now_kg","weight.baseline_kg"].map(function(k){return {k:k,src:src[k]||[]};})};
+          return {ref:s,from:[{k:key,src:src[key]||[]}]};});
+        return {id:f.id,level:f.level,when:f.when,fields:fields};});
+    }
+    /* 紅旗要靠「追問」才算得出來的欄位（來自 coverage 的 followup 類）：病人答「有」卻沒填這些，個管師端要補（待確認） */
+    var FLAGQ={"fever.temp":1,"diarrhea.baseline":1,"diarrhea.now":1,"weight.now_kg":1,"breath.exertion":1,"breath.new_worse":1,"swallow.diet":1,"swallow.choke":1,"skin_rt.look":1,"rash.blister":1,"fatigue.rest":1,"eye_io.pain":1,"eye_io.photophobia":1,"eye_adc.pain":1};
+    /* 一列負責的所有證據欄位（gate、追問、「沒有」補的 0）；復原時用 */
+    function rowKeys(id,tx){var r=ROWS.filter(function(x){return x.id===id;})[0],ks=[];if(!r)return ks;
+      targets(r,tx).forEach(function(t){if(t.adl){ks.push(t.adl);return;}[].concat(t.gate?[t.gate]:[],t.own||[],t.zero||[]).forEach(function(q){ks.push(t.item+"."+q);});});return ks;}
+    /* 待確認清單（個管師端）：L=病人的清單答案{a}、ev=疊加後的有效答案、dec={列id:'y'|'n'|'x'}（個管師的決定：電話確認有／沒有／聯絡不到）
+       回 [{row,kind:'unsure'|'followup',red,keys?}]；red=紅旗相關（沒處理不能送出初審）。「聯絡不到」(x)視為已交給醫師，不再列。 */
+    function pending(L,tx,ev,dec){var out=[];dec=dec||{};
+      rowsFor(tx||[]).forEach(function(r){if(r.grp==="adl")return;var st=((L||{}).a||{})[r.id];if(!st)return;var d=dec[r.id],eff=st;
+        if(st==="u"){if(d==="x")return;if(d==="y"||d==="n")eff=d;else{out.push({row:r.id,kind:"unsure",red:!!r.red});return;}}
+        if(eff==="n"&&r.id==="weight"&&d!=="x"){var wv=((ev||{}).weight||{}).now_kg;if(wv===undefined||wv===null||wv==="")out.push({row:"weight",kind:"measure",red:false,keys:["weight.now_kg"]});return;}   /* D3：「沒掉很多」只是自述，到院本來就要量；列成待量體重（不擋送出） */
+        if(eff!=="y"||d==="x")return;var need=[];
+        targets(r,tx).forEach(function(t){if(t.adl)return;var sub=(ev||{})[t.item]||{};
+          (t.own||[]).forEach(function(qid){var key=t.item+"."+qid;if(!FLAGQ[key])return;var q=Q(t.item,qid);if(!q||q.staff||!visibleQ(q,sub))return;var v=sub[qid];if(v===undefined||v===null||v==="")need.push(key);});});
+        if(need.length)out.push({row:r.id,kind:"followup",red:!!r.red,keys:need});});
+      return out;}
+    /* D2：病人明確答「沒有」的症狀，它依賴的紅旗不必在「判不出來」框一條條列「資料不足」。
+       一條紅旗只有在它依賴的、這位病人實際被問到的每一列都是「沒有」時才隱藏（沒問到的列＝依治療別本來就不問，視同滿足）；
+       只要有一列是「有」「不確定」或沒答，就保留。紅旗引擎與紀錄原樣，這只是顯示層。 */
+    var covC={};
+    function quietFlags(L,tx){var q={};if(!L||!L.a)return q;var ck=(tx||[]).slice().sort().join(","),cv=covC[ck]||(covC[ck]=coverage(tx));
+      cv.forEach(function(f){var rows={};f.fields.forEach(function(fd){fd.from.forEach(function(x){x.src.forEach(function(sr){if(sr.how==="gate"||sr.how==="followup")rows[sr.row]=1;});});});
+        var ids=Object.keys(rows);q[f.id]=ids.every(function(id){return L.a[id]==="n";});});
+      return q;}
+    return {rows:ROWS,rowsFor:rowsFor,targets:targets,askFor:askFor,toAnswers:toAnswers,visibleQ:visibleQ,coverage:coverage,Q:Q,FLAGQ:FLAGQ,rowKeys:rowKeys,pending:pending,quietFlags:quietFlags};
+  }
+  return {make:make,ROWS:ROWS};
+})();
+
+/* ---- 清單流程（P12 第 3 階段，2026-10-04）----
+   插進病人頁的同一個 <script>（共用 A、I、STEPS、TREAT、paint、wire、val、esc、$、toast…）。
+   流程：主訴 → 重要項目清單 →（有的項目各一頁追問，題庫原題）→ 治療相關重要項目 → 身體的感覺 → 皮膚與其他 → 日常自理 → 確認頁。
+   A 仍是唯一的作答存放處（gate、追問都寫進 A[item][qid]），送出前才用 LISTMAP.toAnswers 整理成 body.answers，
+   所以下游（解密、分流、紅旗、個管師／醫師畫面）完全不用改。?flow=item 可切回舊的逐題流程。 */
+var LISTFLOW=!/[?&]flow=item/.test(location.search), LA={}, REDOK=false, NEED_HITS=0, FUROOT=null, ALLNO=null, RET_REV=false;
+var LM=LISTMAP.make(PROM_PANEL);
+var LGROUPS=[["red","先確認幾件重要的事","這些項目最需要知道，請每一項都選。"],
+  ["red2","和這次治療有關的重要項目","這些和這次的治療有關，也很重要，請每一項都選。"],
+  ["A","身體的感覺","最近一週，有沒有這些不舒服？每一項都要選。"],
+  ["B","皮膚與其他","最近一週，有沒有這些不舒服？每一項都要選。"]];
+function lrowsOf(grp){return LM.rowsFor(TREAT).filter(function(r){return r.grp===grp;});}
+function lrowById(id){return LM.rows.filter(function(r){return r.id===id;})[0];}
+function lItem(id){return PROM_PANEL.items.filter(function(i){return i.id===id;})[0];}
+function hasFU(r){var a={};a[r.id]='y';return LM.askFor({tx:TREAT,a:a}).some(function(x){return x.q&&!x.q.staff;});}
+function buildListSteps(){var S=[{kind:'cc'}];
+  LGROUPS.forEach(function(g){var rows=lrowsOf(g[0]);if(!rows.length)return;
+    S.push({kind:'list',grp:g[0],name:g[1],lead:g[2],rows:rows,short:g[0]==='A'||g[0]==='B'});
+    rows.forEach(function(r){if(LA[r.id]==='y'&&hasFU(r))S.push({kind:'fu',grp:g[0],row:r});});});
+  S.push({kind:'adl'});return S;}
+function listUnanswered(s){return (s.rows||[]).filter(function(r){return !LA[r.id];});}
+/* 這一列負責的欄位全部清掉再依答案寫：不留殘值（gate、追問、「沒有」補的 0、皮疹範圍、照片） */
+function setRow(id,v){var r=lrowById(id);if(!r||LA[id]===v)return;LA[id]=v;
+  LM.targets(r,TREAT).forEach(function(t){if(t.adl)return;var a=A[t.item]=A[t.item]||{};
+    [].concat(t.gate?[t.gate]:[],t.own||[],t.zero||[]).forEach(function(q){delete a[q];});
+    if((t.own||[]).indexOf('extent')>=0){delete a.regions;delete a.bsa;}
+    if(v==='y'){if(t.gate)a[t.gate]=1;}
+    else if(v==='n'){if(t.gate)a[t.gate]=0;(t.zero||[]).forEach(function(q){a[q]=0;});}
+    if(!Object.keys(a).length)delete A[t.item];
+    if(v!=='y'&&MEDIA.photo&&MEDIA.photoItem===t.item){MEDIA.photo=null;MEDIA.photoItem=null;}});
+  REDOK=false;
+  var cur=STEPS[I];STEPS=buildListSteps();
+  if(cur){var k=STEPS.findIndex(function(x){return x.kind===cur.kind&&x.grp===cur.grp&&(!cur.row||x.row===cur.row);});if(k>=0)I=k;}
+  save();}
+function listAnswers(){var r=LM.toAnswers({tx:TREAT,a:LA,fu:A,adl_by:{adl_i:A.adl_i_by||[],adl_s:A.adl_s_by||[]}}),ans=r.answers;
+  ['adl_i','adl_s'].forEach(function(k){if(A[k]===0||A[k]===1){ans[k]=A[k];ans[k+'_by']=A[k]===1?(A[k+'_by']||[]):[];}});
+  return ans;}
+function listMeta(){var u=Object.keys(LA).filter(function(k){return LA[k]==='u';});
+  return {v:1,a:JSON.parse(JSON.stringify(LA)),unsure:u,redOk:REDOK,needHits:NEED_HITS};}
+/* ---- 畫面 ---- */
+function listHeader(s){if(s.kind!=='fu')RET_REV=false;if(s.kind!=='list')$('#stage').onclick=null;var gs=LGROUPS.filter(function(g){return lrowsOf(g[0]).length;}),total=gs.length+2,idx=0,frac=0,right='';
+  if(s.kind==='adl')idx=total-1;
+  else if(s.kind!=='cc'){var gi=gs.map(function(g){return g[0];}).indexOf(s.grp);idx=gi+1;
+    if(s.kind==='fu'){var fus=STEPS.filter(function(x){return x.kind==='fu'&&x.grp===s.grp;});frac=(fus.indexOf(s)+1)/(fus.length+1);right='追問 '+(fus.indexOf(s)+1)+'／'+fus.length;}
+    else{var un=listUnanswered(s).length;right=un?'還有 '+un+' 項沒選':'都選好了';}}
+  $('#fill').style.width=((idx+frac)/total*100).toFixed(1)+'%';
+  $('#tleft').innerHTML='第 <b>'+(idx+1)+'</b> 部分，共 '+total+' 部分';$('#tright').textContent=right;}
+function rowHTML(r,pre){var v=LA[r.id],btn=function(c,val,txt){return '<button type="button" class="'+c+'" data-a="'+r.id+'|'+val+'" aria-pressed="'+(v===val)+'">'+(v===val&&val!=='u'?'✓ ':'')+txt+'</button>';};
+  return '<div class="lrow'+(pre||'')+'" data-row="'+r.id+'" role="group" aria-label="'+esc(r.n)+'"><div class="lq"><b>'+esc(r.n)+'</b><span>'+esc(r.d)+'</span></div>'+
+    '<div class="lseg">'+btn('y','y','有')+btn('n','n','沒有')+btn('u','u','不確定')+'</div>'+
+    (r.red&&v==='u'?'<p class="lalert u">不確定也沒關係，我們會請個管師再向您確認。</p>':'')+
+    (r.red&&v==='y'?'<p class="lalert">這一項很重要，醫療團隊會優先看到。如果現在很不舒服，請不要等回診，直接聯繫您的個管師或就近就醫。</p>':'')+'</div>';}
+function renderList(st,s){FUROOT=null;var un=listUnanswered(s);
+  var h='<h2 class="lh">'+esc(s.name)+'</h2><p class="lead">'+esc(s.lead)+' 選「有」的，按下一步後會再問幾個細節。</p>';
+  if(s.short&&un.length){h+=ALLNO===s.grp?'<div class="lconfirm" role="alertdialog" aria-label="確認這一頁都沒有"><p>這一頁沒選的 '+un.length+' 項，都選「沒有」嗎？</p><div class="two"><button class="btn" id="allno-yes" type="button">對，都沒有</button><button class="btn ghost" id="allno-cancel" type="button">不是，我自己選</button></div></div>'
+    :'<button type="button" class="lall" id="allno">這一頁剩下的都沒有</button>';}
+  h+=s.rows.map(function(r){return rowHTML(r,'');}).join('');st.innerHTML=h;
+  st.onclick=function(e){var b=e.target.closest&&e.target.closest('[data-a],#allno,#allno-yes,#allno-cancel');if(!b)return;
+    if(b.id==='allno'){ALLNO=s.grp;return rerender(st,s,'#allno-yes');}
+    if(b.id==='allno-cancel'){ALLNO=null;return rerender(st,s,'#allno');}
+    if(b.id==='allno-yes'){listUnanswered(s).forEach(function(r){setRow(r.id,'n');});ALLNO=null;return rerender(st,s);}
+    var p=b.dataset.a.split('|');setRow(p[0],p[1]);rerender(st,s,'[data-a="'+p[0]+'|'+p[1]+'"]');};}
+function rerender(st,s,focus){var y=window.scrollY;if(STEPS[I]!==s)s=STEPS[I];renderList(st,s);listHeader(s);window.scrollTo(0,y);
+  if(focus){var f=st.querySelector(focus);if(f)try{f.focus({preventScroll:true});}catch(e){f.focus();}}}
+function stepOk(s){if(s.kind!=='list')return true;var un=listUnanswered(s);if(!un.length)return true;NEED_HITS++;
+  un.forEach(function(r){var e=document.querySelector('[data-row="'+r.id+'"]');if(e)e.classList.add('need');});
+  var f=document.querySelector('[data-row="'+un[0].id+'"]');if(f)f.scrollIntoView({block:'center',behavior:'smooth'});
+  var tr=$('#tright');tr.textContent='請先選完這 '+un.length+' 項';toast('還有 '+un.length+' 項沒選');return false;}
+function renderFU(st,s){var r=s.row,ts=LM.targets(r,TREAT).filter(function(t){return !t.adl;}),it0=lItem(ts[0].item);FUROOT={};
+  var h='<div class="qhead"><div class="qicon">'+esc(it0.icon)+'</div><div><div class="qlabel">'+esc(r.n)+'</div><div class="hint" style="margin:0">您剛剛選了「有」，再請教幾個問題。</div></div></div>';
+  ts.forEach(function(t){h+='<div data-fu="'+t.item+'">';(t.own||[]).forEach(function(qid){var q=LM.Q(t.item,qid);if(q&&!q.staff)h+='<div class="q" data-q="'+qid+'"></div>';});h+='</div>';});
+  st.innerHTML=h;st.onclick=null;
+  ts.forEach(function(t){var it=lItem(t.item);FUROOT[t.item]=st.querySelector('[data-fu="'+t.item+'"]');(t.own||[]).forEach(function(qid){var q=LM.Q(t.item,qid);if(q&&!q.staff)paint(it,q);});});}
+/* ---- 確認頁 ---- */
+function allListRows(){return LM.rowsFor(TREAT).filter(function(r){return r.grp!=='adl';});}
+function fuText(r){var parts=[];LM.targets(r,TREAT).forEach(function(t){if(t.adl)return;var s=A[t.item]||{};
+  (t.own||[]).forEach(function(qid){var q=LM.Q(t.item,qid);if(!q||q.staff||q.type==='photo')return;
+    if(q.type==='bodymap'){if(s.bsa!=null)parts.push('範圍約 '+s.bsa+'%');return;}
+    var v=s[qid];if(v===undefined||v===null||v===''||!LM.visibleQ(q,s))return;
+    if(q.type==='yesno')parts.push(q.text.replace(/[？?].*$/,'')+'：'+(v?'有':'沒有'));
+    else if(q.type==='choice')parts.push(q.opts[v]);
+    else if(q.type==='number')parts.push(q.text.replace(/[？?（(].*$/,'')+' '+v+(q.unit||''));});});
+  return parts.join('；');}
+function fuMissing(r){var m=[];LM.targets(r,TREAT).forEach(function(t){if(t.adl)return;var s=A[t.item]||{};
+  (t.own||[]).forEach(function(qid){var q=LM.Q(t.item,qid);if(!q||q.staff||q.type==='photo'||q.type==='bodymap')return;
+    var v=s[qid];if(LM.visibleQ(q,s)&&(v===undefined||v===null||v===''))m.push(q.text.replace(/[？?（(].*$/,''));});});return m;}
+function renderListReview(){var rows=allListRows(),red=rows.filter(function(r){return r.red;}),y=rows.filter(function(r){return LA[r.id]==='y';}),
+    u=rows.filter(function(r){return LA[r.id]==='u';}),n=rows.filter(function(r){return LA[r.id]==='n';}),cc=(A.cc||{}).text||'',h='';
+  var seg=function(r){return ['y','n','u'].map(function(v){return '<button type="button" class="'+v+'" data-a="'+r.id+'|'+v+'" aria-pressed="'+(LA[r.id]===v)+'">'+(v==='y'?'有':v==='n'?'沒有':'不確定')+'</button>';}).join('');};
+  h+='<div class="redblk" id="redblk"><h3>先確認 '+red.length+' 個重要的項目</h3><p>如果有選錯，直接在這裡改。選「不確定」的，我們會請個管師再向您確認。</p>'+
+    red.map(function(r){return '<div class="rr" role="group" aria-label="'+esc(r.n)+'"><b>'+esc(r.n)+'</b><div class="lseg">'+seg(r)+'</div></div>';}).join('')+
+    '<button type="button" class="btn'+(REDOK?'':' ghost')+' full" id="redok" aria-pressed="'+REDOK+'" style="margin-top:10px">'+(REDOK?'✓ 已確認，這幾項正確':'我確認這幾項正確')+'</button></div>';
+  if(cc||MEDIA.audio)h+='<div class="rvrow"><span class="rvq">您自己說的</span><span class="rva">'+(cc?esc(cc.slice(0,60))+(cc.length>60?'…':''):'（錄音 '+MEDIA.audioSec+' 秒）')+'</span></div>';
+  h+='<div class="lsum"><h3>有的不舒服：'+y.length+' 項</h3>'+(y.length?'<ul>'+y.map(function(r){var t=fuText(r);return '<li>'+esc(r.n)+(t?'<small>'+esc(t)+'</small>':'')+'</li>';}).join('')+'</ul>':'<p>沒有</p>')+'</div>';
+  if(u.length)h+='<div class="lsum"><h3>不確定：'+u.length+' 項</h3><ul>'+u.map(function(r){return '<li>'+esc(r.n)+'</li>';}).join('')+'</ul></div>';
+  h+='<div class="lsum"><h3>沒有的：'+n.length+' 項</h3><p>'+(n.map(function(r){return esc(r.n);}).join('、')||'—')+'</p></div>';
+  if(A.adl_i!=null||A.adl_s!=null)h+='<div class="lsum"><h3>日常活動</h3><p>'+(A.adl_i===1?'家事買菜有做不來的':'家事買菜都還行')+'<br>'+(A.adl_s===1?'洗澡穿衣有做不來的':'洗澡穿衣都還行')+'</p></div>';
+  var miss=[];y.forEach(function(r){var m=fuMissing(r);if(m.length)miss.push(r.n+'（'+m.join('、')+'）');});
+  if(miss.length)h+='<div class="warnbox">細節還沒填的有：'+esc(miss.join('；'))+'<br>沒填也可以送出，醫療團隊會看到這幾題是空白，不等於沒症狀。要補可以按上一步回去。</div>';
+  var rv=$('#rvbody');rv.innerHTML=h;
+  rv.onclick=function(e){var b=e.target.closest&&e.target.closest('[data-a],#redok');if(!b)return;
+    if(b.id==='redok'){REDOK=!REDOK;return renderListReview();}
+    var p=b.dataset.a.split('|'),was=LA[p[0]];setRow(p[0],p[1]);
+    if(p[1]==='y'&&was!=='y'){var k=STEPS.findIndex(function(x){return x.kind==='fu'&&x.row.id===p[0];});
+      if(k>=0){I=k;RET_REV=true;save();$('#review').classList.add('hid');$('#form').classList.remove('hid');$('#next').textContent='下一步';render();toast('請再回答幾個問題');return;}}
+    renderListReview();var f=rv.querySelector('[data-a="'+p[0]+'|'+p[1]+'"]');if(f)try{f.focus({preventScroll:true});}catch(x){}};}
+function listSubmitGate(){if(REDOK)return true;NEED_HITS++;var bl=$('#redblk');if(bl){bl.classList.add('need');bl.scrollIntoView({block:'center',behavior:'smooth'});}toast('請先確認上面的重要項目');return false;}
+function listDoneNote(){var u=Object.keys(LA).filter(function(k){return LA[k]==='u';});if(!LISTFLOW||!u.length)return '';
+  return '<div class="note" style="text-align:left;margin-top:18px;font-size:18px"><b>我們會再向您確認</b><br>'+u.map(function(k){var r=lrowById(k);return esc(r?r.n:k);}).join('、')+'</div>';}
+
 /* ---------- 導覽 ---------- */
+var NAV_GAP=(location.hash==='#selftest')?0:300, NAV_T=0;
+function navGate(){var n=Date.now(); if(n-NAV_T<NAV_GAP) return false; NAV_T=n; return true}
 $('#next').onclick=function(){
+  if(!navGate()) return;
   if($('#login').classList.contains('hid')===false) return startForm();
   if(!$('#review').classList.contains('hid')) return doSubmit();
+  if(LISTFLOW&&STEPS[I]&&!stepOk(STEPS[I])) return;
+  if(LISTFLOW&&RET_REV){RET_REV=false;$('#form').classList.add('hid');$('#review').classList.remove('hid');$('#next').textContent='確定送出';renderReview();window.scrollTo(0,0);return;}
   if(I<STEPS.length-1){I++;save();render();}
   else{$('#form').classList.add('hid');$('#review').classList.remove('hid');
        $('#next').textContent='確定送出';renderReview();window.scrollTo(0,0);}
 };
 $('#back').onclick=function(){
+  if(!navGate()) return;
   if(!$('#review').classList.contains('hid')){
     $('#review').classList.add('hid');$('#form').classList.remove('hid');render();return}
   if(I>0){I--;save();render()}
@@ -713,7 +1002,7 @@ function applyIdentity(k){
   ['#mrn','#pname','#dclass'].forEach(function(q){var e=$(q);if(e){var lab=e.previousElementSibling;if(lab&&lab.tagName==='LABEL')lab.classList.add('hid');e.classList.add('hid');}});
   var hc=$('#hascode'); if(hc) hc.classList.add('hid');
   var nx=document.querySelector('#next'); if(nx){ nx.disabled=false; nx.textContent='開始填寫'; }
-  var d=LS.get('prom.draft.'+TOKEN,null); if(d&&d.A){A=d.A;LOGIN=d.login||LOGIN;VISIT=d.visit||null;toast('找到上次填到一半的紀錄');}
+  var d=LS.get('prom.draft.'+TOKEN,null); if(d&&d.A){A=d.A;LA=d.LA||{};REDOK=!!d.RO;LOGIN=d.login||LOGIN;VISIT=d.visit||null;toast('找到上次填到一半的紀錄');}
   $('#login').insertAdjacentHTML('afterbegin',
     '<div class="card"><div class="note" style="font-size:21px">'+
     '您好，身分已經確認。<br>按下面的「開始填寫」就可以開始。'+
@@ -748,6 +1037,6 @@ SAFETY={phone:'', text:'如果現在很不舒服，例如很喘、發燒超過 3
   flush();
 })();
 if(location.hash==='#selftest') window.__pp={A:function(){return A},setv:setv,state:function(){return {I:I,TOKEN:TOKEN,SID:SID,TREAT:TREAT,BIRTH:BIRTH,TOK:TOK,steps:STEPS.length,inForm:!$('#form').classList.contains('hid'),inReview:!$('#review').classList.contains('hid'),done:!$('#done').classList.contains('hid')}},
-  goReview:function(){I=STEPS.length-1;save();render();$('#next').click();},goItem:function(id){var k=STEPS.findIndex(function(s){return s.kind==='item'&&s.item.id===id});if(k>=0){I=k;save();render();}return k;},buildBody:buildBody,MEDIA:MEDIA,STEPS:function(){return STEPS}};
+  goReview:function(){I=STEPS.length-1;save();render();$('#next').click();},goItem:function(id){var k=STEPS.findIndex(function(s){return s.kind==='item'&&s.item.id===id});if(k>=0){I=k;save();render();}return k;},LA:function(){return LA},devStart:function(tr){TREAT=tr.slice();TOK={pid:'DEV'};SESS={pid:'DEV',name:''};VISIT='vdev';$('#next').disabled=false;buildSteps();$('#login').classList.add('hid');$('#form').classList.remove('hid');$('#back').classList.remove('hid');$('#top').classList.remove('hid');render();},devReset:function(){A={};LA={};REDOK=false;NEED_HITS=0;RET_REV=false;ALLNO=null;FUROOT=null;MEDIA.photo=null;MEDIA.audio=null;I=0;$('#review').classList.add('hid');$('#done').classList.add('hid');},setRow:setRow,listAnswers:listAnswers,listMeta:listMeta,LM:LM,REDOK:function(){return REDOK},LISTFLOW:LISTFLOW,buildBody:buildBody,navGap:function(ms){if(ms!=null)NAV_GAP=ms;return NAV_GAP},MEDIA:MEDIA,STEPS:function(){return STEPS}};
 window.addEventListener('online',flush);
 </script></body></html>
