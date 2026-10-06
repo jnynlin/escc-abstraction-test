@@ -404,6 +404,7 @@ p.small,.small{font-size:.92rem;} .legend,.legend span{font-size:.92rem;} #m1,#m
 .tl-tgt{fill:var(--ink);} .tl-draw{fill:var(--ink);stroke:var(--sheet);stroke-width:1.5;} .tl-dose{stroke:var(--done);stroke-width:2;} .tl-end{fill:var(--done);} .tl-today{stroke:var(--err);stroke-width:1.5;stroke-dasharray:4 3;} .tl-todayt{font-size:11px;fill:var(--err);font-weight:600;}
 .tl-st{font-size:11px;font-weight:600;} .tl-s-overdue{fill:var(--err);} .tl-s-open{fill:var(--iodine);}
 .ir-tll{margin:6px 0 0;} .tl-key{display:inline-block;width:14px;height:8px;border-radius:2px;vertical-align:middle;margin-right:3px;box-sizing:border-box;} .tl-key.tl-b-done{background:var(--done);} .tl-key.tl-b-open{background:var(--iodine);} .tl-key.tl-b-overdue{background:var(--err);} .tl-key.tl-b-dev{background:none;border:2px solid var(--iodine);} .tl-key.tl-b-not{background:var(--rule);} .tl-key.tl-b-wait{background:none;border:1px dashed var(--soft);}
+.ir-imp-ok{display:flex;gap:8px;align-items:flex-start;margin:14px 0;cursor:pointer;} .ir-imp-ok input{margin-top:5px;width:18px;height:18px;flex:none;}
 .ir-hint{display:block;color:var(--soft);font-size:.82rem;font-weight:400;margin:1px 0 4px;line-height:1.4;} .ir-chips{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;} .ir-adv{margin:4px 0 10px;border:0;padding:0;} .ir-adv summary{cursor:pointer;color:var(--soft);font-size:.92rem;padding:6px 0;}
 .ir-prev{background:none;border-top:1px solid var(--rule);padding:8px 0 2px;font-size:.92rem;margin:8px 0 4px;min-height:1.2em;} .ir-prev:empty{display:none;} #modal .mf input[type=date],#modal .mf input[type=number]{min-height:44px;}
 tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{background:var(--done-soft);}to{background:transparent;}}
@@ -6663,7 +6664,7 @@ var IRAE_STORE=(function(){
     /* 載入後直接算時間軸（today 由呼叫端給台北日曆日） */
     function timelineOf(id,today,cfg,known){return loadSubject(id,known).then(function(s){var a=SC.assemble({subject:s.doc,facts:s.facts,confirms:s.confirms});return {assembled:a,timeline:TLm?TLm.timeline(a.subject,cfg||null,today):null,undecryptable:s.undecryptable};});}
     function lock(){K=null;}
-    return {openKey:openKey,createKey:createKey,grant:grant,revoke:revoke,seal:seal,open:open,createSubject:createSubject,updateSubject:updateSubject,addFact:addFact,addConfirm:addConfirm,
+    return {openKey:openKey,createKey:createKey,grant:grant,revoke:revoke,seal:seal,open:open,createSubject:createSubject,updateSubject:updateSubject,addFact:addFact,addConfirm:addConfirm,logAct:function(id,act,ref){return logWrite(id,act,ref);},
       correctFact:function(id,fid,kind,data){return correct("facts",id,fid,kind,data);},correctConfirm:function(id,fid,kind,data){return correct("confirms",id,fid,kind,data);},
       deleteFact:function(id,fid,kind,reason){return remove("facts",id,fid,kind,reason);},deleteConfirm:function(id,fid,kind,reason){return remove("confirms",id,fid,kind,reason);},
       loadSubject:loadSubject,loadList:loadList,timelineOf:timelineOf,lock:lock,_k:function(){return K;}};
@@ -6801,19 +6802,19 @@ function drawHome(bad){
   var rows=dl.rows.map(function(r){return '<tr class="ir-row" data-id="'+esc(r.subjectId)+'"><td class="ir-t1"><b>'+esc(r.subjectId)+'</b></td><td data-l="時點">'+esc(r.label)+'</td><td data-l="目標日">'+esc(r.target)+'</td><td data-l="可抽的窗">'+dd(r.windowStart)+" ～ "+dd(r.windowEnd)+'</td><td data-l="狀態">'+st(r.status)+'</td></tr>';}).join("");
   var srows=LIST.map(function(s){var v=SUMS[s.id]||{},r=v.timeline,a=v.assembled;return '<tr class="ir-row" data-id="'+esc(s.id)+'"><td class="ir-t1"><b>'+esc(s.id)+'</b></td><td data-l="同意日">'+dd(s.doc.consentDate)+'</td><td data-l="狀態">'+statusText(s.doc)+'</td><td data-l="下次抽血">'+(v.err?'<span class="ir-st ir-overdue">讀取失敗</span>':nextText(r))+'</td><td data-l="事實數">'+(a?a.counts.facts:"—")+'</td></tr>';}).join("");
   var isAdm=x().isAdmin()&&!S().offline;
-  main().innerHTML='<div class="ir-page ir"><section class="ir-card head"><div class="ir-hd"><h2 class="ir-id">irAE 登錄</h2><div class="ir-hact">'+(canWrite()?'<button class="btn go" type="button" id="irNew">＋新增受試者</button>':"")+(isAdm?'<button class="btn" type="button" id="irBackup" title="下載加密備份（含受試者、事實、確認、稽核與金鑰）">下載加密備份</button>':"")+'<button class="btn" type="button" id="irReload">重新整理</button></div></div>'+
+  main().innerHTML='<div class="ir-page ir"><section class="ir-card head"><div class="ir-hd"><h2 class="ir-id">irAE 登錄</h2><div class="ir-hact">'+(canWrite()?'<button class="btn go" type="button" id="irNew">＋新增受試者</button>':"")+(isAdm?'<button class="btn" type="button" id="irBackup" title="下載加密備份（含受試者、事實、確認、稽核與金鑰）">下載加密備份</button>':"")+(isAdm&&canWrite()?'<button class="btn" type="button" id="irImport" title="匯入去識別轉換後的檔案（先預覽，確認後才寫入）">匯入去識別資料</button>':"")+'<button class="btn" type="button" id="irReload">重新整理</button></div></div>'+
     '<div class="ir-bd"><p class="ir-kpi" id="irKpi">今日 <b>'+c.today+'</b>　本週 <b>'+c.week+'</b>　逾期 <b>'+c.overdue+'</b>　目前可抽 <b>'+c.openNow+'</b>　<span class="mini">（今天 '+esc(t)+'，台北日曆日）</span>'+(isAdm?'　<span class="mini" id="irBk">'+bkText()+'</span>':"")+'</p>'+
     (bad?'<p class="ir-warn">有 '+bad+' 位受試者的文件無法以您目前的金鑰解開，請通知主持人。</p>':"")+'</div></section>'+
     card("","下次抽血清單 <span class=\"mini\">（點一列進入該受試者）</span>","",'<div class="ir-scroll"><table id="irDue" class="ir-stack"><thead><tr><th>研究編號</th><th>時點</th><th>目標日</th><th>可抽的窗</th><th>狀態</th></tr></thead><tbody>'+(rows||'<tr><td colspan="5" class="mini">目前沒有待抽血的受試者。</td></tr>')+'</tbody></table></div>')+
     card("","受試者（"+LIST.length+"）","",'<div class="ir-scroll"><table id="irSubj" class="ir-stack"><thead><tr><th>研究編號</th><th>同意日</th><th>狀態</th><th>下次抽血</th><th>事實數</th></tr></thead><tbody>'+(srows||'<tr><td colspan="5" class="mini">尚無受試者。請按右上角「＋新增受試者」。</td></tr>')+'</tbody></table></div>',"ir-calc")+
     '<p class="mini">預設時點＝同意書 v3.0 現行 5 個時點（治療前、治療結束後、+3、+6、+12 個月）。每項預設的理由與改選影響見備註表 Q-M1。資料在瀏覽器內加密後才上傳；本空間不存姓名與病歷號。</p></div>';
   $$("#irDue tr.ir-row,#irSubj tr.ir-row").forEach(function(tr){tr.onclick=function(){openSubject(tr.dataset.id);};});
-  $("#irReload").onclick=home;var nb=$("#irNew");if(nb)nb.onclick=newSubject;
+  $("#irReload").onclick=home;var nb=$("#irNew");if(nb)nb.onclick=newSubject;var ib=$("#irImport");if(ib)ib.onclick=importPage;
   var bb=$("#irBackup");if(bb)bb.onclick=function(){var t0=bb.textContent;bb.disabled=true;bb.textContent="備份中…（受試者多時要十幾秒）";var done=function(){setTimeout(function(){var q=$("#irBk");if(q)q.textContent=bkText();bb.disabled=false;bb.textContent=t0;},1500);};Promise.resolve(SEC.doBackup()).then(done,done);};}
 function bkText(){var d=SEC.lastBackup&&SEC.lastBackup();if(!d)return "備份：尚無（建議每 7 天一次）";var n=Math.floor((Date.now()-d.getTime())/86400000);return "上次備份："+IRAE_TL.todayTaipei(d.getTime())+"（"+(n<=0?"今天":n+" 天前")+"）";}
 function newSubject(){
   irDialog({title:"新增受試者",msg:"第一步：建立受試者。之後依序新增療程、給藥、抽血。",fields:[
-    {k:"id",label:"研究編號",req:true,hint:"假名，例如 IRAE0001。不得填姓名或病歷號。",placeholder:"IRAE0001"},
+    {k:"id",label:"研究編號",req:true,hint:"假名。測試資料請用 DEMO 開頭（例如 DEMO0001），正式受試者用 IRAE 開頭（例如 IRAE0017）。不得填姓名或病歷號。",placeholder:"DEMO0001"},
     {k:"consentDate",label:"同意書簽署日",type:"date",value:today(),hint:"點欄位右側的日曆圖示選日期。"},
     {k:"sex",label:"生理性別",type:"select",options:["女","男","不詳"]},{k:"cancer",label:"癌別",hint:"ICD-O-3 代碼或文字，例如 C15.9 或 食道癌。"},
     {k:"priorIci",label:"先前免疫治療",type:"select",options:["無","有","不明"]},{k:"autoimmune",label:"自體免疫病史",type:"select",options:["無","有","不明"]},{k:"note",label:"備註",type:"textarea"}],ok:"建立"}).then(function(v){if(!v)return;
@@ -6981,6 +6982,98 @@ function confirmEnd(cid){var ds=cur(CD.facts,"ici_dose").filter(function(f){retu
     var d={courseId:cid,endDate:v.date,basis:{"末劑日":"lastDose","停藥決定日":"stopDecision","其他":"other"}[v.basis]};if(v.note)d.note=v.note;var prev=cur(CD.confirms,"end").filter(function(e){return e.data.courseId===cid;})[0];
     ok2(prev?store().correctConfirm(CD.id,prev.id,"end",d):store().addConfirm(CD.id,"end",d),"已確認治療結束日");});}
 
+/* ---------- 匯入去識別資料（2026-10-07；user「把我之前excel檔的資料看能否先灌進去」）----------
+   輸入：tools/irae_deid_pad4.py 產生的 irae_pad4_registry.json（編碼化、不是匿名：保留臨床日期）。
+   流程：選檔（只在瀏覽器內讀取，檔名不記錄）→ 掃描識別資訊（有就整份拒絕）→ 資料字典驗證＋時間軸空跑＋和現有受試者比對 → 預覽 → 主持人勾選確認 → 寫入。
+   寫入走 store（瀏覽器內加密、稽核紀錄、規則 v5）；事實 id 由內容決定（i_類別_序號_雜湊）→ 中斷後重跑只補沒寫過的。
+   已存在、而且不是這份檔寫入的受試者一律不寫（避免把真實資料併進別人的編號，例如測試用的假受試者）。
+   不含 assays（PAD4／CBC／MDW 數值）：那是另一個資料模型（盲裁定隔離），尚未建置。 */
+var IMP_KEY=/(姓名|病歷|病历|身分證|身份證|出生|生日|birth|mrn|\bdob\b|mapping|phone|電話|手機|address|地址|email)/i,
+    IMP_ISS={consentAfterDay0:"納入晚於首劑：T0 不適用",drawOutsideWindows:"有抽血不在任何時點的窗內",extraDraw:"同一時點多次抽血",overCap:"抽血次數超過上限",drawBeforeConsent:"有抽血早於同意日"};
+function fnv(t){var h=2166136261,i;for(i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h.toString(36);}
+function impFactId(sid,kind,idx,data){return "i_"+kind+"_"+("000"+idx).slice(-3)+"_"+fnv(sid+"|"+kind+"|"+JSON.stringify(data));}
+/* 中文只允許轉換腳本自己寫入的固定詞（累計劑量、次採血、待核對…）；去掉這些詞後還有漢字＝可能是人名或自由文字 → 拒絕 */
+var IMP_ZH=["由自由文字解析","累計劑量","未標日期","收案日期","待核對","待確認","次採血","基線","收案日","採血","日期","到","第"];
+function hasCjk(t){var i,c;IMP_ZH.forEach(function(w){t=t.split(w).join("");});for(i=0;i<t.length;i++){c=t.charCodeAt(i);if(c>=0x3400&&c<=0x9fff)return true;}return false;}
+/* 只回報「位置」，不回報內容 */
+function impScan(J){var bad=[];(function walk(v,p){if(v==null)return;
+  if(typeof v==="string"){if(/\d{6,}/.test(v))bad.push(p+"（連續 6 位以上數字）");else if(hasCjk(v))bad.push(p+"（含中文字）");return;}
+  if(Array.isArray(v)){v.forEach(function(q,i){walk(q,p+"["+i+"]");});return;}
+  if(typeof v==="object")Object.keys(v).forEach(function(k){if(IMP_KEY.test(k))bad.push(p+".（欄位名稱像識別資訊）");walk(v[k],p+"."+k);});})(J,"$");return bad;}
+/* ex：{研究編號:{ids:{事實id:1},bad:是否有解不開的}}（目標空間已有的受試者）。純函式，不寫任何東西 */
+function planImport(J,ex,todayStr){ex=ex||{};var P={ok:false,refuse:[],scan:[],scanN:0,subjects:[],source:"",totals:{subjects:0,pending:0,kinds:{}}},SC=IRAE_SCHEMA,seen={};
+  if(!J||typeof J!=="object"||Array.isArray(J)||!Array.isArray(J.subjects)||!J.subjects.length){P.refuse.push("檔案格式不對：需要 irae_pad4_registry.json（含受試者清單）。");return P;}
+  var sc=impScan(J);if(sc.length){P.refuse.push("檔案裡有看起來像識別資訊的內容，整份拒絕（沒有寫入任何東西）。");P.scanN=sc.length;P.scan=sc.slice(0,8).map(function(q){return q.slice(0,80);});return P;}
+  P.source=String(J.source||"").slice(0,60);
+  J.subjects.forEach(function(s){var e={id:"",status:"invalid",errs:[],warns:0,counts:{},issues:{},items:[],pending:[],slots:{}},sub=s&&s.subject,fa=s&&Array.isArray(s.facts)?s.facts:null,cf=s&&Array.isArray(s.confirms)?s.confirms:[];
+    P.subjects.push(e);
+    if(!sub||typeof sub!=="object"||!fa){e.errs.push("結構不對");return;}
+    e.id=String(sub.id||"");if(seen[e.id])e.errs.push("研究編號在檔案裡重複");seen[e.id]=1;
+    var vs=SC.validateSubject(sub),kc={};vs.errors.forEach(function(q){e.errs.push("受試者:"+q.path+":"+q.code);});e.warns+=vs.warnings.length;
+    fa.map(function(f){return {st:"facts",f:f};}).concat(cf.map(function(f){return {st:"confirms",f:f};})).forEach(function(w){var f=w.f,k=f&&f.kind,spec=k&&SC.KINDS[k];
+      if(!spec||spec.reserved){e.errs.push("未知或保留的類別:"+String(k).slice(0,20));return;}
+      if(spec.store!==w.st){e.errs.push("類別 "+k+" 存放位置不對");return;}
+      var v=SC.validateFact(k,f.data);v.errors.forEach(function(q){e.errs.push(k+":"+q.path+":"+q.code);});e.warns+=v.warnings.length;
+      kc[k]=(kc[k]||0)+1;e.items.push({store:w.st,kind:k,data:f.data,id:impFactId(e.id,k,kc[k],f.data)});});
+    e.counts=kc;
+    if(!e.errs.length){var fl=e.items.filter(function(i){return i.store==="facts";}).map(function(i,n){return {id:i.id,kind:i.kind,at:n+1,uid:"import",data:i.data};}),
+        cl=e.items.filter(function(i){return i.store==="confirms";}).map(function(i,n){return {id:i.id,kind:i.kind,at:n+1,uid:"import",data:i.data};}),
+        a=SC.assemble({subject:sub,facts:fl,confirms:cl}),r=IRAE_TL.timeline(a.subject,null,todayStr||today());
+      r.issues.concat(a.issues).forEach(function(q){e.issues[q.code]=(e.issues[q.code]||0)+1;});e.slots=r.counts||{};}
+    var x0=ex[e.id];
+    if(e.errs.length)e.status="invalid";
+    else if(!x0){e.status="new";e.pending=e.items.slice();}
+    else if(x0.bad)e.status="blocked";
+    else{var have=e.items.filter(function(i){return x0.ids&&x0.ids[i.id];}).length;
+      if(!have)e.status="blocked";else{e.pending=e.items.filter(function(i){return !(x0.ids&&x0.ids[i.id]);});e.status=e.pending.length?"resume":"done";}}
+    if(e.status==="new"||e.status==="resume"){P.totals.subjects++;P.totals.pending+=e.pending.length;e.pending.forEach(function(i){P.totals.kinds[i.kind]=(P.totals.kinds[i.kind]||0)+1;});}});
+  P.ok=P.totals.subjects>0;return P;}
+function impExisting(ids){return store().loadList().then(function(r){var m={},jobs=[];r.subjects.forEach(function(s){if(ids.indexOf(s.id)<0)return;
+    jobs.push(store().loadSubject(s.id,s).then(function(v){var o={};v.facts.concat(v.confirms).forEach(function(f){o[f.id]=1;});m[s.id]={ids:o,bad:v.undecryptable>0};},function(){m[s.id]={ids:{},bad:true};}));});
+  return Promise.all(jobs).then(function(){return m;});});}
+function runImport(P,tag,onP){var list=P.subjects.filter(function(e){return e.status==="new"||e.status==="resume";}),R={subjects:0,facts:0,errors:[]},total=P.totals.pending,st=store();
+  return pool(list,4,function(e){var start=e.status==="new"?st.createSubject(e.id,e.subjectDoc).then(function(){return st.logAct(e.id,"subject:import",tag);}):st.logAct(e.id,"subject:import-resume",tag);
+    return start.then(function(){return e.pending.reduce(function(pr,it){return pr.then(function(){return (it.store==="facts"?st.addFact:st.addConfirm)(e.id,it.kind,it.data,{id:it.id});}).then(function(){R.facts++;if(onP)onP(R,total);});},Promise.resolve());})
+      .then(function(){R.subjects++;if(onP)onP(R,total);},function(err2){R.errors.push({id:e.id,msg:msgOf(err2)});});}).then(function(){return R;});}
+function canImport(){var s=S();return !!s&&!s.offline&&canWrite()&&x().isAdmin();}
+var IMP_ST={"new":"新增","resume":"接續（補寫）","done":"已匯入過","blocked":"已存在（不寫）","invalid":"不合格"};
+function impPreview(P){
+  if(P.refuse.length)return '<p class="ir-warn">'+esc(P.refuse[0])+'</p>'+(P.scan.length?'<p class="mini">共 '+P.scanN+' 處（只列位置，不顯示內容）：</p><ul class="ir-iss">'+P.scan.map(function(q){return '<li>'+esc(q)+'</li>';}).join("")+'</ul>':"");
+  var k=P.totals.kinds,kt=Object.keys(k).map(function(n){return (IRAE_SCHEMA.KINDS[n]?IRAE_SCHEMA.KINDS[n].label.replace(/（.*$/,""):n)+" "+k[n];}).join("、")||"（無）";
+  var c={};P.subjects.forEach(function(e){c[e.status]=(c[e.status]||0)+1;});
+  var rows=P.subjects.map(function(e){var cn=e.counts,pro=[];if(e.errs.length)pro.push(esc(e.errs.slice(0,2).join("；"))+(e.errs.length>2?" 等 "+e.errs.length+" 項":""));
+    if(e.warns)pro.push(e.warns+" 項建議補填");Object.keys(e.issues).forEach(function(q){pro.push(esc(IMP_ISS[q]||q));});
+    return '<tr><td class="ir-t1"><b>'+esc(e.id||"（無編號）")+'</b></td><td data-l="狀態"><span class="ir-st ir-'+(e.status==="new"||e.status==="resume"?"open":e.status==="done"?"done":"overdue")+'">'+esc(IMP_ST[e.status])+(e.status==="resume"?" "+e.pending.length+" 筆":"")+'</span></td><td data-l="療程">'+(cn.course||0)+'</td><td data-l="給藥">'+(cn.ici_dose||0)+'</td><td data-l="抽血">'+(cn.draw||0)+'</td><td data-l="事件">'+(cn.event||0)+'</td><td data-l="提醒" class="wrap">'+(pro.join("；")||"—")+'</td></tr>';}).join("");
+  var blocked=c.blocked?'<p class="ir-warn">有 '+c.blocked+' 位的研究編號在這個空間已經存在、而且不是這份檔案寫入的（例如測試用的假受試者）。這些<b>不會寫入</b>；要先在主控台處理那筆既有資料或改研究編號，再重新匯入。</p>':"";
+  return '<p>來源：'+esc(P.source||"（未註明）")+'。共 <b>'+P.subjects.length+'</b> 位：新增 '+(c["new"]||0)+'、接續 '+(c.resume||0)+'、已匯入過 '+(c.done||0)+'、已存在不寫 '+(c.blocked||0)+'、不合格 '+(c.invalid||0)+'。待寫入 <b>'+P.totals.pending+'</b> 筆（'+esc(kt)+'）。</p>'+blocked+
+    '<div class="ir-scroll"><table class="ir-stack"><thead><tr><th>研究編號</th><th>狀態</th><th>療程</th><th>給藥</th><th>抽血</th><th>事件</th><th>提醒</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<details class="ir-notes"><summary>轉換時採用的預設（Q-D）</summary><ul class="ir-iss"><li>Q-D-01 收案日視為同意日，也是基線抽血日</li><li>Q-D-02 年齡以首劑日（無則收案日）計整數歲</li><li>Q-D-03 存活＝進行中；最後追蹤日取 AE 欄名的日期</li><li>Q-D-05 AE 自由文字每個「項目 gr N」成一筆事件（標待核對）</li><li>Q-D-06 藥名對照：Nivo／Pembro／Nivo+Ipi</li><li>Q-D-07 病歷號重複只警告、不合併</li></ul><p class="mini">詳見 docs/IRAE_PAD4_DEID_20261005.md。事實寫入後只能用「更正／刪除」留下紀錄，不能直接改，所以這些預設要先確認。</p></details>'+
+    (P.ok?'<div class="ir-next warn"><div class="why"><b>這會把真實病人的資料（編碼化，含臨床日期）寫進雲端。</b>寫入前請確認：①檔案是去識別轉換後的結果，不是對照表；②備份與資料保護事項（第二份備份、網路環境）已處理。</div></div>'+
+      '<label class="ir-imp-ok"><input type="checkbox" id="irImpOk"><span>我確認以上兩點，並同意寫入。</span></label><p><button class="btn go" type="button" id="irImpGo" disabled>寫入 '+P.totals.subjects+' 位受試者（'+P.totals.pending+' 筆）</button></p><p class="merr" id="irImpMsg"></p>':
+      '<p class="mini">沒有可寫入的受試者。</p>');}
+function importPage(){if(!canImport())return;++SEQ;CUR=null;CD=null;var P=null,J=null;
+  main().innerHTML='<div class="ir-page ir"><section class="ir-card head"><div class="ir-hd"><h2 class="ir-id">匯入去識別資料</h2><div class="ir-hact"><button class="btn" type="button" id="irImpBack">← 清單</button></div></div>'+
+    '<div class="ir-bd"><p class="mini">把舊的 Excel／CSV 先導資料（已用 irae_deid_pad4.py 去識別轉換）放進登錄。先預覽，確認後才寫入；已存在的受試者不會被覆蓋。</p></div></section>'+
+    card("①","選擇檔案","",'<p>請選 <b>irae_pad4_registry.json</b>（不是 MAPPING 對照表）。檔案只在這個瀏覽器內讀取，不會上傳，也不記錄檔名。</p><p><input type="file" id="irImpFile" accept=".json,application/json"></p>'+
+      '<p class="mini">這個檔案只有受試者、療程、給藥、抽血與不良事件；PAD4／CBC／MDW 等檢驗數值（assays）不在其中，需要另一個步驟。</p><p class="merr" id="irImpErr"></p>')+
+    card("②","預覽與寫入","",'<div id="irImpOut"><p class="mini">選好檔案後在這裡預覽。</p></div>')+'</div>';
+  $("#irImpBack").onclick=home;
+  $("#irImpFile").onchange=function(){var f=this.files&&this.files[0],err=$("#irImpErr"),out=$("#irImpOut");err.textContent="";P=null;J=null;if(!f)return;
+    if(/mapping/i.test(f.name||"")){err.textContent="這看起來是對照表（含真實個資），不能匯入。請選 irae_pad4_registry.json。";this.value="";out.innerHTML="";return;}
+    if(f.size>5e6){err.textContent="檔案太大（超過 5 MB），不像是登錄資料。";this.value="";return;}
+    out.innerHTML='<p class="mini">讀取與檢查中…</p>';
+    new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result||""));};r.onerror=function(){rej(new Error("讀不到檔案"));};r.readAsText(f);}).then(function(t){
+      try{J=JSON.parse(t.charCodeAt(0)===65279?t.slice(1):t);}catch(e){throw new Error("不是有效的 JSON 檔");}
+      var ids=(J&&Array.isArray(J.subjects)?J.subjects:[]).map(function(s){return s&&s.subject&&String(s.subject.id||"");});
+      return store().openKey().then(function(){return impExisting(ids);});}).then(function(ex){P=planImport(J,ex);P.subjects.forEach(function(e,i){e.subjectDoc=J.subjects[i]&&J.subjects[i].subject;});
+        out.innerHTML=impPreview(P);var ok=$("#irImpOk"),go=$("#irImpGo");if(!ok||!go)return;ok.onchange=function(){go.disabled=!ok.checked;};
+        go.onclick=function(){if(!ok.checked||!P||!P.ok)return;go.disabled=true;ok.disabled=true;var msg=$("#irImpMsg"),tag="imp:"+fnv(JSON.stringify(J));msg.textContent="寫入中…";
+          runImport(P,tag,function(R,total){msg.textContent="寫入中… 事實 "+R.facts+" / "+total+"，受試者完成 "+R.subjects;}).then(function(R){
+            msg.innerHTML=(R.errors.length?'<span class="ir-warn">有 '+R.errors.length+' 位寫入失敗：'+R.errors.map(function(q){return esc(q.id+"（"+q.msg+"）");}).join("；")+'。可重新選同一個檔案再按一次，已寫入的不會重複。</span><br>':"")+
+              '寫入完成：受試者 '+R.subjects+' 位、事實 '+R.facts+' 筆。<b>建議現在就下載加密備份。</b> <button class="btn sm" type="button" id="irImpBk">下載加密備份</button> <button class="btn sm" type="button" id="irImpHome">回清單</button>';
+            var b1=$("#irImpBk"),b2=$("#irImpHome");if(b1)b1.onclick=function(){Promise.resolve(SEC.doBackup());};if(b2)b2.onclick=home;});};
+      }).catch(function(e){out.innerHTML="";err.textContent=(e&&e.message)||String(e);});};}
+
 /* ---------- 空間入口（主持人）與生命週期 ---------- */
 function ensureMk(){var s=S(),b=$("#bIraeMk"),has=x().studies().some(function(q){return q.mode==="irae";});
   if(!s||s.offline||!x().isAdmin()||s.mode||has){if(b)b.hidden=true;return;}
@@ -6996,7 +7089,7 @@ function grantKeys(){return store().openKey().then(function(){var M=x().members(
   var k=store()._k();if(k&&k.keys[uid]&&k.kfp&&k.kfp[uid])jobs.push(x().fpOf(u.pub).then(function(fp){return k.kfp[uid]===fp?0:store().grant(uid).then(function(){return 1;});}));else jobs.push(store().grant(uid).then(function(){return 1;}));});
   return Promise.all(jobs).then(function(a){return a.reduce(function(n,v){return n+v;},0);});});}
 return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:function(){return LIST.length;},home:home,openSubject:openSubject,grantKeys:grantKeys,grantOne:grantOne,revokeOne:revokeOne,store:store,
-  _t:{timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
+  _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
 /* ---------- init ---------- */
