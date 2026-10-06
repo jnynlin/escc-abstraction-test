@@ -377,7 +377,7 @@ p.small,.small{font-size:.92rem;} .legend,.legend span{font-size:.92rem;} #m1,#m
 
 /* ---- irAE 登錄空間（M1-a，2026-10-05）：沒有摘錄側欄、資料選單、分派；表格可橫向捲動；只用 token ---- */
 .irae-space .rail,.irae-space #dock,.irae-space #bAssign,.irae-space #menu{display:none!important;} .irae-space .shell{display:block;}
-.ir h2{margin:0 0 6px;} .ir h3{margin:20px 0 6px;font-size:1.08rem;} .ir h4{margin:12px 0 4px;font-size:1rem;}
+.ir{--ir-h1:2rem;--ir-h2:1.4rem;--ir-h3:1.12rem;} .ir h2{margin:0 0 6px;font-size:var(--ir-h1);font-weight:800;line-height:1.2;} .ir h3{margin:20px 0 6px;font-size:var(--ir-h2);font-weight:700;line-height:1.3;} .ir h4{margin:12px 0 4px;font-size:var(--ir-h3);font-weight:700;line-height:1.35;}
 .ir-top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;} .ir-act{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;}
 .ir-scroll{overflow-x:auto;} .ir table{width:100%;border-collapse:collapse;font-size:.95rem;} .ir td{white-space:nowrap;} .ir td.wrap{white-space:normal;min-width:10em;} .ir th,.ir td{border-bottom:1px solid var(--rule);padding:8px 6px;text-align:left;vertical-align:top;} .ir th{color:var(--soft);font-weight:600;font-size:.88rem;white-space:nowrap;}
 .ir tr.ir-row{cursor:pointer;} .ir tr.ir-row:hover{background:rgba(127,127,127,.09);}
@@ -386,28 +386,33 @@ p.small,.small{font-size:.92rem;} .legend,.legend span{font-size:.92rem;} #m1,#m
 .ir button.sm{min-height:36px;padding:0 10px;font-size:.9rem;} .ir-sugg{border:1px solid var(--iodine);border-radius:8px;padding:8px 10px;margin:8px 0;} .ir-course{border:1px solid var(--rule);border-radius:10px;padding:8px 10px;margin:10px 0;}
 .ir-iss{margin:6px 0 6px 18px;padding:0;font-size:.92rem;} .ir-iss li{margin:3px 0;} abbr.ir-q{font-size:.8rem;border:1px solid var(--rule);border-radius:6px;padding:0 4px;text-decoration:none;cursor:help;white-space:nowrap;}
 
-/* ---- 版面改版（2026-10-06，user：各區塊不明顯、功能按鈕位置）：每個區塊一張卡片、標題列右側放該區塊的主要按鈕、頂端「下一步」橫幅、手機表格轉卡片 ---- */
-.sheet.ir,.ir-page{background:transparent;border:0;padding:0;} .ir-page{max-width:1000px;margin:0 auto;padding:4px 0 24px;}
-.ir-card{background:var(--sheet);border:1px solid var(--rule);border-left:6px solid var(--done);border-radius:10px;margin:14px 0;overflow:hidden;} .ir-card.ir-calc{border-left-color:var(--soft);} .ir-card.head{border-left-color:var(--focus);}
-.ir-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;background:var(--well);border-bottom:1px solid var(--rule);} .ir-hd h3,.ir-hd h2{margin:0;} .ir-hd h3{font-size:1.06rem;display:flex;align-items:center;gap:8px;flex:1 1 14em;} .ir-id{font-size:1.35rem;}
-.ir-no{display:inline-flex;align-items:center;justify-content:center;width:1.7em;height:1.7em;border-radius:50%;background:var(--done);color:#fff;font-size:.9rem;font-weight:700;} .ir-card.ir-calc .ir-no{background:var(--soft);}
-.ir-hact{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;align-items:center;} .ir-bd{padding:8px 14px 12px;} .ir-card h2{margin:0;}
-.ir-chip{display:inline-block;padding:2px 10px;border-radius:12px;background:var(--done-soft);color:var(--done);font-weight:600;font-size:.9rem;} .ir-meta{margin:2px 0 8px;}
-.ir-chd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--well);border-radius:8px 8px 0 0;border-bottom:1px solid var(--rule);} .ir-chd h4{margin:0;flex:1 1 12em;} .ir-course{padding:0;overflow:hidden;background:var(--sheet);} .ir-course .ir-scroll{padding:0 10px;}
-.ir-cft{padding:8px 12px;border-top:1px solid var(--rule);display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--well);}
-.ir-next{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--done);background:var(--done-soft);border-left-width:6px;border-radius:10px;padding:10px 14px;margin:14px 0;} .ir-next .why{flex:1 1 16em;} .ir-next .t{font-size:1.02rem;}
-.ir-next.warn{border-color:var(--err);background:var(--err-soft);} .ir-next.wait{border-color:var(--iodine);background:var(--iodine-soft);} .ir-next.info{border-color:var(--rule);background:var(--well);}
-.ir button.ir-del{color:var(--err);background:transparent;} .ir td.ir-ops,.ir th.ir-ops{text-align:right;white-space:nowrap;} .ir td.ir-t1{font-weight:600;}
-.ir-hint{display:block;color:var(--soft);font-size:.82rem;font-weight:400;margin:1px 0 4px;line-height:1.4;} .ir-chips{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;} .ir-adv{margin:4px 0 10px;border:1px dashed var(--rule);border-radius:8px;padding:2px 10px;} .ir-adv summary{cursor:pointer;color:var(--soft);font-size:.92rem;padding:6px 0;}
-.ir-prev{background:var(--well);border-radius:8px;padding:6px 10px;font-size:.9rem;margin:6px 0 4px;min-height:1.2em;} .ir-prev:empty{display:none;} #modal .mf input[type=date],#modal .mf input[type=number]{min-height:44px;}
+/* ---- 版面（2026-10-07 改為扁平：少用框與陰影，區塊靠留白與細分隔線；user 回饋「區塊間隔」「減少陰影框」） ---- */
+.sheet.ir,.ir-page{background:transparent;border:0;padding:0;box-shadow:none;} .ir-page{max-width:980px;margin:0 auto;padding:8px 0 56px;}
+.ir-card{background:none;border:0;border-radius:0;box-shadow:none;margin:52px 0 0;overflow:visible;} .ir-card.head{margin-top:12px;}
+.ir-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 0 10px;margin:0 0 16px;border-bottom:2px solid var(--ink);} .ir-hd h3,.ir-hd h2{margin:0;} .ir-hd h3{font-size:var(--ir-h2);font-weight:700;display:flex;align-items:baseline;gap:10px;flex:1 1 14em;} .ir-id{font-size:var(--ir-h1);}
+.ir-no{color:var(--done);font-weight:700;} .ir-hd h3{flex-wrap:wrap;} .ir-tt{white-space:nowrap;} .ir-hd h3 .mini{font-size:.86rem;font-weight:400;color:var(--soft);} .ir-hact{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;align-items:center;} .ir-bd{padding:0;} .ir-card h2{margin:0;}
+.ir-chip{display:inline-block;padding:2px 10px;border-radius:12px;background:var(--done-soft);color:var(--done);font-weight:600;font-size:.9rem;} .ir-meta{margin:2px 0 12px;}
+.ir-course{border:0;background:none;margin:28px 0 0;padding:0;overflow:visible;} .ir-chd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 0 4px;} .ir-chd h4{margin:0;flex:1 1 12em;font-size:var(--ir-h3);} .ir-course .ir-scroll{padding:0;}
+.ir-cft{padding:12px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.ir-next{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);background:none;padding:14px 0;margin:22px 0 0;} .ir-next::before{content:"";flex:none;width:10px;height:10px;border-radius:50%;background:var(--done);}
+.ir-next .why{flex:1 1 16em;} .ir-next .t{font-size:1.04rem;} .ir-next.warn::before{background:var(--err);} .ir-next.warn .t{color:var(--err);} .ir-next.wait::before{background:var(--iodine);} .ir-next.info::before{background:var(--soft);}
+.ir button.ir-del{color:var(--err);background:transparent;} .ir td.ir-ops,.ir th.ir-ops{text-align:right;white-space:nowrap;} .ir td.ir-t1{font-weight:600;} .ir th,.ir td{padding:10px 6px;} .ir-h4{margin:22px 0 4px;font-size:var(--ir-h3);color:var(--ink);font-weight:700;}
+.ir-leg{margin:10px 0 2px;} .ir-leg summary,.ir-notes summary{cursor:pointer;color:var(--soft);font-size:.92rem;padding:4px 0;} .ir-notes{border:0;padding:0;margin:40px 0 0;} .ir-notes .ir-bd{padding:6px 0;}
+/* 抽血時間軸圖（SVG）：顏色全用主題 token；沒有框與陰影 */
+.ir-tl{margin:4px 0;} .tl-svg{display:block;max-width:100%;height:auto;} .tl-lab{font-size:12px;fill:var(--ink);} .tl-tag{font-weight:700;} .tl-sub{font-size:10.5px;fill:var(--soft);} .tl-grid{stroke:var(--rule);stroke-width:1;} .tl-row{stroke:var(--rule);stroke-width:1;opacity:.55;}
+.tl-band{opacity:.92;} .tl-b-done{fill:var(--done);} .tl-b-open{fill:var(--iodine);} .tl-b-overdue{fill:var(--err);} .tl-b-dev{fill:none;stroke:var(--iodine);stroke-width:2;} .tl-b-not{fill:var(--rule);stroke:var(--soft);stroke-opacity:.35;} .tl-b-wait,.tl-b-na{fill:none;stroke:var(--soft);stroke-dasharray:3 3;}
+.tl-tgt{fill:var(--ink);} .tl-draw{fill:var(--ink);stroke:var(--sheet);stroke-width:1.5;} .tl-dose{stroke:var(--done);stroke-width:2;} .tl-end{fill:var(--done);} .tl-today{stroke:var(--err);stroke-width:1.5;stroke-dasharray:4 3;} .tl-todayt{font-size:11px;fill:var(--err);font-weight:600;}
+.tl-st{font-size:11px;font-weight:600;} .tl-s-overdue{fill:var(--err);} .tl-s-open{fill:var(--iodine);}
+.ir-tll{margin:6px 0 0;} .tl-key{display:inline-block;width:14px;height:8px;border-radius:2px;vertical-align:middle;margin-right:3px;box-sizing:border-box;} .tl-key.tl-b-done{background:var(--done);} .tl-key.tl-b-open{background:var(--iodine);} .tl-key.tl-b-overdue{background:var(--err);} .tl-key.tl-b-dev{background:none;border:2px solid var(--iodine);} .tl-key.tl-b-not{background:var(--rule);} .tl-key.tl-b-wait{background:none;border:1px dashed var(--soft);}
+.ir-hint{display:block;color:var(--soft);font-size:.82rem;font-weight:400;margin:1px 0 4px;line-height:1.4;} .ir-chips{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;} .ir-adv{margin:4px 0 10px;border:0;padding:0;} .ir-adv summary{cursor:pointer;color:var(--soft);font-size:.92rem;padding:6px 0;}
+.ir-prev{background:none;border-top:1px solid var(--rule);padding:8px 0 2px;font-size:.92rem;margin:8px 0 4px;min-height:1.2em;} .ir-prev:empty{display:none;} #modal .mf input[type=date],#modal .mf input[type=number]{min-height:44px;}
 tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{background:var(--done-soft);}to{background:transparent;}}
-.ir-leg{margin:8px 0 2px;} .ir-leg summary,.ir-notes summary{cursor:pointer;color:var(--soft);font-size:.92rem;padding:4px 0;} .ir-notes{padding:6px 14px;} .ir-notes .ir-bd{padding:4px 0;}
 @media (max-width:640px){
-  .ir-hd{padding:8px 10px;} .ir-bd{padding:6px 10px 10px;} .ir-hact{margin-left:0;width:100%;} .ir-hact .btn{flex:1 1 auto;min-height:44px;}
-  .ir table.ir-stack thead{display:none;} .ir table.ir-stack,.ir table.ir-stack tbody{display:block;width:100%;} .ir table.ir-stack tr{display:block;border:1px solid var(--rule);border-radius:8px;padding:6px 10px;margin:8px 0;background:var(--sheet);}
+  .ir{--ir-h1:1.65rem;--ir-h2:1.25rem;--ir-h3:1.08rem;} .ir-card{margin-top:38px;} .ir-hact{margin-left:0;width:100%;} .ir-hact .btn{flex:1 1 auto;min-height:44px;}
+  .ir table.ir-stack thead{display:none;} .ir table.ir-stack,.ir table.ir-stack tbody{display:block;width:100%;} .ir table.ir-stack tr{display:block;border:0;border-bottom:1px solid var(--rule);border-radius:0;padding:12px 0;margin:0;background:none;}
   .ir table.ir-stack td{display:flex;gap:8px;justify-content:space-between;align-items:flex-start;border:0;padding:3px 0;white-space:normal;text-align:right;} .ir table.ir-stack td::before{content:attr(data-l);color:var(--soft);font-size:.85rem;flex:0 0 5.5em;text-align:left;}
   .ir table.ir-stack td.ir-t1{font-size:1.02rem;text-align:left;justify-content:flex-start;} .ir table.ir-stack td.ir-t1::before{content:none;} .ir table.ir-stack td.ir-ops{justify-content:flex-end;} .ir table.ir-stack td.ir-ops::before{content:none;}
-  .ir table.ir-stack td[colspan]{display:block;text-align:left;} .ir table.ir-stack td[colspan]::before{content:none;} .ir-scroll{overflow-x:visible;} .ir-course .ir-scroll{padding:0 8px;}
+  .ir table.ir-stack td[colspan]{display:block;text-align:left;} .ir table.ir-stack td[colspan]::before{content:none;} .ir-scroll{overflow-x:visible;}
   .ir-next .btn{width:100%;min-height:44px;} .ir button.sm{min-height:40px;}
 }
 </style>
@@ -6846,7 +6851,7 @@ function drawSubject(){
     '<div class="ir-bd"><p class="mini ir-meta">'+meta+'</p>'+(d.note?'<p class="mini">備註：'+esc(d.note)+'</p>':"")+(w?'<div class="ir-act"><button class="btn sm" type="button" id="irEdit">編輯基本資料</button><button class="btn sm" type="button" id="irStatus">變更狀態</button></div>':"")+'</div></section>';
   var nx=nextStep(tl,cids,facts,w,cf);NEXTACT=nx.act||null;
   var tasksHtml=tasks?'<div class="ir-tasks">'+tasks+'</div>':"";
-  var timeline='<div class="ir-scroll"><table id="irSlots" class="ir-stack"><thead><tr><th>時點</th><th>目標日</th><th>可抽的窗</th><th>狀態</th><th>抽血日</th><th>備註</th></tr></thead><tbody>'+(slotRows||'<tr><td colspan="6" class="mini">尚無療程，沒有時點。請先新增療程。</td></tr>')+'</tbody></table></div>'+
+  var timeline='<div id="irTl" class="ir-tl"></div>'+tlLegend()+'<h4 class="ir-h4">明細</h4><div class="ir-scroll"><table id="irSlots" class="ir-stack"><thead><tr><th>時點</th><th>目標日</th><th>可抽的窗</th><th>狀態</th><th>抽血日</th><th>備註</th></tr></thead><tbody>'+(slotRows||'<tr><td colspan="6" class="mini">尚無療程，沒有時點。請先新增療程。</td></tr>')+'</tbody></table></div>'+
     '<p class="mini">下次抽血：'+nextText(tl)+'</p>'+(issues?'<ul class="ir-iss">'+issues+'</ul>':"")+legendHtml();
   var drawsHtml='<div class="ir-scroll"><table id="irDraws" class="ir-stack"><thead><tr><th>抽血日</th><th>歸屬時點</th><th>管別／備註</th><th>偏差原因</th><th class="ir-ops">操作</th></tr></thead><tbody>'+(drawRows||'<tr><td colspan="5" class="mini">尚無抽血紀錄。請按右上角「＋登錄抽血」。</td></tr>')+'</tbody></table></div>'+(wvRows?'<p class="mini">已放棄的時點：</p><ul class="ir-iss">'+wvRows+'</ul>':"");
   var notes='<details class="ir-card ir-calc ir-notes"><summary>說明代碼（Q-M1）與資料原則</summary><div class="ir-bd"><ul class="ir-iss">'+(Object.keys(noteCodes).sort().map(function(c){return '<li><b>'+esc(c)+'</b>　'+esc(QN[c]||"")+'</li>';}).join("")||'<li class="mini">無</li>')+'</ul>'+
@@ -6854,9 +6859,41 @@ function drawSubject(){
   main().innerHTML='<div class="ir-page ir">'+head+nx.html+tasksHtml+
     card("①","免疫治療療程與給藥",w?'<button class="btn go" type="button" id="irAddCourse">＋新增療程</button>':"",courseHtml||'<p class="mini">尚無療程。請按右上角「＋新增療程」。</p>')+
     card("②","抽血登錄",w?'<button class="btn go" type="button" id="irAddDraw">＋登錄抽血</button><button class="btn" type="button" id="irAddWv">放棄某時點</button>':"",drawsHtml)+
-    card("③",'抽血時間軸 <span class="mini">（自動計算，不能直接改；今天 '+esc(today())+'）</span>',"",timeline,"ir-calc")+notes+'</div>';
+    card("③",'<span class="ir-tt">抽血時間軸</span> <span class="mini">（自動計算，不能直接改；今天 '+esc(today())+'）</span>',"",timeline,"ir-calc")+notes+'</div>';
   var nbb=$("#irNextBtn");if(nbb&&NEXTACT)nbb.onclick=function(){NEXTACT();};
+  drawTimeline();if(!window.__irTlBound){window.__irTlBound=true;window.addEventListener("resize",tlResize);}
   wire();}
+/* ---------- 抽血時間軸可視化（2026-10-07）：一列一個時點（可抽的窗＝橫條、目標日＝菱形、實際抽血＝圓點），最上面一列是給藥，今天用虛線。純函式，輸入已算好的時點與事實，輸出 SVG 字串 ---------- */
+var TLCLS={done:"done",open:"open",dueSoon:"open",overdue:"overdue",deviation:"dev",notYet:"not",awaitingEnd:"wait",awaitingStart:"wait",na:"na"};
+function timelineSvg(o){var slots=o.slots||[],draws=o.draws||[],doses=o.doses||[],W=Math.max(300,Math.round(o.width||800)),narrow=W<520,padL=narrow?44:150,padR=12,top=42,rowH=30,dn=IRAE_TL.dn,iso=IRAE_TL.iso;
+  var ok=function(x){return x&&/^\d{4}-\d{2}-\d{2}$/.test(x);},ds=[];
+  slots.forEach(function(q){[q.windowStart,q.windowEnd,q.target].forEach(function(x){if(ok(x))ds.push(dn(x));});});draws.forEach(function(r){if(ok(r.date))ds.push(dn(r.date));});doses.forEach(function(r){if(ok(r.date))ds.push(dn(r.date));});if(ok(o.endDate))ds.push(dn(o.endDate));if(ok(o.today))ds.push(dn(o.today));
+  if(!ds.length)return '<p class="mini">尚無日期可畫（先新增療程與給藥）。</p>';
+  var d0=Math.min.apply(null,ds)-10,d1=Math.max.apply(null,ds)+10,pw=W-padL-padR,X=function(x){return padL+(dn(x)-d0)/(d1-d0)*pw;},XN=function(n){return padL+(n-d0)/(d1-d0)*pw;};
+  var rows=[{k:"dose",label:"給藥",sub:""}].concat(slots.map(function(q){return {k:"slot",q:q};})),orphan=draws.filter(function(r){return !slots.some(function(q){return q.drawId===r.id;});});if(orphan.length)rows.push({k:"orph",label:"其他抽血",sub:""});
+  var H=top+rows.length*rowH+8,out=[],e=function(t){return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");};
+  /* 月份刻度：視寬度決定每幾個月標一次 */
+  var months=[],dt=new Date(d0*864e5);dt=new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth()+1,1));while(dt.getTime()/864e5<=d1){months.push(Math.round(dt.getTime()/864e5));dt=new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth()+1,1));}
+  var step=Math.max(1,Math.ceil(34/(pw/Math.max(1,(d1-d0)/30.4))));months.forEach(function(n,i){var x=XN(n);out.push('<line class="tl-grid" x1="'+x.toFixed(1)+'" y1="'+(top-6)+'" x2="'+x.toFixed(1)+'" y2="'+(H-6)+'"/>');if(i%step===0)out.push('<text class="tl-sub" x="'+(x+3).toFixed(1)+'" y="'+(top-12)+'">'+iso(n).slice(2,7).replace("-","/")+'</text>');});
+  rows.forEach(function(r,i){var y=top+i*rowH,cy=y+rowH/2;out.push('<line class="tl-row" x1="0" y1="'+(y+rowH)+'" x2="'+W+'" y2="'+(y+rowH)+'"/>');
+    if(r.k==="dose"){out.push('<text class="tl-lab" x="2" y="'+(cy+4)+'">給藥</text>');doses.forEach(function(d){if(!ok(d.date))return;var x=X(d.date);out.push('<line class="tl-dose" x1="'+x.toFixed(1)+'" y1="'+(cy-8)+'" x2="'+x.toFixed(1)+'" y2="'+(cy+8)+'"><title>'+e("給藥 "+d.date+(d.drug?"　"+d.drug:""))+'</title></line>');});
+      if(ok(o.endDate)){var xe=X(o.endDate);out.push('<path class="tl-end" d="M'+xe.toFixed(1)+' '+(cy-9)+' l6 4 l-6 4 z"><title>'+e("治療結束日 "+o.endDate)+'</title></path>');if(!narrow)out.push('<text class="tl-sub" x="'+(xe+9).toFixed(1)+'" y="'+(cy+4)+'">結束</text>');}}
+    else if(r.k==="orph"){out.push('<text class="tl-lab" x="2" y="'+(cy+4)+'">'+e(r.label)+'</text>');orphan.forEach(function(d){if(ok(d.date))out.push('<circle class="tl-draw" cx="'+X(d.date).toFixed(1)+'" cy="'+cy+'" r="5"><title>'+e("抽血 "+d.date+"（未歸屬任何時點）")+'</title></circle>');});}
+    else{var q=r.q,cls=TLCLS[q.status]||"na",tag=(q.key||"").split(":")[1]||"",nm=(q.label||"").replace(/^c\d+\s*/,""),zh=IRAE_TL.STATUS_ZH[q.status]||q.status;
+      out.push('<text class="tl-lab" x="2" y="'+(cy+4)+'"><tspan class="tl-tag">'+e(tag)+'</tspan>'+(narrow?"":'<tspan dx="6">'+e(nm.length>10?nm.slice(0,10)+"…":nm)+'</tspan>')+'</text>');
+      var tip=(q.label||q.key)+"：目標 "+(q.target||"—")+"；可抽的窗 "+(q.windowStart||"—")+" ～ "+(q.windowEnd||"—")+"；"+zh;
+      if(ok(q.windowStart)&&ok(q.windowEnd)){var x1=X(q.windowStart),x2=X(q.windowEnd),w=Math.max(14,x2-x1);out.push('<rect class="tl-band tl-b-'+cls+'" x="'+x1.toFixed(1)+'" y="'+(cy-7)+'" width="'+w.toFixed(1)+'" height="14" rx="3"><title>'+e(tip)+'</title></rect>');}
+      else out.push('<text class="tl-sub" x="'+(padL+6)+'" y="'+(cy+4)+'">日期待定（'+e(zh)+'）</text>');
+      if(ok(q.target))out.push('<path class="tl-tgt" d="M'+X(q.target).toFixed(1)+' '+(cy-10)+' l5 5 l-5 5 l-5 -5 z"><title>'+e("目標日 "+q.target)+'</title></path>');
+      var dr=draws.filter(function(d){return d.id===q.drawId;})[0];if(dr&&ok(dr.date))out.push('<circle class="tl-draw" cx="'+X(dr.date).toFixed(1)+'" cy="'+cy+'" r="4.5"><title>'+e("實際抽血 "+dr.date)+'</title></circle>');
+      if(!narrow&&(q.status==="overdue"||q.status==="open"||q.status==="dueSoon")&&ok(q.windowEnd))out.push('<text class="tl-st tl-s-'+cls+'" x="'+(Math.min(X(q.windowEnd)+8,W-60)).toFixed(1)+'" y="'+(cy+4)+'">'+e(zh)+'</text>');}});
+  if(ok(o.today)){var xt=X(o.today);out.push('<line class="tl-today" x1="'+xt.toFixed(1)+'" y1="'+(top-6)+'" x2="'+xt.toFixed(1)+'" y2="'+(H-6)+'"/><text class="tl-todayt" x="'+Math.max(16,Math.min(W-16,xt)).toFixed(1)+'" y="12" text-anchor="middle">今天</text>');}
+  return '<svg class="tl-svg" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" role="img" aria-label="抽血時間軸：每個時點可抽血的窗、目標日、實際抽血與今天">'+out.join("")+'</svg>';}
+function drawTimeline(){var c=$("#irTl");if(!c||!CD||!CD.tl)return;var s=CD,w0=Math.floor((c.getBoundingClientRect().width||c.clientWidth||800));
+  var ends=cur(s.confirms,"end"),ed=ends.length?ends.map(function(x){return x.data.endDate;}).sort().pop():null;
+  c.innerHTML=timelineSvg({slots:s.tl.slots,draws:cur(s.facts,"draw").map(function(r){return {id:r.id,date:r.data.date};}),doses:cur(s.facts,"ici_dose").map(function(r){return {date:r.data.date,drug:r.data.drug};}),endDate:ed,today:today(),width:w0});}
+var TLRZ=null;function tlResize(){clearTimeout(TLRZ);TLRZ=setTimeout(function(){if($("#irTl"))drawTimeline();},150);}
+function tlLegend(){return '<p class="ir-tll mini"><span class="tl-key tl-b-done"></span>已完成　<span class="tl-key tl-b-open"></span>可抽／即將到期　<span class="tl-key tl-b-overdue"></span>逾期　<span class="tl-key tl-b-dev"></span>偏差　<span class="tl-key tl-b-not"></span>未到　<span class="tl-key tl-b-wait"></span>待確認／不適用　　◆目標日　●實際抽血　┆今天</p>';}
 function card(no,title,acts,body,cls){return '<section class="ir-card'+(cls?" "+cls:"")+'"><div class="ir-hd"><h3>'+(no?'<span class="ir-no">'+no+'</span>':"")+title+'</h3>'+(acts?'<div class="ir-hact">'+acts+'</div>':"")+'</div><div class="ir-bd">'+body+'</div></section>';}
 function legendHtml(){var L=[["notYet","還沒到可以抽血的日期。"],["open","現在在可抽的窗內，請安排抽血。"],["dueSoon","窗快結束了（最後 7 天內），請盡快抽血。"],["overdue","窗已過、還沒有抽血。可以補登（會標為偏差），或放棄這個時點。"],["done","窗內已經抽血。"],
   ["deviation","已抽血但不在窗內，或這個時點被放棄；需要填偏差原因。"],["awaitingEnd","要等醫師或主持人確認「治療結束日」，之後 +0、+3、+6、+12 個月的日期才算得出來。"],["awaitingStart","還沒有給藥紀錄，要有第一劑日才算得出「治療前」的窗。"],["na","這個時點已經不可能抽（例如納入時已在用藥，或已退出、死亡、失聯）。"]];
@@ -6959,7 +6996,7 @@ function grantKeys(){return store().openKey().then(function(){var M=x().members(
   var k=store()._k();if(k&&k.keys[uid]&&k.kfp&&k.kfp[uid])jobs.push(x().fpOf(u.pub).then(function(fp){return k.kfp[uid]===fp?0:store().grant(uid).then(function(){return 1;});}));else jobs.push(store().grant(uid).then(function(){return 1;}));});
   return Promise.all(jobs).then(function(a){return a.reduce(function(n,v){return n+v;},0);});});}
 return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:function(){return LIST.length;},home:home,openSubject:openSubject,grantKeys:grantKeys,grantOne:grantOne,revokeOne:revokeOne,store:store,
-  _t:{toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
+  _t:{timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
 /* ---------- init ---------- */
