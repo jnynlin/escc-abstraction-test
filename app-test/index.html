@@ -374,6 +374,17 @@ p.small,.small{font-size:.92rem;} .legend,.legend span{font-size:.92rem;} #m1,#m
 .prom .cfa .btn{min-height:40px;} .prom .cfn{font:inherit;font-size:1.05rem;width:6.5em;min-height:40px;padding:4px 8px;border:1px solid var(--rule);border-radius:6px;background:var(--sheet);color:var(--ink);}
 .prom .pm-cfdone{margin-top:8px;} .prom .pm-cfdone li{margin:6px 0;font-size:.88rem;} .prom .pm-cfdone .btn{min-height:32px;padding:0 10px;margin-left:6px;}
 .prom .cf-hint{align-self:center;} .prom .actbar .btn[disabled]{opacity:.55;cursor:not-allowed;}
+
+/* ---- irAE 登錄空間（M1-a，2026-10-05）：沒有摘錄側欄、資料選單、分派；表格可橫向捲動；只用 token ---- */
+.irae-space .rail,.irae-space #dock,.irae-space #bAssign,.irae-space #menu{display:none!important;} .irae-space .shell{display:block;}
+.ir h2{margin:0 0 6px;} .ir h3{margin:20px 0 6px;font-size:1.08rem;} .ir h4{margin:12px 0 4px;font-size:1rem;}
+.ir-top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;} .ir-act{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;}
+.ir-scroll{overflow-x:auto;} .ir table{width:100%;border-collapse:collapse;font-size:.95rem;} .ir td{white-space:nowrap;} .ir td.wrap{white-space:normal;min-width:10em;} .ir th,.ir td{border-bottom:1px solid var(--rule);padding:8px 6px;text-align:left;vertical-align:top;} .ir th{color:var(--soft);font-weight:600;font-size:.88rem;white-space:nowrap;}
+.ir tr.ir-row{cursor:pointer;} .ir tr.ir-row:hover{background:rgba(127,127,127,.09);}
+.ir-st{display:inline-block;padding:1px 8px;border-radius:10px;font-size:.88rem;border:1px solid var(--rule);white-space:nowrap;} .ir-overdue{color:var(--err);border-color:var(--err);font-weight:600;} .ir-dueSoon,.ir-open{border-color:var(--acc);font-weight:600;} .ir-done{color:var(--soft);} .ir-deviation{color:var(--iodine);border-color:var(--iodine);}
+.ir-kpi{margin:6px 0 10px;font-size:1rem;} .ir-kpi b{font-size:1.3rem;} .ir .mini{font-size:.88rem;color:var(--soft);line-height:1.5;} .ir-warn{border:1px solid var(--err);border-radius:8px;padding:8px 10px;color:var(--err);}
+.ir button.sm{min-height:36px;padding:0 10px;font-size:.9rem;} .ir-sugg{border:1px solid var(--iodine);border-radius:8px;padding:8px 10px;margin:8px 0;} .ir-course{border:1px solid var(--rule);border-radius:10px;padding:8px 10px;margin:10px 0;}
+.ir-iss{margin:6px 0 6px 18px;padding:0;font-size:.92rem;} .ir-iss li{margin:3px 0;} abbr.ir-q{font-size:.8rem;border:1px solid var(--rule);border-radius:6px;padding:0 4px;text-decoration:none;cursor:help;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -878,6 +889,7 @@ function renderForm(){
     if(SEC.can("chemoin")){var ib=document.createElement("div");ib.className="addrow";ib.innerHTML='<button class="btn" type="button" id="bQrpCur">匯入這位病人的化療明細表(QRP)</button><span class="desc"> 系統會核對明細表上的病歷號是否為 '+esc(cur)+'</span>';
       area.insertBefore(ib,area.firstChild);$("#bQrpCur").onclick=function(){CHEMO.pickQrp(cur);};}}
   if((tab==="rt_course"||tab==="pathology_specimen"||tab==="biomarker"||tab==="staging_imaging")&&typeof DOCIMPORT!=="undefined")DOCIMPORT.bar(tab,area);
+  if(typeof DOCIMPORT!=="undefined"&&DOCIMPORT.hint)DOCIMPORT.hint(tab,area);
   updateDock();
 }
 function summary(fm,x){
@@ -1384,8 +1396,9 @@ var SEC=(function(){
   /* this page's disease module; each study (research space) under /studies/{sid} belongs to one module */
   var MODULE="escc",DEFAULT_SID="ESCC",DEFAULT_NAME="食道鱗狀細胞癌(ESCC)";
   /* 2026-10-03 P10：「門診 PROM」是另一個研究空間（mode:"prom"）：自己的成員、PROM 金鑰、權杖與紀錄，病人不需要研究編號；登入後在「選擇作業」挑 */
-  var CLINIC_SID="CLINIC",CLINIC_NAME="門診 PROM",STUDIES=[],CHOOSER_USER=null;
-  function byMode(a,b){return (a.mode==="prom"?1:0)-(b.mode==="prom"?1:0)||String(a.name).localeCompare(String(b.name));}
+  var CLINIC_SID="CLINIC",CLINIC_NAME="門診 PROM",IRAE_SID="IRAE",IRAE_NAME="irAE 登錄",STUDIES=[],CHOOSER_USER=null;
+  function modeRank(m){return m==="prom"?2:m==="irae"?1:0;}
+  function byMode(a,b){return modeRank(a.mode)-modeRank(b.mode)||String(a.name).localeCompare(String(b.name));}
   var enc=new TextEncoder(),dec=new TextDecoder();
   var FBCFG={apiKey:"AIzaSyBxVKcQaI-_avwbACXrp6UjR7BfAZSZeYA",authDomain:"escc-115.firebaseapp.com",projectId:"escc-115",storageBucket:"escc-115.firebasestorage.app",messagingSenderId:"274287182090",appId:"1:274287182090:web:f701125d8cc183337dbaf3"};
   var EMU=/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&/[?&]emu=1/.test(location.search);
@@ -1446,6 +1459,7 @@ var SEC=(function(){
       .then(function(u){var s=dec.decode(u);DOCS[d.id]={ver:x.ver,assignee:x.assignee||"",keys:x.keys,kfp:x.kfp||{},snap:null};return {id:d.id,b:JSON.parse(s),s:s};});}
   function loadAll(progress){
     DB=emptyDB();DEKS={};DOCS={};conflicts={};
+    if(SESSION.mode==="irae"&&!isAdmin())return Promise.resolve({n:0,miss:0,fromCache:false});   /* irAE 空間：沒有病歷摘錄，研究助理／醫師的資料由 IRAE 模組自己讀 */
     if(SESSION.role==="nurse"||SESSION.role==="doctor")return PROM.loadAll(progress);  /* 個管師/醫師：只讀 PROM，讀不到病歷摘錄(規則也擋) */
     var q=isAdmin()?col("patients"):col("patients").where("assignee","==",SESSION.uid);
     return q.get().then(function(qs){var docs=qs.docs,done=0,miss=0,out=[];
@@ -1503,21 +1517,29 @@ var SEC=(function(){
       if(!L.length){AUTH.signOut();$("#aSub").textContent="尚未加入研究";$("#aBody").innerHTML='<p class="adesc">您的帳號已核准，但尚未加入此癌別的研究，請聯絡主持人。</p><p><button class="btn" type="button" id="aBack">回到登入畫面</button></p>';$("#aBack").onclick=showLogin;return;}
       STUDIES=L;CHOOSER_USER=u;
       if(L.length===1)return enter(u,p,L[0]);
-      $("#aSub").textContent=L.some(function(x){return x.mode==="prom";})?"選擇作業":"選擇研究";  /* 只有研究空間時沿用原標題（e1 測試也驗這個） */
-      $("#aBody").innerHTML=L.map(function(x,i){return '<p><button class="btn go" type="button" data-st="'+i+'">'+esc(x.name)+'</button><span class="adesc" style="display:block;margin:3px 0 0">'+(x.mode==="prom"?"門診病人的症狀紀錄，無須研究編號":"研究：病歷摘錄與 PROM 症狀（研究編號）")+'</span></p>';}).join("")+
-        (p.role==="admin"&&!L.some(function(x){return x.mode==="prom";})?'<p><button class="btn" type="button" id="aMkClinic">＋建立「門診 PROM」空間</button></p>':"");
+      $("#aSub").textContent=L.some(function(x){return x.mode==="prom"||x.mode==="irae";})?"選擇作業":"選擇研究";  /* 只有研究空間時沿用原標題（e1 測試也驗這個） */
+      $("#aBody").innerHTML=L.map(function(x,i){return '<p><button class="btn go" type="button" data-st="'+i+'">'+esc(x.name)+'</button><span class="adesc" style="display:block;margin:3px 0 0">'+(x.mode==="prom"?"門診病人的症狀紀錄，無須研究編號":x.mode==="irae"?"免疫治療受試者登錄：同意、給藥、抽血時間軸與提醒（研究編號）":"研究：病歷摘錄與 PROM 症狀（研究編號）")+'</span></p>';}).join("")+
+        (p.role==="admin"&&!L.some(function(x){return x.mode==="prom";})?'<p><button class="btn" type="button" id="aMkClinic">＋建立「門診 PROM」空間</button></p>':"")+
+        (p.role==="admin"&&!L.some(function(x){return x.mode==="irae";})?'<p><button class="btn" type="button" id="aMkIrae">＋建立「irAE 登錄」空間</button></p>':"");
       $$("[data-st]",$("#aBody")).forEach(function(b){b.onclick=function(){enter(u,p,L[+b.dataset.st]);};});
-      var mk=$("#aMkClinic");if(mk)mk.onclick=function(){mk.disabled=true;createPromSpace().then(function(){return start(u,p);},function(e){mk.disabled=false;err(cErr(e));});};});}
+      var mk=$("#aMkClinic");if(mk)mk.onclick=function(){mk.disabled=true;createPromSpace().then(function(){return start(u,p);},function(e){mk.disabled=false;err(cErr(e));});};
+      var mi=$("#aMkIrae");if(mi)mi.onclick=function(){mi.disabled=true;createIraeSpace().then(function(){return start(u,p);},function(e){mi.disabled=false;err(cErr(e));});};});}
   /* 建立／切換作業空間（P10） */
   function createPromSpace(){if(!isAdmin())return Promise.reject(new Error("只有主持人可以建立"));
     return col("studies").doc(CLINIC_SID).get().then(function(d){if(d.exists&&d.data().mode==="prom")return {sid:CLINIC_SID,name:d.data().name||CLINIC_NAME,mode:"prom",existed:true};
       if(d.exists)throw new Error("代號 "+CLINIC_SID+" 已被別的空間使用");
       return col("studies").doc(CLINIC_SID).set({name:CLINIC_NAME,module:MODULE,mode:"prom",created:TS()}).then(function(){return {sid:CLINIC_SID,name:CLINIC_NAME,mode:"prom"};});})
     .then(function(st){if(!STUDIES.some(function(z){return z.sid===st.sid;})){STUDIES=STUDIES.concat([st]).sort(byMode);}var sw=$("#bSwitch");if(sw&&SESSION&&!SESSION.offline)sw.hidden=STUDIES.length<2;if(SESSION)secLog("建立門診 PROM 空間 "+st.sid);return st;});}
+  /* irAE 登錄空間（M1-a，2026-10-05）：mode:"irae"；自己的成員、金鑰、受試者、事實、確認，不碰 ESCC 病歷摘錄。 */
+  function createIraeSpace(){if(!isAdmin())return Promise.reject(new Error("只有主持人可以建立"));
+    return col("studies").doc(IRAE_SID).get().then(function(d){if(d.exists&&d.data().mode==="irae")return {sid:IRAE_SID,name:d.data().name||IRAE_NAME,mode:"irae",existed:true};
+      if(d.exists)throw new Error("代號 "+IRAE_SID+" 已被別的空間使用");
+      return col("studies").doc(IRAE_SID).set({name:IRAE_NAME,module:MODULE,mode:"irae",created:TS()}).then(function(){return {sid:IRAE_SID,name:IRAE_NAME,mode:"irae"};});})
+    .then(function(st){if(!STUDIES.some(function(z){return z.sid===st.sid;})){STUDIES=STUDIES.concat([st]).sort(byMode);}var sw=$("#bSwitch");if(sw&&SESSION&&!SESSION.offline)sw.hidden=STUDIES.length<2;if(SESSION)secLog("建立 irAE 登錄空間 "+st.sid);return st;});}
   function switchSpace(){if(!SESSION||SESSION.offline||!CHOOSER_USER||STUDIES.length<2)return Promise.resolve();
     var u=CHOOSER_USER,p=PROFILE;try{tick();}catch(e){}secLog("切換作業");
     return flush().then(function(){return Promise.race([FS.waitForPendingWrites(),new Promise(function(r){setTimeout(r,10000);})]);}).catch(function(){}).then(function(){
-      if(typeof PROM!=="undefined")PROM.onLock();DB=emptyDB();DEKS={};DOCS={};USERS={};MEMBERS={};GLOBAL=null;SESSION=null;cur=null;STATE={};
+      if(typeof PROM!=="undefined")PROM.onLock();if(typeof IRAE!=="undefined")IRAE.onLock();DB=emptyDB();DEKS={};DOCS={};USERS={};MEMBERS={};GLOBAL=null;SESSION=null;cur=null;STATE={};
       $("#main").innerHTML="";$("#dock").hidden=true;$("#list").innerHTML="";var bb=$("#bkbar");if(bb)bb.hidden=true;$("#auth").hidden=false;err("");
       /* 重新讀一次自己的帳號文件：登入後才被主持人加進別的空間的人，切換作業時才看得到（舊版會沿用登入當下的 profile） */
       return col("users").doc(u.uid).get().then(function(d){var p2=d.exists?d.data():p;if(p2.role==="pending"||p2.role==="disabled")p2=p;PROFILE=p2;return start(u,p2);},function(){return start(u,p);});});}
@@ -1529,7 +1551,7 @@ var SEC=(function(){
       $("#aBack").onclick=function(){AUTH.signOut().then(showLogin);};throw e;}).then(function(r){loading=false;secLog("登入");applySession();
       if(isAdmin()&&!PROFILE.recPriv)toast("您尚未建立復原碼。請按右上角「建立復原碼」；否則忘記密碼時，資料將無法復原");
       if(r.miss)toast(isAdmin()?r.miss+" 位病人無法以您目前的金鑰解密（可能原因：金鑰曾經重建）。這些資料以舊金鑰加密，請聯絡系統維護者":r.miss+" 位病人尚未授權給您的金鑰，請通知主持人");if(r.regranted)toast("已自動把 "+r.regranted+" 位病人重新授權給更新過金鑰的助理");if(r.fromCache)toast("目前離線：所顯示者為這台電腦上次同步的資料");});}
-  function wipe(){if(typeof PROM!=="undefined")PROM.onLock();DB=emptyDB();DEKS={};DOCS={};USERS={};MEMBERS={};GLOBAL=null;PRIV=null;PW=null;SESSION=null;PROFILE=null;cur=null;STATE={};
+  function wipe(){if(typeof PROM!=="undefined")PROM.onLock();if(typeof IRAE!=="undefined")IRAE.onLock();DB=emptyDB();DEKS={};DOCS={};USERS={};MEMBERS={};GLOBAL=null;PRIV=null;PW=null;SESSION=null;PROFILE=null;cur=null;STATE={};
     $("#who").value="";$("#main").innerHTML="";$("#dock").hidden=true;$("#list").innerHTML="";var bb=$("#bkbar");if(bb)bb.hidden=true;showAuth();}
   function lock(reason){if(!SESSION){showAuth();return Promise.resolve();}
     if(SESSION.offline){wipe();return Promise.resolve();}
@@ -1554,9 +1576,11 @@ var SEC=(function(){
     var sid=SESSION.sid,upd={approvedAt:TS(),approvedBy:SESSION.uid},join=["abstractor","nurse","doctor"].indexOf(role)>=0;upd.role=join||role==="user"?"user":role;if(name)upd.name=name;
     if(join)upd["studies."+sid]=true;
     return col("users").doc(uid).update(upd).then(function(){if(join)return col("members").doc(uid).set({role:role,name:name||USERS[uid].name||"",at:TS()});})
-      .then(refreshUsers).then(function(){secLog((join?"核准並加入本研究("+RN[role]+") ":"設定帳號 "+upd.role+" ")+USERS[uid].email);return (join?(role==="abstractor"?regrant(uid):PROM.grant(uid)):Promise.resolve()).then(function(){return role==="nurse"||role==="doctor"?0:promRevokeStale();});});}
+      .then(refreshUsers).then(function(){secLog((join?"核准並加入本研究("+RN[role]+") ":"設定帳號 "+upd.role+" ")+USERS[uid].email);return (join?(SESSION.mode==="irae"?iraeGrant(uid):(role==="abstractor"?regrant(uid):PROM.grant(uid))):Promise.resolve()).then(function(){return role==="nurse"||role==="doctor"?0:promRevokeStale();});});}
+  /* irAE 空間：核准成員（研究助理／醫師）時授權 irAE 金鑰；移出時收回。失敗不擋主要動作，會 console.warn */
+  function iraeGrant(uid){return typeof IRAE!=="undefined"?IRAE.grantOne(uid):Promise.resolve();}
   function leaveStudy(uid){if(!isAdmin())return Promise.reject(new Error("只有主持人可以設定"));
-    return col("members").doc(uid).set({role:"disabled",at:TS()},{merge:true}).then(refreshUsers).then(function(){secLog("移出本研究 "+USERS[uid].email);}).then(promRevokeStale);}
+    return col("members").doc(uid).set({role:"disabled",at:TS()},{merge:true}).then(refreshUsers).then(function(){secLog("移出本研究 "+USERS[uid].email);}).then(function(){return SESSION.mode==="irae"&&typeof IRAE!=="undefined"?IRAE.revokeOne(uid).catch(function(e){console.warn("irAE 金鑰收回失敗",e);return 0;}):0;}).then(promRevokeStale);}
   /* 收回已非個管師/醫師者的 PROM 金鑰；失敗不擋主要動作(規則本來就已擋讀)，下次主持人開 PROM 分頁會自動補收 */
   function promRevokeStale(){return (typeof PROM!=="undefined"&&PROM.revokeStale)?PROM.revokeStale().catch(function(e){console.warn("PROM 金鑰收回失敗，下次開啟 PROM 分頁時將補行收回",e);return 0;}):Promise.resolve(0);}
   function staleRegrant(){var jobs=[];DB.order.forEach(function(id){var d=DOCS[id],u=d&&d.assignee;if(!u||!USERS[u]||!d.kfp||!d.kfp[u])return;
@@ -1586,26 +1610,41 @@ var SEC=(function(){
   /* encrypted full backup: patient ciphertext + wrapped patient keys + the investigator's password- and recovery-wrapped private key,
      so the file alone (plus the password or recovery code) can be decrypted even if Firebase is gone. Self-checked before download. */
   function backupString(){if(!isAdmin())return Promise.reject(new Error("只有主持人可以備份"));
-    return flush().then(function(){return Promise.all([col("patients").get(),col("users").get(),col("meta").get(),col("prom").get(),col("tokens").get(),col("prom_inbox").get()]);}).then(function(r){
+    /* v4（2026-10-05）：irAE 登錄空間多備份 subjects／facts／confirms／raw／log／assays（密文）、members、研究空間文件；其他空間仍是 v3、集合不變 */
+    var irae=SESSION.mode==="irae"&&typeof IRAE_STORE!=="undefined";
+    return flush().then(function(){return Promise.all([col("patients").get(),col("users").get(),col("meta").get(),col("prom").get(),col("tokens").get(),col("prom_inbox").get(),
+        irae?IRAE_STORE.exportAll({col:col}):Promise.resolve(null),irae?col("members").get():Promise.resolve(null),irae?FS.collection("studies").doc(SESSION.sid).get():Promise.resolve(null)]);}).then(function(r){
       var pts={};r[0].forEach(function(d){pts[d.id]=d.data();});var us={};r[1].forEach(function(d){var x=d.data();us[d.id]={email:x.email,name:x.name,role:x.role,pub:x.pub};
         if(d.id===SESSION.uid){us[d.id].priv=x.priv;if(x.recPriv)us[d.id].recPriv=x.recPriv;}});
       var mt={};r[2].forEach(function(d){mt[d.id]=d.data();});
       /* v3 (2026-10-01): 加入 PROM 症狀紀錄密文、權杖、尚未收件的收件匣(遺失一筆未收件＝遺失一份病人回報)；promkey/recipients 已在 meta */
       var pr={};r[3].forEach(function(d){pr[d.id]=d.data();});var tk={};r[4].forEach(function(d){tk[d.id]=d.data();});var ib={};r[5].forEach(function(d){var x=d.data();if(!x.consumed)ib[d.id]=x;});
-      var b={kind:"escc-cloud-backup",v:3,at:stamp(),by:SESSION.email,pi:SESSION.uid,study:SESSION.sid,studyName:SESSION.studyName,mode:SESSION.mode||"",module:MODULE,n:Object.keys(pts).length,nProm:Object.keys(pr).length,nTokens:Object.keys(tk).length,nInbox:Object.keys(ib).length,
+      var b={kind:"escc-cloud-backup",v:irae?4:3,at:stamp(),by:SESSION.email,pi:SESSION.uid,study:SESSION.sid,studyName:SESSION.studyName,mode:SESSION.mode||"",module:MODULE,n:Object.keys(pts).length,nProm:Object.keys(pr).length,nTokens:Object.keys(tk).length,nInbox:Object.keys(ib).length,
         note:"病人資料與 PROM 症狀紀錄均為密文。解密須同時具備：本檔案＋主持人的登入密碼（或復原碼）。",patients:pts,users:us,meta:mt,prom:pr,tokens:tk,inbox:ib};
+      var isub=[];
+      if(irae){var ic=IRAE_STORE.countsOf(r[6]),mb={};r[7].forEach(function(d){mb[d.id]=d.data();});isub=Object.keys(r[6].subjects);
+        b.irae=r[6];b.nSubjects=ic.subjects;b.nIraeFacts=ic.facts;b.nIraeConfirms=ic.confirms;b.nIraeRaw=ic.raw;b.nIraeLog=ic.log;b.members=mb;b.studyDoc=r[8]&&r[8].exists?r[8].data():null;}
       var ids=Object.keys(pts).filter(function(id){return pts[id].keys&&pts[id].keys[SESSION.uid];});var pk=mt.promkey,pids=Object.keys(pr);
-      if(!ids.length&&!(pk&&pids.length))return b;
+      if(!ids.length&&!(pk&&pids.length)&&!isub.length){if(irae)b.selfcheckIrae="empty";return b;}
       return unwrap(us[SESSION.uid].priv,PW).then(importPriv).then(function(k){
         var c1=ids.length?crypto.subtle.decrypt({name:"RSA-OAEP"},k,ub64(pts[ids[0]].keys[SESSION.uid])).then(function(raw){return aesKey(new Uint8Array(raw));}).then(function(kk){return aesDec(kk,pts[ids[0]]);}):Promise.resolve();
         /* 自我檢查也解一筆 PROM：備份若解不開 PROM，就不能說它涵蓋 PROM */
         var c2=(pk&&pids.length&&pk.keys&&pk.keys[SESSION.uid])?crypto.subtle.decrypt({name:"RSA-OAEP"},k,ub64(pk.keys[SESSION.uid])).then(function(raw){return aesKey(new Uint8Array(raw));}).then(function(kk){return aesDec(kk,pr[pids[0]]);}):Promise.resolve();
-        return Promise.all([c1,c2]);}).then(function(){b.selfcheck="ok";b.selfcheckProm=!!(pk&&pids.length);return b;},
-          function(){throw new Error("備份自我檢查失敗，請勿依賴此備份，並通知維護者");});})
-    .then(function(b){secLog("下載加密備份("+b.n+" 位病歷,"+b.nProm+" 筆 PROM,"+b.nInbox+" 筆未收件)");
-      col("meta").doc("backup").set({at:TS(),by:SESSION.uid,n:b.n}).then(function(){lastBackup=new Date();backupBar();}).catch(function(){});return JSON.stringify(b);});}
+        /* irAE：金鑰沒有包給這位主持人＝備份打不開，視為失敗（不像 PROM 那樣略過）；再把每份密文都試解一次，解不開的只計數、不擋備份（壞文件本身就是要留下的證據） */
+        var c3=isub.length?iraeCheck(k,mt.iraekey,r[6],b):Promise.resolve();
+        return Promise.all([c1,c2,c3]);}).then(function(){b.selfcheck="ok";b.selfcheckProm=!!(pk&&pids.length);if(irae)b.selfcheckIrae=isub.length?"ok":"empty";return b;},
+          function(e){throw new Error(e&&e.message==="noirkey"?"備份自我檢查失敗：irAE 金鑰沒有包給您的帳號，這份備份將無法開啟。請先到「帳號管理」處理後再備份":"備份自我檢查失敗，請勿依賴此備份，並通知維護者");});})
+    .then(function(b){secLog("下載加密備份("+(b.irae?"irAE "+b.nSubjects+" 位受試者、"+b.nIraeFacts+" 筆事實、"+b.nIraeConfirms+" 筆確認；":"")+b.n+" 位病歷,"+b.nProm+" 筆 PROM,"+b.nInbox+" 筆未收件)");
+      col("meta").doc("backup").set({at:TS(),by:SESSION.uid,n:b.irae?b.nSubjects:b.n}).then(function(){lastBackup=new Date();backupBar();}).catch(function(){});return JSON.stringify(b);});}
+  function iraeCheck(k,ik,dump,b){var w=ik&&ik.keys&&ik.keys[SESSION.uid];if(!w)return Promise.reject(new Error("noirkey"));
+    return crypto.subtle.decrypt({name:"RSA-OAEP"},k,ub64(w)).then(function(raw){return aesKey(new Uint8Array(raw));}).then(function(kk){
+      var docs=[];Object.keys(dump.subjects).forEach(function(id){var s=dump.subjects[id];docs.push(s.doc);["facts","confirms","raw"].forEach(function(c){Object.keys(s[c]).forEach(function(q){docs.push(s[c][q]);});});});
+      var s0=dump.subjects[Object.keys(dump.subjects)[0]];
+      /* 抽樣必過：第一位受試者文件；全部試解：解不開的計數 */
+      return aesDec(kk,s0.doc).then(function(){var bad=0;return Promise.all(docs.map(function(d){return aesDec(kk,d).then(function(){},function(){bad++;});})).then(function(){b.nIraeUndecryptable=bad;});});});}
   var lastBackup=null,BACKUP_DAYS=7;
-  function backupBar(){var bb=$("#bkbar");if(!bb)return;if(!isAdmin()||SESSION.offline||!DB.order.length){bb.hidden=true;return;}
+  function iraeCount(){return typeof IRAE!=="undefined"&&IRAE.count?IRAE.count():0;}
+  function backupBar(){var bb=$("#bkbar");if(!bb)return;if(!isAdmin()||SESSION.offline||!(DB.order.length||iraeCount())){bb.hidden=true;return;}
     var days=lastBackup?Math.floor((Date.now()-lastBackup.getTime())/86400000):null;
     if(days!==null&&days<BACKUP_DAYS){bb.hidden=true;return;}
     $("#bkmsg").textContent=days===null?"雲端尚無任何加密備份。":"已經 "+days+" 天沒有下載加密備份(建議每 "+BACKUP_DAYS+" 天一次)。";bb.hidden=false;}
@@ -1625,7 +1664,8 @@ var SEC=(function(){
         .then(function(){sortOrder();var g=(B.meta||{}).global;if(!g||!g.keys||!g.keys[B.pi])return;
           return rsaUnwrap(g.keys[B.pi]).then(aesKey).then(function(k){return aesDec(k,g);}).then(function(u){DB.audSample=JSON.parse(dec.decode(u)).audSample||[];}).catch(function(){});})
         .then(function(){if(typeof PROM!=="undefined"&&B.prom)return PROM.loadFromBackup(B).catch(function(){return 0;});return 0;})
-        .then(function(np){applySession();toast("已開啟備份("+(B.at||"")+"):"+DB.order.length+" 位"+(miss?",另有 "+miss+" 位無法解開":"")+(np?"、PROM "+np+" 筆":"")+"。此為唯讀檢視，修改不會儲存。");return {n:DB.order.length,miss:miss,nProm:np||0};});});}
+        .then(function(np){var ni=0;if(B.irae&&typeof IRAE!=="undefined"&&typeof IRAE_STORE!=="undefined"){ni=IRAE_STORE.countsOf(B.irae).subjects;IRAE.loadFromBackup(B);}
+          applySession();toast("已開啟備份("+(B.at||"")+"):"+DB.order.length+" 位"+(miss?",另有 "+miss+" 位無法解開":"")+(np?"、PROM "+np+" 筆":"")+(B.irae?"、irAE "+ni+" 位受試者":"")+"。此為唯讀檢視，修改不會儲存。");return {n:DB.order.length,miss:miss,nProm:np||0,nSubjects:ni};});});}
   function showOpenBackup(){pickFile($("#fJson"),function(t){$("#aSub").textContent="開啟加密備份檔（無須網路）";
     form('<form><p class="adesc">請輸入主持人的登入密碼；忘記密碼時，改填復原碼（二擇一）。解密後可匯出 REDCap 匯入檔；此為唯讀檢視，不會寫回雲端。</p>'+
       '<label class="mf"><span>主持人密碼</span><input name="p" type="password" autocomplete="off"></label>'+
@@ -1650,6 +1690,7 @@ var SEC=(function(){
     var sw=$("#bSwitch");if(sw)sw.hidden=!(STUDIES.length>1)||!!SESSION.offline;
     $("#auth").hidden=true;syncChip();backupBar();queue=curQueues()[0].id;tab="core_abstraction";refreshStates();renderRail();renderMain();
     if(typeof PROM!=="undefined")PROM.onSession();
+    if(typeof IRAE!=="undefined")IRAE.onSession();
   }
   function err(m){$("#aErr").textContent=m||"";}
   function showAuth(){$("#auth").hidden=false;err("");showLogin();}
@@ -1713,7 +1754,7 @@ var SEC=(function(){
   }
   function renderUsers(){cur=null;$("#dock").hidden=true;$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取帳號中…</p></section>';
     return refreshUsers().then(drawUsers,function(e){toast(cErr(e));});}
-  function joinBtns(uid,pre){return (SESSION&&SESSION.mode==="prom"?["nurse","doctor"]:["abstractor","nurse","doctor"]).map(function(r){return '<button class="btn'+(r==="abstractor"?" go":"")+'" type="button" data-ok="'+uid+'" data-mr="'+r+'">'+pre+RN[r]+'</button>';}).join(" ")+" ";}
+  function joinBtns(uid,pre){return (SESSION&&SESSION.mode==="prom"?["nurse","doctor"]:SESSION&&SESSION.mode==="irae"?["abstractor","doctor"]:["abstractor","nurse","doctor"]).map(function(r){return '<button class="btn'+(r==="abstractor"?" go":"")+'" type="button" data-ok="'+uid+'" data-mr="'+r+'">'+pre+RN[r]+'</button>';}).join(" ")+" ";}
   function drawUsers(){
     var m=$("#main"),sn=esc(SESSION.studyName||SESSION.sid);
     var rank=function(uid){var u=USERS[uid];return u.role==="pending"||u.role==="abstractor"?0:u.role==="admin"?3:1;};
@@ -1831,8 +1872,8 @@ var SEC=(function(){
       .then(function(v){if(!v)return;if(v.n!==v.n2){toast("兩次新密碼不同");return;}changeOwn(v.o,v.n).then(function(){toast("密碼已變更");}).catch(function(e){toast(cErr(e));});});};
     showAuth();return Promise.resolve();
   }
-  return {backupName:backupName,session:function(){return SESSION;},init:init,can:can,backupString:backupString,restoreText:restoreText,secLog:secLog,persist:persist,flush:flush,uname:uname,
-    _x:{createPromSpace:createPromSpace,studies:function(){return STUDIES;},switchSpace:switchSpace,col:col,TS:TS,rsaWrap:rsaWrap,rsaUnwrap:rsaUnwrap,aesKey:aesKey,aesEnc:aesEnc,aesDec:aesDec,rnd:rnd,fpOf:fpOf,isAdmin:isAdmin,cErr:cErr,profile:function(){return PROFILE;},users:function(){return USERS;},members:function(){return MEMBERS;},refreshUsers:refreshUsers}};
+  return {backupName:backupName,backupBar:backupBar,doBackup:doBackup,lastBackup:function(){return lastBackup;},session:function(){return SESSION;},init:init,can:can,backupString:backupString,restoreText:restoreText,secLog:secLog,persist:persist,flush:flush,uname:uname,
+    _x:{createPromSpace:createPromSpace,createIraeSpace:createIraeSpace,studies:function(){return STUDIES;},switchSpace:switchSpace,col:col,TS:TS,rsaWrap:rsaWrap,rsaUnwrap:rsaUnwrap,aesKey:aesKey,aesEnc:aesEnc,aesDec:aesDec,rnd:rnd,fpOf:fpOf,isAdmin:isAdmin,cErr:cErr,profile:function(){return PROFILE;},users:function(){return USERS;},members:function(){return MEMBERS;},refreshUsers:refreshUsers}};
 })();
 
 /* ---------- 化療明細表匯入 + 治療線草稿 + 影子模式(2026-09-28,phase 3) ----------
@@ -2296,15 +2337,38 @@ var DOCP=(function(){
     if((m=t.match(/(?:報告日期|檢驗日期|採檢日期|Date)\s*[:：]\s*'?(\d{7}|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/))){var d=toISO(m[1]);if(d)F.push(V("hep_date",d,m[0]));}
     return {kind:"serology",ok:F.some(function(f){return /^hep_(hbsag|antihbc|hcv)$/.test(f.f);}),fields:F,meta:{}};}
   /* cumulative laboratory table (HIS 檢驗報告 QRP): fixed-width columns under header lines; rows start with a 7-digit ROC date */
-  var LAB_KNOWN=/^(WBC|Neu\.?|Lym\.?|Mono\.?|Eos\.?|Baso\.?|RBC|Hb|Hct|RDW|PLT|MCV|MCH|MCHC|NRBC|MPV|MDW|PT|PTCON|INR|APTT|APTTCON|D-Dimer|Glu-AC|Glucose|BUN|CRE|GFR|eGFR|UA|CHOL|TG|LDL|LDL-C|HDL-C|Ca|P|Na|K|Cl|T-Bil\.?|D-Bil\.?|AST|ALT|ALP|LDH|CPK|CK|hsCRP|CRP|Alb\.BCG|Albumin|Alb|Amylase|Lipase|CO2|r-GT|GGT|Mg|Creatinine|Protein|pH|pCO2|pO2|HCO3|BE|SaO2|TP|Fe|TIBC|Ferritin|HbA1c|TSH|Free-T4|CEA|SCC|AFP|CA19-9|Lactate|NH3)$/i;
-  function labHeader(l){var re=/\S+/g,m,h=[],known=0;while((m=re.exec(l))){h.push({name:m[0],at:m.index});if(LAB_KNOWN.test(m[0]))known++;}
+  var LAB_KNOWN=/^(WBC|Neu\.?|Lym\.?|Mono\.?|Eos\.?|Baso\.?|RBC|Hb|Hct|RDW|PLT|MCV|MCH|MCHC|NRBC|MPV|MDW|PT|PTCON|INR|APTT|APTTCON|D-Dimer|Glu-AC|Glucose|BUN|CRE|GFR|eGFR|UA|CHOL|TG|LDL|LDL-C|HDL-C|Ca|P|Na|K|Cl|T-Bil\.?|D-Bil\.?|AST|ALT|ALP|LDH|CPK|CK|hsCRP|CRP|Alb\.BCG|Albumin|Alb|Amylase|Lipase|CO2|r-GT|GGT|Mg|Creatinine|Protein|pH|pCO2|pO2|HCO3|BE|SaO2|TP|Fe|TIBC|Ferritin|HbA1c|TSH|Free-T4|CEA|SCC|AFP|CA19-9|Lactate|NH3|RVSP|Glu)$/i;
+  /* o＝原始行（沒有 wide() 加寬）：中文欄名取自原始行，位置取自加寬後的行 */
+  function labHeader(l,o){var re=/\S+/g,m,h=[],known=0,ot=o?o.match(/\S+/g):null,ix=0;while((m=re.exec(l))){var nm=(ot&&ot[ix]!==undefined)?ot[ix]:m[0];ix++;h.push({name:nm,at:m.index});if(LAB_KNOWN.test(nm.replace(/\(.*$/,"")))known++;   /* 欄寬太窄時表頭會被截成 SCC(EIA 這種；括號之後不影響辨識 */}
     if(h.length<2||known<1||/^\d{7}/.test(l))return null;h.shift();while(h.length&&/中|檢體|編號|備註/.test(h[h.length-1].name))h.pop();
-    if(!h.length||!h.every(function(x){return /^[A-Za-z][\w.\-\/%]*$/.test(x.name);}))return null;if(h.length>2&&known<2)return null;return h;}
+    if(!h.length||!h.every(function(x){return /^[A-Za-z\u3400-\u9fff][\w.\-\/%(\u3400-\u9fff]*$/.test(x.name);}))return null;   /* 欄名可以是中文（尿糖等）；原本只收英文，含中文欄名的表頭整個被拒，列就被套到上一個表頭的欄位 */if(h.length>2&&known<2)return null;return h;}
   var LAB_MAP={"WBC":"wbc","Neu.":"neu_pct","Lym.":"lym_pct","Hb":"hb","PLT":"plt","CRE":"cre","GFR":"egfr","Alb.BCG":"alb","Albumin":"alb","hsCRP":"crp","CRP":"crp","Na":"na","K":"k","T-Bil.":"tbil","AST":"ast","ALT":"alt","BUN":"bun"};
   function wide(l){return l.replace(/[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]/g,function(c){return c+c;});}
+  /* 「項目: 值 單位 (參考範圍) 旗標」型的結果列（2026-10-06）。例：
+       1150812 Pct:                     0.127 *    %         (0.141-0.303) B        123457
+       1150813 Glucose   :         264 *   mg/dL  (<140)                   B        123457
+       1150814 TR max Vel：       2.14             m/s                     NONE     123458
+     範圍 (a-b)→lo/hi；(<a)／(<=a)→hi；(>a)／(>=a)→lo；下限大於上限視為異常（遮罩或排版問題），保留數值、不存範圍。非數字結果（Negative 等）略過。 */
+  var KV_UNIT=/^(?:(?:x?10\^?\d+|\d+E\d+)\/)?[A-Za-z%µμ\/][A-Za-z0-9%µμ\/\^.\-]*$/;   /* mg/dL、%、/HPF、µg/L、10^3/uL（以數字開頭的只收 10^n／ nEm 後接 / 的科學記號單位） */
+  function parseRange(s){var m=s.match(/\(\s*(<=|>=|<|>|≤|≥)?\s*(-?\d+(?:\.\d+)?)\s*(?:[-~–]\s*(-?\d+(?:\.\d+)?))?\s*\)/);if(!m)return null;var a=parseFloat(m[2]),b=m[3]!==undefined?parseFloat(m[3]):null,op=m[1]||"";
+    if(b!==null)return a>b?{bad:true}:{lo:a,hi:b};
+    if(op==="<"||op==="<="||op==="≤")return {hi:a,op:op==="<"?"<":"<="};
+    if(op===">"||op===">="||op==="≥")return {lo:a,op:op===">"?">":">="};
+    return null;}
+  function parseKv(line){var m=line.match(/^(\d{7})\s+([^\d\s:：][^:：]{0,40}?)\s*[:：]\s*(.*)$/);if(!m)return null;var d=toISO(m[1]);if(!d)return null;
+    var vm=m[3].match(/^([<>]?)(-?\d+(?:\.\d+)?)([*HL]{0,2})(?=\s|$)/);if(!vm||vm[1])return null;
+    var after=m[3].slice(vm[0].length),flag=!!vm[3],fm=after.match(/^\s*(\*|HH?|LL?)(?=\s|$)/);if(fm){flag=true;after=after.slice(fm[0].length);}
+    var unit=null,um=after.match(/^\s*(\S+)/);if(um&&KV_UNIT.test(um[1])&&!/^[A-Z]$/.test(um[1])){unit=um[1];after=after.slice(um[0].length);}
+    var rg=parseRange(after),name=m[2].replace(/\s+/g," ").trim();if(!name)return null;
+    var o={date:d,test:name,value:parseFloat(vm[2]),flag:flag,kv:true};if(unit)o.unit=unit;
+    if(rg&&rg.bad)o.badRange=true;else if(rg){if(rg.lo!==undefined)o.lo=rg.lo;if(rg.hi!==undefined)o.hi=rg.hi;if(rg.op)o.op=rg.op;}
+    return o;}
   function parseLabs(text){var t=norm(text),lines=t.split("\n"),rows=[],hdr=null,i,m,unassigned=[],orphan=0;
+    var kvRows=[];
     for(i=0;i<lines.length;i++){var l=wide(lines[i]);
-      var hh=labHeader(l);if(hh){hdr=hh;continue;}
+      if(/^-{10,}\s*$/.test(lines[i])){hdr=null;continue;}   /* 分隔線＝新區段；不讓上一個表頭的欄位位置套到下一區段的列（例如 項目: 值 型的列） */
+      var kv=parseKv(lines[i]);if(kv){kvRows.push(kv);continue;}
+      var hh=labHeader(l,lines[i]);if(hh){hdr=hh;continue;}
       if(!hdr&&/^\d{7}\s/.test(l)){orphan++;continue;}
       if(hdr&&(m=l.match(/^(\d{7})\s/))){var d=toISO(m[1]);if(!d)continue;
         /* assign each value token to the nearest header column by start position (tolerates a few columns of drift) */
@@ -2312,13 +2376,15 @@ var DOCP=(function(){
           for(var c=0;c<hdr.length;c++){var dd=Math.abs(hdr[c].at-tok.index);if(dd<bd){bd=dd;best=c;}}
           if(best<0||bd>4){if(/^[<>]?-?\d+(?:\.\d+)?[*HL]*$/.test(v)&&!/^\d{5,}$/.test(v))unassigned.push(m[1]+" "+v);continue;}var vv=v.replace(/[*HL]+$/,"");if(vv==="-"||/^[<>]/.test(vv))continue;var num=parseFloat(vv);if(isNaN(num)||!/^-?\d/.test(vv))continue;
           rows.push({date:d,test:hdr[best].name,value:num,flag:/[*HL]$/.test(v)});}}}
+    rows=rows.concat(kvRows);
     if(!rows.length)return {kind:"labs",ok:false,fields:[],note:"找不到檢驗值表格(需有檢驗項目表頭與 7 碼日期列)"};
     var F=[],dates=rows.map(function(r){return r.date;}).sort(),base=dates[0];
     Object.keys(LAB_MAP).forEach(function(k){var f=LAB_MAP[k];if(F.some(function(x){return x.f==="lab_"+f;}))return;var r=rows.filter(function(x){return x.test===k;}).sort(function(a,b){return a.date<b.date?-1:1;})[0];if(r)F.push(V("lab_"+f,String(r.value),k+" "+r.value+" ("+r.date+")",r.date===base));});
     if(rows.length)F.push(V("lab_date",base,"最早一次檢驗日 "+base+"（共 "+dates.length+" 筆、"+rows.length+" 個值）",false));
     /* monitoring: values that could not be placed under a header column, and dated rows with no header above them → new layout variant, needs a human look */
-    var warn=[];if(unassigned.length)warn.push("有 "+unassigned.length+" 個數值無法對到表頭欄（可能是新版型）："+unassigned.slice(0,5).join("；"));if(orphan)warn.push("有 "+orphan+" 列日期資料前面沒有表頭，已略過");
-    return {kind:"labs",ok:F.length>1,fields:F,meta:{rows:rows,dates:Array.from(new Set(dates)),n:rows.length,unassigned:unassigned,orphan:orphan,warn:warn}};}
+    var badR=kvRows.filter(function(x){return x.badRange;}).length;
+    var warn=[];if(badR)warn.push("有 "+badR+" 個參考範圍的下限大於上限（可能是遮罩或排版問題），這些值已保存、範圍未存");if(unassigned.length)warn.push("有 "+unassigned.length+" 個數值無法對到表頭欄（可能是新版型）："+unassigned.slice(0,5).join("；"));if(orphan)warn.push("有 "+orphan+" 列日期資料前面沒有表頭，已略過");
+    return {kind:"labs",ok:F.length>1||kvRows.length>0,fields:F,meta:{rows:rows,dates:Array.from(new Set(dates)),n:rows.length,unassigned:unassigned,orphan:orphan,warn:warn,kv:kvRows.length,withRange:kvRows.filter(function(x){return x.lo!==undefined||x.hi!==undefined;}).length}};}
   /* biomarker (PD-L1 IHC) report */
   function parseBiomarker(text){var t=norm(text),F=[],meta={},m;
     if(!/PD-?L1|pharmDx|\bCPS\b|\bTPS\b|22C3|28-8|SP263|SP142/i.test(t))return {kind:"biomarker",ok:false,fields:[],note:"不像生物標記報告"};
@@ -2346,7 +2412,7 @@ var DOCP=(function(){
     if(/^\d{7}\s/m.test(t)&&!/carcinoma|biopsy|Gy\b/i.test(t)&&t.split("\n").some(function(l){return !!labHeader(l);}))return "labs";
     if((t.match(/C[A-Z]-[A-Z]\d{3}-\d{4,}/g)||[]).length>=2&&!/MACROSCOPIC SUMMARY/i.test(t)&&!/^\s*(?:中中中中|Diagnosis)\s*:/m.test(t.split("\n").slice(0,3).join("\n")))return "pathlist";if(/pathology|carcinoma|biopsy|specimen/i.test(t))return "path";return "";}
   function parse(text){var k=detect(text);return k==="rt"?parseRT(text):k==="biomarker"?parseBiomarker(text):k==="imaging"?parseImaging(text):k==="serology"?parseSerology(text):k==="egd"?parseEGD(text):k==="labs"?parseLabs(text):k==="pathlist"?parsePathList(text):k==="path"?parsePath(text):{kind:"",ok:false,fields:[],note:"無法辨識文件類型"};}
-  out={parse:parse,parseRT:parseRT,parsePath:parsePath,parseBiomarker:parseBiomarker,parseImaging:parseImaging,parseSerology:parseSerology,parseEGD:parseEGD,parseLabs:parseLabs,endoDistances:endoDistances,parsePathList:parsePathList,detect:detect,toISO:toISO,norm:norm};return out;
+  out={parse:parse,parseRT:parseRT,parsePath:parsePath,parseBiomarker:parseBiomarker,parseImaging:parseImaging,parseSerology:parseSerology,parseEGD:parseEGD,parseLabs:parseLabs,parseKv:parseKv,parseRange:parseRange,endoDistances:endoDistances,parsePathList:parsePathList,detect:detect,toISO:toISO,norm:norm};return out;
 })();
 if(typeof module!=="undefined")module.exports=DOCP;
 
@@ -2407,7 +2473,7 @@ var DOCIMPORT=(function(){
     if(!filled.length&&!conf.length){toast("報告中無可帶入的欄位");return null;}
     logChange("core_abstraction","由"+label+"帶入："+(filled.join("、")||"無")+(conf.length?"；不一致："+conf.length+" 項":""));
     if(typeof SEC!=="undefined"&&SEC.secLog)SEC.secLog("文件擷取 core "+id);persist(true);refreshStates();return {filled:filled,conf:conf};}
-  function pasteAnyText(id,text,docDate){var k=DOCP.detect(text);
+  function pasteAnyText(id,text,docDate,src){var k=DOCP.detect(text);
     if(k==="pathlist"){var L=DOCP.parsePathList(text),r=recOf(id),eso=L.items.filter(function(x){return /esophag|oesophag|mediastin/i.test(x.diagnosis);}),other=L.items.filter(function(x){return !/esophag|oesophag|mediastin/i.test(x.diagnosis);});
       r.pathindex={at:stamp(),items:eso,others:other.map(function(x){return {report_no:x.report_no,date:x.date,diagnosis:x.diagnosis.slice(0,120)};})};
       logChange("pathology_specimen","貼入病理清單："+eso.length+" 份食道相關、"+other.length+" 份其他");persist(true);return {kind:"pathlist",eso:eso.length,other:other.length};}
@@ -2418,28 +2484,87 @@ var DOCIMPORT=(function(){
       return {kind:"egd",fmId:"core_abstraction",postop:eg.meta.postop,core:core2,meta:eg.meta};}
     if(k==="serology"){var sp=DOCP.parseSerology(text);if(!sp.ok)return null;var cr=applyCore(id,sp,"肝炎血清報告");return cr?{kind:"serology",fmId:"core_abstraction",core:cr}:null;}
     if(k==="labs"){var lb=DOCP.parseLabs(text);if(!lb.ok)return null;var r3=recOf(id);
-      r3.labs={at:stamp(),dates:lb.meta.dates,rows:lb.meta.rows.map(function(x){return {d:x.date,t:x.test,v:x.value,f:x.flag?1:0};})};
+      r3.labs={at:stamp(),dates:lb.meta.dates,rows:lb.meta.rows.map(function(x){var o={d:x.date,t:x.test,v:x.value,f:x.flag?1:0};if(x.unit)o.u=x.unit;if(x.lo!==undefined)o.lo=x.lo;if(x.hi!==undefined)o.hi=x.hi;if(x.op)o.op=x.op;return o;})};
       var cl=applyCore(id,lb,"檢驗報告累積表");logChange("core_abstraction","貼入檢驗累積表："+lb.meta.rows.length+" 個值、"+lb.meta.dates.length+" 個日期");persist(true);
       return {kind:"labs",fmId:"core_abstraction",core:cl,meta:lb.meta};}
-    if(!KIND_FM[k])return null;var res=fromText(id,KIND_FM[k],text,docDate||"","貼上文字");return res?{kind:k,fmId:KIND_FM[k],res:res}:null;}
+    if(!KIND_FM[k])return null;var res=fromText(id,KIND_FM[k],text,docDate||"",src||"貼上文字");return res?{kind:k,fmId:KIND_FM[k],res:res}:null;}
   function pasteAny(){if(!needWho())return;
     dialog({title:"貼上任何報告",msg:"可貼入下列任一種內容：病理報告、胃鏡、放療摘要、PD-L1 報告、CT／PET／EUS 分期報告、B／C 型肝炎血清報告、檢驗報告累積表、病理清單。系統將自動辨識並送至對應表單產生草稿。化療明細表請以 QRP 檔匯入。",
       fields:[{k:"t",label:"報告全文",type:"textarea",req:1},{k:"d",label:"報告日期（選填）"}],ok:"辨識並擷取"}).then(function(v){if(!v)return;var d=v.d?parseDate(v.d).iso:"";
       var out=pasteAnyText(cur,v.t,d);if(!out){toast("無法辨識這段文字是哪一種報告");return;}
+      showAny(out);});}
+  function showAny(out){
       if(out.kind==="egd"){var msg=out.postop?"這是術後追蹤胃鏡（"+(out.meta.stricture?"有吻合口狹窄":"無狹窄")+(out.meta.dilation?"、建議擴張":"")+"）。已記入病人紀錄；待手術與併發症表單建立後，將轉入該表單。":
           (out.core?"帶入："+(out.core.filled.join("、")||"無（欄位已有值）")+(out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):""):"此份胃鏡報告無可帶入的欄位（無距門齒距離）")+"\n\n請到核心補登「① 首次內視鏡報告」核對。";
         dialog({title:"胃鏡報告",info:1,msg:msg,ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
       if(out.kind==="serology"){dialog({title:"已帶入肝炎血清結果",info:1,msg:"帶入："+(out.core.filled.join("、")||"無")+(out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):"")+"\n\n請到核心補登「⑥ 病毒性肝炎」核對。",ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
-      if(out.kind==="labs"){dialog({title:"已帶入基礎檢驗值",info:1,msg:"讀到 "+out.meta.rows.length+" 個檢驗值（"+out.meta.dates.length+" 個日期，全部已保存在病人紀錄），基礎值取最早一次 "+out.meta.dates[0]+"。\n\n帶入："+((out.core&&out.core.filled.join("、"))||"無（欄位已有值）")+(out.core&&out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):"")+(out.meta.warn&&out.meta.warn.length?"\n\n⚠️ 請人工核對：\n・"+out.meta.warn.join("\n・"):"")+"\n\n請到核心補登「⑦ 治療前基礎檢驗值」確認該日期是首次治療前；若不是，請改填正確日期與數值。",ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
+      if(out.kind==="labs"){dialog({title:"已帶入基礎檢驗值",info:1,msg:"讀到 "+out.meta.rows.length+" 個檢驗值（"+out.meta.dates.length+" 個日期，全部已保存在病人紀錄），基礎值取最早一次 "+out.meta.dates[0]+"。"+(out.meta.kv?"其中 "+out.meta.kv+" 個是「項目：值」型的結果，"+out.meta.withRange+" 個帶參考範圍（連同單位一併保存）。":"")+"\n\n帶入："+((out.core&&out.core.filled.join("、"))||"無（欄位已有值）")+(out.core&&out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):"")+(out.meta.warn&&out.meta.warn.length?"\n\n⚠️ 請人工核對：\n・"+out.meta.warn.join("\n・"):"")+"\n\n請到核心補登「⑦ 治療前基礎檢驗值」確認該日期是首次治療前；若不是，請改填正確日期與數值。",ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
       if(out.kind==="pathlist"){dialog({title:"已建立病理索引",info:1,msg:"食道相關 "+out.eso+" 份、其他 "+out.other+" 份。索引列於「病理與檢體」分頁上方；須詳細檢視的報告，請另將該份全文貼入。",ok:"知道了"}).then(function(){tab="pathology_specimen";renderMain();});return;}
-      tab=out.fmId;renderMain();report(out.res,out.fmId);});}
-  function spineBar(){var sp=$(".spine");if(!sp||$("#spinePaste")||!SEC.can("docin")||auditMode())return;var b=document.createElement("button");b.className="btn go";b.type="button";b.id="spinePaste";b.textContent="貼上任何報告 → 自動辨識";b.style.marginTop="8px";b.onclick=pasteAny;sp.appendChild(b);}
+      tab=out.fmId;renderMain();report(out.res,out.fmId);}
+
+
+  /* ---------- 選檔案匯入（2026-10-06）：.csv／.tsv／.txt／.xls（Excel 2–4 原始記錄，每行文字一格；醫院 QuickReport 匯出）／.pdf → 文字 → 同一條「貼上任何報告」流程 ----------
+     檔案只在這個瀏覽器內讀取，不上傳。來源只記「檔案匯入」，不記檔名（檔名常含病歷號）。 */
+  var FILECAP=8*1024*1024;
+  function decodeFile(buf){var u=new Uint8Array(buf),t;
+    if(u[0]===0xFF&&u[1]===0xFE)t=new TextDecoder("utf-16le").decode(u.subarray(2));
+    else if(u[0]===0xFE&&u[1]===0xFF)t=new TextDecoder("utf-16be").decode(u.subarray(2));
+    else{var v=(u[0]===0xEF&&u[1]===0xBB&&u[2]===0xBF)?u.subarray(3):u;try{t=new TextDecoder("utf-8",{fatal:true}).decode(v);}catch(e){try{t=new TextDecoder("big5").decode(v);}catch(e2){t=new TextDecoder("utf-8").decode(v);}}}
+    return t.replace(/\r\n?/g,"\n");}
+  function isEmf(u){var n=Math.min(u.length-44,4096),i;for(i=0;i<=n;i++){if(u[i]===1&&u[i+1]===0&&u[i+2]===0&&u[i+3]===0&&u[i+40]===0x20&&u[i+41]===0x45&&u[i+42]===0x4D&&u[i+43]===0x46)return true;}return false;}
+  function isBiffRaw(u){return u.length>8&&u[0]===0x09&&(u[1]===0x00||u[1]===0x02||u[1]===0x04||u[1]===0x08)&&u[3]===0&&u[2]>=4&&u[2]<=16;}
+  function biffText(buf){var d=new Uint8Array(buf),dv=new DataView(buf),p=0,rows=[];
+    function put(r,c,v){if(r>=20000)return;while(rows.length<=r)rows.push([]);var row=rows[r];while(row.length<c)row.push("");row[c]=v;}
+    function str(b){try{return new TextDecoder("big5").decode(b);}catch(e){return new TextDecoder("utf-8").decode(b);}}
+    while(p+4<=d.length){var t=dv.getUint16(p,true),len=dv.getUint16(p+2,true),q=p+4;if(q+len>d.length)break;
+      if(t===0x0004&&len>=8)put(dv.getUint16(q,true),dv.getUint16(q+2,true),str(d.subarray(q+8,q+8+Math.min(d[q+7],len-8))));
+      else if(t===0x0204&&len>=8)put(dv.getUint16(q,true),dv.getUint16(q+2,true),str(d.subarray(q+8,q+8+Math.min(dv.getUint16(q+6,true),len-8))));
+      else if(t===0x0003&&len>=15)put(dv.getUint16(q,true),dv.getUint16(q+2,true),String(dv.getFloat64(q+7,true)));
+      else if(t===0x0203&&len>=14)put(dv.getUint16(q,true),dv.getUint16(q+2,true),String(dv.getFloat64(q+6,true)));
+      else if(t===0x0002&&len>=9)put(dv.getUint16(q,true),dv.getUint16(q+2,true),String(dv.getUint16(q+7,true)));
+      else if(t===0x000A)break;
+      p=q+len;}
+    return rows.map(function(r){return r.join("\t").replace(/\s+$/,"");}).join("\n");}
+  function fileToText(f){
+    if(f.size>FILECAP)return Promise.reject(new Error("檔案太大（超過 8 MB），請確認選的是報告檔"));
+    return f.arrayBuffer().then(function(buf){var u=new Uint8Array(buf);
+      if(u[0]===0x25&&u[1]===0x50&&u[2]===0x44&&u[3]===0x46)return pdfText(f).then(function(t){if(!t.replace(/\s/g,"").length)throw new Error("這個 PDF 沒有文字層(掃描影像)，請改貼文字");return t;});
+      if(u[0]===0xD0&&u[1]===0xCF&&u[2]===0x11&&u[3]===0xE0)throw new Error("這是 Excel 97–2003 的 .xls，網頁讀不了。請在 Excel 另存為「CSV UTF-8」，或複製儲存格後用「貼上任何報告」貼上");
+      if(u[0]===0x50&&u[1]===0x4B)throw new Error("暫不支援 .xlsx。請另存為「CSV UTF-8」，或複製儲存格後用「貼上任何報告」貼上");
+      if(isEmf(u))throw new Error("這是 QuickReport（QRP）檔。化療明細表請用選單的「匯入化療明細表」；其他報告請改選 .csv／.txt 或貼上文字");
+      if(isBiffRaw(u)){var t0=biffText(buf);if(!t0.replace(/\s/g,"").length)throw new Error("這個 .xls 裡沒有文字");return t0;}
+      var nb=0,n=Math.min(u.length,2000),i;for(i=0;i<n;i++)if(u[i]===0||(u[i]<9)||(u[i]>13&&u[i]<32))nb++;
+      if(n&&nb/n>0.02&&!(u[0]===0xFF&&u[1]===0xFE)&&!(u[0]===0xFE&&u[1]===0xFF))throw new Error("無法辨識的檔案格式。請改選 .csv／.txt／.pdf，或複製報告文字後貼上");
+      var t=decodeFile(buf);if(!t.replace(/\s/g,"").length)throw new Error("檔案內沒有文字");return t;});}
+  function importFile(f){return fileToText(f).then(function(t){var out=pasteAnyText(cur,t,"","檔案匯入");
+      if(!out){var ls=t.split("\n").filter(function(l){return l.trim();}),cm=ls.filter(function(l){return (l.match(/,/g)||[]).length>=3;}).length;
+        toast(ls.length&&cm/ls.length>0.5?"這看起來是逗號分隔的表格；目前只支援醫院系統匯出的報告文字（固定欄寬）":"無法辨識這份檔案是哪一種報告");return null;}
+      showAny(out);return out;}).catch(function(e){toast(e&&e.message||String(e));return null;});}
+  function pickReportFile(){if(!needWho())return;var inp=document.createElement("input");inp.type="file";inp.accept=".csv,.tsv,.txt,.xls,.pdf,text/csv,text/plain,application/pdf";inp.onchange=function(){var f=inp.files&&inp.files[0];if(f)importFile(f);};inp.click();}
+
+  /* ---------- 各分頁可匯入的檔案說明（2026-10-06）：只顯示給能匯入的角色（登錄人員、主持人）；稽核模式不顯示 ---------- */
+  var FILES_ALL="檔案：.csv／.txt／.xls（醫院系統匯出的報告文字）／.pdf（需連網、要有文字層），或直接貼上文字";
+  var HINTS={
+    core_abstraction:"<b>可匯入</b>（病人資料卡片的「貼上任何報告」或「選檔案匯入報告」）：<b>胃鏡報告</b> → ① 首次內視鏡報告；<b>肝炎血清報告</b> → ⑥ 病毒性肝炎；<b>檢驗報告累積表</b> → ⑦ 治療前基礎檢驗值（全部檢驗值存入病人紀錄；「項目：值」型的結果另存單位與參考範圍）；<b>放療摘要</b>也會帶入 ECOG、共病、抽菸、臨床分期。已有值的欄位不會被覆蓋。"+"<br>"+FILES_ALL+"。",
+    staging_workup:"此分頁<b>沒有檔案匯入</b>，請依病歷手動填寫。（CT／PET／EUS 報告請到「分期影像」；胃鏡報告請到「核心補登」。）",
+    staging_imaging:"<b>可匯入</b>：<b>CT／PET／EUS／MRI 分期報告</b>。上面兩顆按鈕（貼上文字、上傳 PDF）；或用病人資料卡片的「選檔案匯入報告」（.csv／.txt／.xls／.pdf）。EUS 報告也會帶入核心補登的腫瘤距門齒距離（已有值不覆蓋）。",
+    pathology_specimen:"<b>可匯入</b>：<b>病理報告</b>（手術或切片）。上面兩顆按鈕（貼上文字、上傳 PDF）；或「選檔案匯入報告」（.csv／.txt／.xls／.pdf）。<b>病理清單</b>請用「貼上任何報告」建立病理索引；PD-L1／生物標記報告請到「生物標記」。",
+    biomarker:"<b>可匯入</b>：<b>PD-L1／生物標記報告</b>。上面兩顆按鈕（貼上文字、上傳 PDF）；或「選檔案匯入報告」（.csv／.txt／.xls／.pdf）。",
+    dcrt_detail:"此分頁<b>沒有檔案匯入</b>，請依病歷手動填寫。（放療摘要請到「放療療程」匯入；化療明細表請到「治療線別」。）",
+    rt_course:"<b>可匯入</b>：<b>放療摘要</b>。上面兩顆按鈕（貼上文字、上傳 PDF）；或「選檔案匯入報告」（.csv／.txt／.xls／.pdf）。同時帶入核心補登的 ECOG、共病、抽菸、臨床分期（已有值不覆蓋）。",
+    systemic_line:"<b>可匯入</b>：<b>化療明細表</b>，<b>只收 QuickReport .qrp</b>（可多選；系統核對病歷號）。不收 .csv／.xls／.pdf，也不能用「貼上任何報告」。",
+    clin_event:"此分頁<b>沒有檔案匯入</b>，請依病歷手動填寫。",
+    other_cancer:"此分頁<b>沒有檔案匯入</b>，請手動填寫。（其他部位的病理報告，可用「貼上任何報告」建立病理索引作為參考。）"};
+  function hint(tab,area){var H=HINTS[tab];if(!H||!SEC.can("docin")||auditMode()||$("#upnote",area))return;
+    var d=document.createElement("p");d.className="desc";d.id="upnote";d.style.margin="4px 0 10px";d.innerHTML=H;
+    var f=area.firstChild;if(f&&f.classList&&f.classList.contains("addrow"))area.insertBefore(d,f.nextSibling);else area.insertBefore(d,area.firstChild);}
+  function spineBar(){var sp=$(".spine");if(!sp||$("#spinePaste")||!SEC.can("docin")||auditMode())return;var b=document.createElement("button");b.className="btn go";b.type="button";b.id="spinePaste";b.textContent="貼上任何報告 → 自動辨識";b.style.marginTop="8px";b.onclick=pasteAny;sp.appendChild(b);var b2=document.createElement("button");b2.className="btn";b2.type="button";b2.id="spineFile";b2.textContent="選檔案匯入報告（.csv／.txt／.xls／.pdf）";b2.style.marginTop="8px";b2.onclick=pickReportFile;sp.appendChild(b2);}
   function indexBox(area){var r=recOf(cur),ix=r.pathindex;if(!ix)return;var d=document.createElement("div");d.className="draftbox";
     d.innerHTML='<h3 class="drafth">病理索引（'+esc(ix.at)+' 貼入）：食道相關 '+ix.items.length+' 份</h3><div class="tw"><table><thead><tr><th>報告號</th><th>日期</th><th>診斷</th><th>已擷取</th></tr></thead><tbody>'+
       ix.items.map(function(x){var done=(r.pathology_specimen||[]).some(function(pth){return pth.path_report_no&&pth.path_report_no===x.report_no;});return '<tr><td class="mono">'+esc(x.report_no)+'</td><td>'+esc(x.date||"")+'</td><td>'+esc(x.diagnosis)+'</td><td>'+(done?'✓':'<span class="desc">尚未</span>')+'</td></tr>';}).join("")+'</tbody></table></div>'+
       (ix.others&&ix.others.length?'<p class="desc">其他部位報告 '+ix.others.length+' 份（例如 '+esc(ix.others[0].diagnosis.slice(0,60))+'…）— 若為其他原發癌請登在「其他原發癌」</p>':'');
     area.insertBefore(d,area.firstChild);}
-  return {fromText:fromText,bar:bar,pdfText:pdfText,pasteAny:pasteAny,pasteAnyText:pasteAnyText,spineBar:spineBar,indexBox:indexBox};
+  return {fromText:fromText,bar:bar,pdfText:pdfText,pasteAny:pasteAny,pasteAnyText:pasteAnyText,spineBar:spineBar,indexBox:indexBox,fileToText:fileToText,importFile:importFile,showAny:showAny,hint:hint,HINTS:HINTS};
 })();
 
 /* ---------- PROM assets (generated by build_cloud.py; sources in /home/jnynlin/work/epro/v2) ---------- */
@@ -6115,7 +6240,8 @@ function ensureButton(){if($("#bProm"))return;var b=document.createElement("butt
   b.onclick=function(){if(S()&&S().offline){render();return;}$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取 PROM 中…</p></section>';loadAll().then(function(){return regrantStale();}).then(function(n){return revokeStale().then(function(g){if(g)toast("已收回 "+g+" 位已離開／改角色成員的 PROM 金鑰");return n;});}).then(function(n){if(n)toast("已自動把 PROM 金鑰重新授權給 "+n+" 位更新過金鑰的成員");render();},function(e){toast(e.message||x().cErr(e));});};}
 function tidyHeader(){var lk=$("#bLock");if(!lk||$("#acctBox"))return;var items=["#bUsers","#bRec","#bPw"].map(function(q){return $(q);}).filter(Boolean);if(items.length<2)return;
   var d=document.createElement("details");d.className="pm-more";d.id="acctBox";d.innerHTML='<summary class="btn" id="acctSum">帳號 ▾</summary><div class="pm-menu"></div>';lk.parentNode.insertBefore(d,lk);var m=d.querySelector(".pm-menu");items.forEach(function(b){m.appendChild(b);b.addEventListener("click",function(){d.removeAttribute("open");});});}
-function onSession(){var s=S();if(!s)return;VIEW=false;var h1=document.querySelector("h1");if(h1){if(!h1.dataset.orig)h1.dataset.orig=h1.textContent;h1.textContent=promSpace()?"門診 PROM":clin()?"PROM 症狀":h1.dataset.orig;}
+function onSession(){var s=S();if(!s)return;if(s.mode==="irae")return;   /* irAE 登錄空間由 IRAE 模組負責（醫師角色不可落入 PROM 畫面） */
+VIEW=false;var h1=document.querySelector("h1");if(h1){if(!h1.dataset.orig)h1.dataset.orig=h1.textContent;h1.textContent=promSpace()?"門診 PROM":clin()?"PROM 症狀":h1.dataset.orig;}
   document.body.classList.toggle("prom-space",promSpace());
   if(x().isAdmin())tidyHeader();
   if(clin()){document.body.classList.add("prom-only");render();}else{document.body.classList.remove("prom-only");if(x().isAdmin())ensureButton();var b=$("#bProm");if(b)b.hidden=!x().isAdmin()||(!!s.offline&&!LOADED);
@@ -6126,6 +6252,591 @@ return {loadAll:loadAll,render:render,onSession:onSession,onLock:onLock,onLeave:
   issueToken:issueToken,issueTokens:issueTokens,revokeToken:revokeToken,cleanScan:cleanScan,cleanApply:cleanApply,openCleanTest:openCleanTest,listTokens:listTokens,tokLink:tokLink,consumeInbox:consumeInbox,writeRecipients:writeRecipients,lastConsume:lastConsume,purgeInbox:purgeInbox,loadFromBackup:loadFromBackup,qrSvg:qrSvg,
   core:{lm:lm,panel:PROM_PANEL,fire:function(ev){return F.fire(PROM_PANEL,ev);},confClean:confClean,confMap:confMap,evOf:evOf,pendingOf:pendingOf,decOf:decOf,listClean:listClean,inferTx:inferTx,autoCode:autoCode,genPid:genPid,pidOk:pidOk,testCandidates:testCandidates,ccDiscord:ccDiscord,ccStats:ccStats,ccMentions:ccMentions,CC_RULES:CC_RULES,enrich:enrich,applyReview:applyReview,applyConfirm:applyConfirm,newBody:newBody,chartText:chartText,inScope:inScope,unfilledOf:unfilledOf,deltasOf:deltasOf,demoBodies:demoBodies,lastReview:lastReview},
   _t:{staleKeyUids:staleKeyUids,seal:seal,openCt:openCt,setKey:function(k){PK=k;},recs:function(){return RECS;},order:function(){return ORDER;},setScope:function(s){SCOPE=s;},setFilt:function(f){FILT=f;},listIds:function(){EN=ens();return listIds();}}};
+})();
+
+/* ---------- irAE 登錄（M1-a）：時間軸、資料字典、儲存層、畫面 ---------- */
+/* irAE 登錄 M1-b：採血時間軸（slot 表）與「下次抽血」純函式（2026-10-05）
+   規格：docs/IRAE_REGISTRY_MVP_20261004.md §2；決定：B7（slot 表）、B13（先只做站內提醒）、B15（結束只建議不認定）、B16（窗）。
+   純函式、無 DOM、不讀系統時鐘、不碰儲存；瀏覽器與 node 測試共用。日期一律是日曆日 "YYYY-MM-DD"（台北日曆，Asia/Taipei），
+   內部換成整數天數做整數運算，不用本地時區的 Date（避免跨時區與夏令時間問題）。
+   資料原則：
+   ・抽血「事實」（draws）與「歸屬哪個 slot」分存；歸屬可自動、也可人工指定／改派。
+   ・ici_dose（逐次給藥日）是唯一事實：療程的 Day 0、末劑、預期間隔都由它推；系統不自動認定「治療結束」，只產生「請確認」任務。
+   ・疑問處的預設值都掛 Q-M1-nn 代碼（docs/IRAE_M1_OPEN_QUESTIONS_20261005.md），輸出的 slot／任務帶 notes 供畫面顯示「備註」。 */
+var IRAE_TL=(function(){
+  /* ===== 日期（整數天數；公曆；Howard Hinnant 演算法） ===== */
+  function isLeap(y){return (y%4===0&&y%100!==0)||y%400===0;}
+  function dim(y,m){return [31,isLeap(y)?29:28,31,30,31,30,31,31,30,31,30,31][m-1];}
+  function fromCivil(y,m,d){y-=m<=2?1:0;var era=Math.floor(y/400),yoe=y-era*400,doy=Math.floor((153*(m+(m>2?-3:9))+2)/5)+d-1,doe=yoe*365+Math.floor(yoe/4)-Math.floor(yoe/100)+doy;return era*146097+doe-719468;}
+  function toCivil(z){z+=719468;var era=Math.floor(z/146097),doe=z-era*146097,yoe=Math.floor((doe-Math.floor(doe/1460)+Math.floor(doe/36524)-Math.floor(doe/146096))/365),y=yoe+era*400,doy=doe-(365*yoe+Math.floor(yoe/4)-Math.floor(yoe/100)),mp=Math.floor((5*doy+2)/153),d=doy-Math.floor((153*mp+2)/5)+1,m=mp<10?mp+3:mp-9;return [y+(m<=2?1:0),m,d];}
+  function dn(s){if(typeof s!=="string")return null;var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);if(!m)return null;var y=+m[1],mo=+m[2],d=+m[3];if(mo<1||mo>12||d<1||d>dim(y,mo))return null;return fromCivil(y,mo,d);}
+  function pad(n,w){var s=String(n);while(s.length<w)s="0"+s;return s;}
+  function iso(n){if(n==null||!isFinite(n))return null;var c=toCivil(n);return pad(c[0],4)+"-"+pad(c[1],2)+"-"+pad(c[2],2);}
+  /* +k 個月：預設「曆月＋月底夾取」（1/31＋1 個月＝2 月最後一天）。Q-M1-02；rule==="days91"（每 3 個月＝91 天）供對照 */
+  function addMonths(n,k,rule){if(rule==="days91")return n+Math.round(k*30.4375);var c=toCivil(n),t=c[1]-1+k,y=c[0]+Math.floor(t/12),m=((t%12)+12)%12+1;return fromCivil(y,m,Math.min(c[2],dim(y,m)));}
+  /* 台北日曆日：給「現在的毫秒」，回 "YYYY-MM-DD"（UTC+8，無夏令時間） */
+  function todayTaipei(ms){return iso(Math.floor((ms+8*3600e3)/864e5));}
+
+  /* ===== 預設 slot 表：同意書 v3.0 現行 5 個時點（B16 窗為草案）；visit／event 型預設停用（A11 與 IRB 變更前不開） ===== */
+  var DEFAULT_CONFIG={
+    version:"icf-v3.0-5pt",
+    monthRule:"calendar-clamp",            /* Q-M1-02 */
+    dueSoonDays:7,                         /* Q-M1-09：窗尾前幾天標「即將到期」 */
+    courseScope:"index",                   /* Q-M1-06：只對「納入後的第一條療程」產生 T0–T4；"all"＝每條療程各一組 */
+    maxDraws:5,                            /* 同意書：共 5 次、50 cc；超過只標旗不擋 */
+    studyEnd:"2028-12-31",                 /* Q-M1-11：同意書資料期間止日；窗尾超過只標旗 */
+    endSuggest:{N:2,defaultIntervalDays:21},/* Q-M1-05（B15）：最後一劑後超過 N×預期間隔 → 建議確認治療是否已結束 */
+    slots:[
+      {id:"T0",label:"疾病治療前",type:"course",anchor:"day0",offset:{days:0},lo:null,hi:0,enabled:true,notes:["Q-M1-01","Q-M1-07"]},
+      {id:"T1",label:"治療結束後",type:"course",anchor:"end",offset:{days:0},lo:0,hi:14,enabled:true,notes:["Q-M1-03","Q-M1-04"]},
+      {id:"T2",label:"治療結束後 3 個月",type:"course",anchor:"end",offset:{months:3},lo:-14,hi:14,enabled:true,notes:["Q-M1-03"]},
+      {id:"T3",label:"治療結束後 6 個月",type:"course",anchor:"end",offset:{months:6},lo:-14,hi:14,enabled:true,notes:["Q-M1-03"]},
+      {id:"T4",label:"治療結束後 12 個月",type:"course",anchor:"end",offset:{months:12},lo:-28,hi:28,enabled:true,notes:["Q-M1-03"]},
+      {id:"V",label:"返診加抽",type:"visit",anchor:"visit",offset:{days:0},lo:-3,hi:3,enabled:false,notes:["Q-M1-08"]},
+      {id:"E",label:"不良事件觸發",type:"event",anchor:"event",offset:{days:0},lo:0,hi:14,enabled:false,notes:["Q-M1-08"]}
+    ]
+  };
+  var STATUS_ZH={notYet:"未到",open:"可抽",dueSoon:"即將到期",overdue:"逾期",done:"已完成",deviation:"偏差",awaitingEnd:"待治療結束",awaitingStart:"待排定第一劑",na:"不適用"};
+  var PENDING={notYet:1,open:1,dueSoon:1,overdue:1};
+  var RANK={notYet:0,open:1,dueSoon:2,overdue:3};
+
+  function copy(o){return JSON.parse(JSON.stringify(o));}
+  function median(a){var s=a.slice().sort(function(x,y){return x-y;}),n=s.length;return n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2;}
+
+  /* ===== 療程：由逐次給藥日推 Day 0、末劑、預期間隔 ===== */
+  function courseFacts(c){
+    var ds=(c.doses||[]).map(dn).filter(function(x){return x!=null;}).sort(function(a,b){return a-b;});
+    var plan=dn(c.plannedStart),first=ds.length?ds[0]:null,day0=first!=null?first:plan,gaps=[];
+    for(var i=1;i<ds.length;i++)if(ds[i]>ds[i-1])gaps.push(ds[i]-ds[i-1]);
+    return {id:String(c.id),day0:day0,day0Planned:first==null&&plan!=null,last:ds.length?ds[ds.length-1]:null,nDose:ds.length,interval:gaps.length?median(gaps):null,
+      stop:dn(c.stopDecisionDate),end:dn(c.endConfirmedDate),raw:c};
+  }
+  function orderCourses(cs){return cs.slice().sort(function(a,b){var x=a.day0==null?Infinity:a.day0,y=b.day0==null?Infinity:b.day0;return x-y||(a.id<b.id?-1:a.id>b.id?1:0);});}
+
+  /* ===== 主函式 ===== */
+  function timeline(subject,config,today){
+    config=config||DEFAULT_CONFIG;
+    var T=dn(today);if(T==null)throw new Error("today 必須是 YYYY-MM-DD");
+    var issues=[],tasks=[],consent=dn(subject.consentDate);
+    if(subject.consentDate!=null&&consent==null)issues.push({code:"badConsentDate",value:String(subject.consentDate)});
+    if(consent==null)tasks.push({type:"fillBasics",what:"consentDate"});
+    if(!(subject.courses||[]).length)tasks.push({type:"fillBasics",what:"course"});
+    var term=subject.terminal&&dn(subject.terminal.date)!=null?{kind:subject.terminal.kind||"",date:dn(subject.terminal.date)}:null;
+    var courses=orderCourses((subject.courses||[]).map(courseFacts)),use=config.courseScope==="all"?courses:courses.slice(0,1);
+
+    /* --- 建 slot --- */
+    var slots=[];
+    config.slots.forEach(function(S,si){
+      if(!S.enabled)return;
+      var mk=function(anchorDate,anchorKey,courseId,extra){
+        var key=(courseId!=null?courseId+":":"")+S.id+(extra&&extra.sfx?"@"+extra.sfx:"");
+        var o={key:key,id:S.id,label:S.label,type:S.type,courseId:courseId,anchor:S.anchor,anchorDate:iso(anchorDate),_order:si,
+          target:null,windowStart:null,windowEnd:null,status:null,reason:null,drawId:null,flags:[],notes:(S.notes||[]).slice(),_ws:null,_we:null,_t:null};
+        if(anchorDate!=null){
+          var t=S.offset&&S.offset.months?addMonths(anchorDate,S.offset.months,config.monthRule):anchorDate+((S.offset&&S.offset.days)||0);
+          o._t=t;o.target=iso(t);
+          o._ws=S.lo==null?-Infinity:t+S.lo;o._we=S.hi==null?Infinity:t+S.hi;
+          if(consent!=null&&o._ws<consent)o._ws=consent;          /* 同意前不能抽 */
+          o.windowStart=isFinite(o._ws)?iso(o._ws):null;o.windowEnd=isFinite(o._we)?iso(o._we):null;
+        }
+        slots.push(o);return o;};
+      if(S.type==="course"){
+        use.forEach(function(c){
+          var a=S.anchor==="day0"?c.day0:S.anchor==="end"?c.end:null,o=mk(a,S.anchor,c.id);
+          o._course=c;
+          if(S.anchor==="day0"&&c.day0Planned)o.flags.push("plannedStart");
+          if(a==null)o._await=S.anchor==="day0"?"awaitingStart":"awaitingEnd";
+        });
+      }else if(S.type==="visit"){
+        (subject.visits||[]).forEach(function(v){var d=dn(v.date);if(d!=null)mk(d,"visit",null,{sfx:String(v.id!=null?v.id:v.date)});});
+      }else if(S.type==="event"){
+        (subject.events||[]).forEach(function(v){var d=dn(v.date);if(d!=null)mk(d,"event",null,{sfx:String(v.id!=null?v.id:v.date)});});
+      }
+    });
+    var byKey={};slots.forEach(function(s){byKey[s.key]=s;});
+
+    /* --- 抽血歸屬：先人工指定，再自動。course 型優先，visit／event 只收 course 型接不住的（只增不減） --- */
+    var draws=(subject.draws||[]).map(function(d,i){return {id:String(d.id!=null?d.id:"d"+i),date:dn(d.date),slotKey:d.slotKey||null,reason:d.deviationReason||null,raw:d};});
+    draws.forEach(function(d){if(d.date==null)issues.push({code:"badDrawDate",drawId:d.id});});
+    var valid=draws.filter(function(d){return d.date!=null;}).sort(function(a,b){return a.date-b.date||(a.id<b.id?-1:a.id>b.id?1:0);});
+    var taken={};
+    function give(s,d,how){s.drawId=d.id;s._draw=d;s._how=how;taken[s.key]=d;}
+    valid.forEach(function(d){if(!d.slotKey)return;var s=byKey[d.slotKey];
+      if(!s){issues.push({code:"unknownSlot",drawId:d.id,slotKey:d.slotKey});return;}
+      if(taken[s.key]){issues.push({code:"extraDraw",drawId:d.id,slotKey:s.key});return;}
+      give(s,d,"manual");});
+    function inWin(s,d){return s._t!=null&&d>=s._ws&&d<=s._we;}
+    valid.forEach(function(d){if(d.slotKey)return;
+      var pick=null;
+      ["course","other"].forEach(function(tier){if(pick)return;
+        slots.forEach(function(s){if((tier==="course")!==(s.type==="course"))return;if(taken[s.key]||!inWin(s,d.date))return;
+          var dist=Math.abs(d.date-s._t);if(!pick||dist<pick.dist||(dist===pick.dist&&s._order<pick.s._order))pick={s:s,dist:dist};});});
+      if(pick)give(pick.s,d,"auto");
+      else if(slots.some(function(s){return inWin(s,d.date);}))issues.push({code:"extraDraw",drawId:d.id,date:iso(d.date)});   /* 該窗已有一次抽血 */
+      else issues.push({code:"drawOutsideWindows",drawId:d.id,date:iso(d.date)});});
+    valid.forEach(function(d){
+      if(consent!=null&&d.date<consent)issues.push({code:"drawBeforeConsent",drawId:d.id,date:iso(d.date)});
+      if(term&&d.date>term.date)issues.push({code:"drawAfterTerminal",drawId:d.id,date:iso(d.date)});});
+    if(valid.length>config.maxDraws)issues.push({code:"overCap",n:valid.length,max:config.maxDraws});
+
+    /* --- 狀態 --- */
+    var waived={};(subject.waivers||[]).forEach(function(w){if(w&&w.slotKey)waived[w.slotKey]=w;});
+    slots.forEach(function(s){
+      var set=function(st,reason){s.status=st;s.reason=reason||null;};
+      if(s._t!=null&&consent!=null&&s._we<consent&&!s._draw){set("na","windowBeforeConsent");}
+      else if(term&&!s._draw&&!waived[s.key]&&(s._t==null||term.date<s._we)){set("na","terminal:"+term.kind);}
+      else if(s._t==null){set(s._await||"na",s._await?null:"noAnchor");}
+      else if(s._draw){
+        if(inWin(s,s._draw.date))set("done",null);
+        else{set("deviation",s._draw.date<s._ws?"early":"late");if(!s._draw.reason)tasks.push({type:"deviationReason",slotKey:s.key,drawId:s._draw.id});}
+        if(s._how==="manual"&&!inWin(s,s._draw.date)&&s._draw.reason)s.reason+=":"+s._draw.reason;}
+      else if(waived[s.key]){set("deviation","waived");if(!waived[s.key].reason)tasks.push({type:"deviationReason",slotKey:s.key});}
+      else if(T<s._ws)set("notYet",null);
+      else if(T>s._we)set("overdue",null);
+      else if(isFinite(s._we)&&T>=s._we-config.dueSoonDays)set("dueSoon",null);
+      else set("open",null);
+      if(s._we!=null&&isFinite(s._we)&&config.studyEnd&&dn(config.studyEnd)!=null&&s._we>dn(config.studyEnd))s.flags.push("pastStudyEnd");
+    });
+    slots.forEach(function(s){if(s.status==="open"||s.status==="dueSoon"||s.status==="overdue")tasks.push({type:"drawDue",slotKey:s.key,status:s.status,target:s.target,windowEnd:s.windowEnd});});
+
+    /* --- 「治療是否已結束」建議：只提任務，不設結束日（B15） --- */
+    courses.forEach(function(c){
+      if(c.end!=null&&c.last!=null&&c.end<c.last)issues.push({code:"endBeforeLastDose",courseId:c.id});
+      if(c.end!=null||c.last==null)return;
+      var iv=c.interval!=null?c.interval:config.endSuggest.defaultIntervalDays,lim=c.last+config.endSuggest.N*iv;
+      if(T>lim)tasks.push({type:"confirmEnd",courseId:c.id,lastDose:iso(c.last),raisedFrom:iso(Math.floor(lim)+1),daysSince:T-c.last,intervalDays:iv,notes:["Q-M1-05"]});
+    });
+    if(consent!=null&&use.length&&use[0].day0!=null&&use[0].day0<consent)issues.push({code:"consentAfterDay0",courseId:use[0].id});
+
+    /* --- 下次抽血：尚未完成且有目標日者中，目標日最早（同日依 slot 表順序）；全無日期時回「待…」 --- */
+    var cand=slots.filter(function(s){return PENDING[s.status]&&s._t!=null;}).sort(function(a,b){return a._t-b._t||a._order-b._order;});
+    var next=cand.length?{slotKey:cand[0].key,target:cand[0].target,windowStart:cand[0].windowStart,windowEnd:cand[0].windowEnd,status:cand[0].status}:null;
+    var waiting=slots.filter(function(s){return s.status==="awaitingEnd"||s.status==="awaitingStart";});
+    var nextDraw=next||(waiting.length?{slotKey:waiting[0].key,target:null,status:waiting[0].status}:null);
+
+    var out=slots.map(function(s){var o={};Object.keys(s).forEach(function(k){if(k.charAt(0)!=="_")o[k]=s[k];});o.statusZh=STATUS_ZH[o.status];return o;});
+    return {subjectId:subject.id!=null?subject.id:null,today:today,configVersion:config.version,slots:out,nextDraw:nextDraw,tasks:tasks,issues:issues,
+      counts:out.reduce(function(a,s){a[s.status]=(a[s.status]||0)+1;return a;},{})};
+  }
+
+  /* ===== 多位受試者：今日／本週／逾期計數與「下次抽血清單」 ===== */
+  function dueList(results,today,weekDays){
+    var T=dn(today),W=weekDays==null?7:weekDays,rows=[];
+    results.forEach(function(r){if(!r.nextDraw||!r.nextDraw.target)return;
+      var s=r.slots.filter(function(x){return x.key===r.nextDraw.slotKey;})[0];
+      rows.push({subjectId:r.subjectId,slotKey:r.nextDraw.slotKey,label:s?s.label:"",target:r.nextDraw.target,windowStart:r.nextDraw.windowStart,windowEnd:r.nextDraw.windowEnd,status:r.nextDraw.status});});
+    rows.sort(function(a,b){var d=dn(a.target)-dn(b.target);if(d)return d;var x=String(a.subjectId),y=String(b.subjectId);return x<y?-1:x>y?1:0;});
+    var cnt={today:0,week:0,overdue:0,openNow:0};
+    rows.forEach(function(x){var t=dn(x.target);
+      if(x.status==="overdue"){cnt.overdue++;return;}
+      if(x.status==="open"||x.status==="dueSoon")cnt.openNow++;
+      if(t===T)cnt.today++;
+      if(t>=T&&t<=T+W)cnt.week++;});
+    return {rows:rows,counts:cnt};
+  }
+
+  return {timeline:timeline,dueList:dueList,DEFAULT_CONFIG:DEFAULT_CONFIG,STATUS_ZH:STATUS_ZH,dn:dn,iso:iso,addMonths:addMonths,todayTaipei:todayTaipei,dim:dim,isLeap:isLeap};
+})();
+if(typeof module==="object"&&module.exports)module.exports=IRAE_TL;
+
+/* irAE 登錄 M1-a：資料字典、驗證、與「事實 → 時間軸輸入」組裝（純函式，2026-10-05）
+   設計：docs/IRAE_STORAGE_ROLES_20261005.md（subjects＋facts 只增不改＋confirms）、docs/IRAE_REGISTRY_MVP_20261004.md §5。
+   原則：
+   ・受試者文件（小，可更新）與事實（一筆一份、只增不改）分開；更正＝新增一筆並以 supersedes 指向舊的；刪除＝新增 {deleted:true} 墓碑。
+   ・ici_dose 是給藥的唯一事實（B3）；療程的 Day 0、末劑、預期間隔由它推（見 irae_timeline.js）。
+   ・確認（治療結束日等）是另一類（confirms），只有醫師／主持人能寫（規則層）。
+   ・沒有姓名、病歷號、生日、電話欄位（B5：只存研究編號）；驗證器會擋掉疑似身分欄位。
+   ・純函式、無 DOM、不碰儲存與加密；瀏覽器與 node 測試共用。 */
+var IRAE_SCHEMA=(function(){
+  function isLeap(y){return (y%4===0&&y%100!==0)||y%400===0;}
+  function dim(y,m){return [31,isLeap(y)?29:28,31,30,31,30,31,31,30,31,30,31][m-1];}
+  function isDate(s){if(typeof s!=="string")return false;var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);if(!m)return false;var y=+m[1],mo=+m[2],d=+m[3];return mo>=1&&mo<=12&&d>=1&&d<=dim(y,mo);}
+  var ID_RE=/^[A-Za-z0-9_-]{1,16}$/, SUBJ_RE=/^[A-Za-z]{2,8}\d{3,8}$/;
+  var IDENT_RE=/(mrn|name|姓名|病歷|身分證|idno|phone|電話|手機|birthday|birth|生日|address|地址|email)/i;   /* B5：不得出現的身分欄位 */
+
+  /* ===== 資料字典 =====
+     型別：id、subjectId、date、str、int、num、bool、strlist、tubes、enum:a,b,c；結尾 ! ＝必填。 */
+  var SUBJECT={
+    fields:{id:"subjectId!",consentDate:"date",consentVersion:"str",includeOk:"bool",sex:"enum:M,F,U",ageAtIci:"int",cancer:"str",priorIci:"enum:yes,no,unknown",autoimmune:"enum:yes,no,unknown",
+      status:"status",lastFollowUp:"date",note:"str"},
+    recommended:["consentDate","sex","cancer"],
+    labels:{id:"研究編號",consentDate:"同意書簽署日",consentVersion:"同意書版本",includeOk:"符合納入／排除",sex:"生理性別（申請書要求依性別報告）",ageAtIci:"開始 ICI 時年齡",cancer:"癌別（ICD-O-3）",priorIci:"先前免疫治療",autoimmune:"自體免疫病史",status:"狀態（進行中／退出／死亡／失聯＋日期）",lastFollowUp:"最後追蹤日",note:"備註"}
+  };
+  var KINDS={
+    course:{store:"facts",key:["courseId"],fields:{courseId:"id!",drugs:"strlist",combo:"str",plannedStart:"date",startDate:"date",stopDecisionDate:"date",stopReason:"str",note:"str"},label:"免疫治療療程"},
+    ici_dose:{store:"facts",key:["courseId","date","drug"],fields:{courseId:"id!",date:"date!",drug:"str!",dose:"num",unit:"str",status:"enum:given,delayed,skipped",srcRow:"str",note:"str"},label:"逐次給藥（唯一事實）"},
+    draw:{store:"facts",fields:{date:"date!",tubes:"tubes",slotKey:"str",preDose:"enum:yes,no,unknown",deviationReason:"str",note:"str"},label:"抽血"},
+    waiver:{store:"facts",key:["slotKey"],fields:{slotKey:"str!",reason:"str"},label:"放棄某抽血時點"},
+    visit:{store:"facts",fields:{date:"date!",note:"str"},label:"返診"},
+    event:{store:"facts",fields:{date:"date!",term:"str",grade:"int",note:"str"},label:"不良事件（M1 只作為抽血時點錨點）"},
+    proposal:{store:"facts",fields:{about:"str",text:"str"},label:"提議（研究助理；不算確認）"},
+    con_med:{store:"facts",reserved:true,fields:{},label:"併用藥（M1-d）"},
+    lab:{store:"facts",reserved:true,fields:{},label:"檢驗（M1-c）"},
+    end:{store:"confirms",key:["courseId"],fields:{courseId:"id!",endDate:"date!",basis:"enum:lastDose,stopDecision,other",note:"str"},label:"治療結束日確認（醫師／主持人）"}
+  };
+
+  function checkType(t,v,path,errs){
+    var req=/!$/.test(t);t=t.replace(/!$/,"");
+    if(v===undefined||v===null||v===""){if(req)errs.push({code:"required",path:path});return;}
+    var ok=true;
+    if(t==="id")ok=typeof v==="string"&&ID_RE.test(v);
+    else if(t==="subjectId")ok=typeof v==="string"&&SUBJ_RE.test(v);
+    else if(t==="date")ok=isDate(v);
+    else if(t==="str")ok=typeof v==="string"&&v.length<=2000;
+    else if(t==="int")ok=typeof v==="number"&&isFinite(v)&&Math.floor(v)===v;
+    else if(t==="num")ok=typeof v==="number"&&isFinite(v);
+    else if(t==="bool")ok=typeof v==="boolean";
+    else if(t==="strlist")ok=Array.isArray(v)&&v.length<=20&&v.every(function(x){return typeof x==="string"&&x.length<=80;});
+    else if(t==="tubes")ok=Array.isArray(v)&&v.length<=20&&v.every(function(x){return x&&typeof x==="object"&&typeof x.type==="string"&&x.type.length<=40&&typeof x.n==="number"&&Math.floor(x.n)===x.n&&x.n>=1&&x.n<=20&&(x.ml==null||(typeof x.ml==="number"&&x.ml>0&&x.ml<=50));});
+    else if(/^enum:/.test(t))ok=typeof v==="string"&&t.slice(5).split(",").indexOf(v)>=0;
+    else if(t==="status")ok=v&&typeof v==="object"&&["active","withdrawn","dead","lost"].indexOf(v.kind)>=0&&(v.kind==="active"?(v.date==null||isDate(v.date)):isDate(v.date));
+    if(!ok)errs.push({code:"badValue",path:path});
+  }
+  function identifierKeys(o,pfx,out){Object.keys(o||{}).forEach(function(k){if(IDENT_RE.test(k))out.push((pfx||"")+k);var v=o[k];if(v&&typeof v==="object"&&!Array.isArray(v))identifierKeys(v,(pfx||"")+k+".",out);});return out;}
+  function checkFields(spec,data,errs,warns){
+    Object.keys(spec.fields).forEach(function(k){checkType(spec.fields[k],data[k],k,errs);});
+    Object.keys(data).forEach(function(k){if(!(k in spec.fields))errs.push({code:"unknownField",path:k});});
+    identifierKeys(data,"",[]).forEach(function(k){errs.push({code:"identifierField",path:k});});
+    (spec.recommended||[]).forEach(function(k){if(data[k]==null||data[k]==="")warns.push({code:"recommended",path:k});});
+  }
+  function validateSubject(d){var errs=[],warns=[];if(!d||typeof d!=="object")return {ok:false,errors:[{code:"notObject"}],warnings:[]};checkFields(SUBJECT,d,errs,warns);return {ok:!errs.length,errors:errs,warnings:warns};}
+  function validateFact(kind,d){
+    var spec=KINDS[kind],errs=[],warns=[];
+    if(!spec)return {ok:false,errors:[{code:"unknownKind",path:String(kind)}],warnings:[]};
+    if(!d||typeof d!=="object")return {ok:false,errors:[{code:"notObject"}],warnings:[]};
+    if(d.deleted===true){Object.keys(d).forEach(function(k){if(k!=="deleted"&&k!=="reason")errs.push({code:"unknownField",path:k});});return {ok:!errs.length,errors:errs,warnings:[]};}   /* 墓碑 */
+    if(spec.reserved){warns.push({code:"reservedKind",path:kind});identifierKeys(d,"",[]).forEach(function(k){errs.push({code:"identifierField",path:k});});return {ok:!errs.length,errors:errs,warnings:warns};}
+    checkFields(spec,d,errs,warns);return {ok:!errs.length,errors:errs,warnings:warns};
+  }
+
+  /* ===== 亂數 ID（客戶端產生；重送冪等）。rnd(n) 回傳 n 個 0–255 的位元組陣列（注入，方便測試） ===== */
+  var A32="abcdefghjkmnpqrstuvwxyz23456789";   /* 去 0/o/1/i/l */
+  function newId(rnd,prefix){var b=rnd(12),s="";for(var i=0;i<b.length;i++)s+=A32.charAt(b[i]%A32.length);return (prefix||"")+s;}
+
+  /* ===== 事實處理：被 supersedes 指到的、墓碑，都不算現行 ===== */
+  function current(items){
+    var hidden={};items.forEach(function(f){if(f.supersedes&&f.supersedes!==f.id)hidden[f.supersedes]=true;});
+    return items.filter(function(f){return !hidden[f.id]&&!(f.data&&f.data.deleted===true);});
+  }
+  function cmpAt(a,b){return ((a.at||0)-(b.at||0))||(a.id<b.id?-1:a.id>b.id?1:0);}
+  function keyOf(kind,data){var k=KINDS[kind].key;return k?k.map(function(x){return String(data[x]);}).join("|"):null;}
+  function dedupe(kind,items){   /* 同一個鍵（例如同療程同日同藥）只留最後寫入的 */
+    if(!KINDS[kind].key)return items.slice().sort(cmpAt);
+    var m={};items.slice().sort(cmpAt).forEach(function(f){m[keyOf(kind,f.data)]=f;});
+    return Object.keys(m).sort().map(function(k){return m[k];});
+  }
+  var STATUS_TL={withdrawn:"withdraw",dead:"death",lost:"lost"};
+
+  /* ===== 組裝：受試者文件＋事實＋確認 → irae_timeline.js 的 subject 輸入 =====
+     in: {subject:{…解密後受試者文件…}, facts:[{id,kind,at(ms),uid,supersedes,data}], confirms:[同格式]}
+     out: {subject:<時間軸輸入>, issues:[…], counts:{…}} ；輸入順序不影響結果。 */
+  function assemble(inp){
+    var S=inp.subject||{},issues=[],all=function(a){return (a||[]).filter(function(f){return f&&f.id&&KINDS[f.kind];});};
+    var facts=current(all(inp.facts)),confs=current(all(inp.confirms));
+    var by=function(arr,kind){return arr.filter(function(f){return f.kind===kind;});};
+    /* 療程 */
+    var cf={};dedupe("course",by(facts,"course")).forEach(function(f){cf[f.data.courseId]=f.data;});
+    var doses=dedupe("ici_dose",by(facts,"ici_dose")),dosesBy={};
+    doses.forEach(function(f){var d=f.data;if(d.status==="skipped")return;(dosesBy[d.courseId]=dosesBy[d.courseId]||[]).push(d.date);});
+    Object.keys(dosesBy).forEach(function(c){if(!cf[c])issues.push({code:"doseWithoutCourse",courseId:c});});
+    var ends={};dedupe("end",by(confs,"end")).forEach(function(f){ends[f.data.courseId]=f.data;});
+    Object.keys(ends).forEach(function(c){if(!cf[c]&&!dosesBy[c])issues.push({code:"endWithoutCourse",courseId:c});});
+    var ids={};Object.keys(cf).concat(Object.keys(dosesBy)).forEach(function(c){ids[c]=1;});
+    var courses=Object.keys(ids).sort().map(function(c){var k=cf[c]||{},ds=(dosesBy[c]||[]).filter(function(d,i,a){return a.indexOf(d)===i;}).sort(),o={id:c,doses:ds};
+      if(k.plannedStart)o.plannedStart=k.plannedStart;else if(k.startDate&&!ds.length)o.plannedStart=k.startDate;
+      if(k.stopDecisionDate)o.stopDecisionDate=k.stopDecisionDate;
+      if(ends[c])o.endConfirmedDate=ends[c].endDate;return o;});
+    /* 抽血、放棄、返診、事件 */
+    var draws=by(facts,"draw").sort(cmpAt).map(function(f){var o={id:f.id,date:f.data.date};if(f.data.slotKey)o.slotKey=f.data.slotKey;if(f.data.deviationReason)o.deviationReason=f.data.deviationReason;return o;});
+    var waivers=dedupe("waiver",by(facts,"waiver")).map(function(f){return {slotKey:f.data.slotKey,reason:f.data.reason||""};});
+    var visits=by(facts,"visit").sort(cmpAt).map(function(f){return {id:f.id,date:f.data.date};});
+    var events=by(facts,"event").sort(cmpAt).map(function(f){return {id:f.id,date:f.data.date};});
+    var tl={id:S.id!=null?S.id:null,consentDate:S.consentDate,courses:courses,draws:draws,waivers:waivers,visits:visits,events:events};
+    if(S.status&&STATUS_TL[S.status.kind]&&S.status.date)tl.terminal={kind:STATUS_TL[S.status.kind],date:S.status.date};
+    var unk=(inp.facts||[]).concat(inp.confirms||[]).filter(function(f){return f&&!KINDS[f.kind];}).length;if(unk)issues.push({code:"unknownKindFacts",n:unk});
+    return {subject:tl,issues:issues,counts:{facts:facts.length,confirms:confs.length,courses:courses.length,doses:doses.length,draws:draws.length}};
+  }
+
+  return {SUBJECT:SUBJECT,KINDS:KINDS,validateSubject:validateSubject,validateFact:validateFact,newId:newId,assemble:assemble,current:current,isDate:isDate};
+})();
+if(typeof module==="object"&&module.exports)module.exports=IRAE_SCHEMA;
+
+/* irAE 登錄 M1-a：儲存層（金鑰、密文、受試者／事實／確認的讀寫；無 DOM，2026-10-05）
+   設計：docs/IRAE_STORAGE_ROLES_20261005.md；規則：firestore.rules v5（subjects／facts／raw／confirms／log、meta/iraekey）。
+   用法：var S=IRAE_STORE.make(x,{uid:function(){return …;}})；x 是 SEC._x 形狀的物件（col、TS、rnd、aesKey、aesEnc、aesDec、rsaWrap、rsaUnwrap、fpOf、isAdmin、profile、users）。
+   原則：
+   ・寫入前一律先過 IRAE_SCHEMA 驗證（含「不得有身分欄位」）；驗證失敗不寫任何東西。
+   ・事實與確認只新增：更正＝新增一筆並 supersedes 舊的；刪除＝新增墓碑 {deleted:true}。受試者文件才有 ver+1 更新。
+   ・明文只有規則允許的欄位（kind、at、uid、supersedes、ver、時間戳）；所有臨床日期、藥名、狀態都在 iv/ct 密文內。
+   ・稽核（log）只記動作類別與文件 ID，不記臨床內容。 */
+var IRAE_STORE=(function(){
+  var enc=new TextEncoder(),dec=new TextDecoder();
+  function make(x,o){
+    o=o||{};var SC=o.schema||IRAE_SCHEMA,TLm=o.timeline||(typeof IRAE_TL!=="undefined"?IRAE_TL:null),K=null,rnd=function(n){return Array.from(x.rnd(n));};
+    function me(){return o.uid();}
+    function ms(t){return t&&t.toMillis?t.toMillis():(typeof t==="number"?t:0);}
+    function err(code,msg,extra){var e=new Error(msg);e.code=code;if(extra)e.detail=extra;return e;}
+    /* ---------- 金鑰（沿用 PROM 金鑰機制：meta/iraekey{keys{uid:RSA 包裝},kfp,ver}） ---------- */
+    function keyDoc(){return x.col("meta").doc("iraekey");}
+    function openKey(){return keyDoc().get().then(function(d){
+      if(!d.exists){if(!x.isAdmin())throw err("nokey","主持人尚未建立 irAE 金鑰，請通知主持人");return createKey();}
+      var v=d.data(),w=v.keys&&v.keys[me()];if(!w)throw err("notgranted","irAE 金鑰尚未授權給您的帳號，請通知主持人於「帳號管理」授權");
+      return x.rsaUnwrap(w).then(function(raw){return x.aesKey(raw).then(function(k){K={raw:raw,key:k,ver:v.ver||1,keys:v.keys,kfp:v.kfp||{}};return K;});});});}
+    function createKey(){var raw=x.rnd(32),pub=x.profile().pub;return Promise.all([x.aesKey(raw),x.rsaWrap(pub,raw),x.fpOf(pub)]).then(function(r){var keys={},kfp={};keys[me()]=r[1];kfp[me()]=r[2];
+      return keyDoc().set({keys:keys,kfp:kfp,ver:1,createdAt:x.TS()}).then(function(){K={raw:raw,key:r[0],ver:1,keys:keys,kfp:kfp};return K;});});}
+    function grant(uid){if(!x.isAdmin())return Promise.reject(err("admin","只有主持人可以授權 irAE 金鑰"));
+      return (K?Promise.resolve(K):openKey()).then(function(){var u=x.users()[uid];if(!u||!u.pub)throw err("nopub","找不到這個帳號的公鑰");
+        return Promise.all([x.rsaWrap(u.pub,K.raw),x.fpOf(u.pub)]).then(function(r){var keys=Object.assign({},K.keys),kfp=Object.assign({},K.kfp);keys[uid]=r[0];kfp[uid]=r[1];
+          return keyDoc().update({keys:keys,kfp:kfp,ver:(K.ver||1)+1,updatedAt:x.TS()}).then(function(){K.keys=keys;K.kfp=kfp;K.ver=(K.ver||1)+1;});});});}
+    function revoke(uid){if(!x.isAdmin())return Promise.reject(err("admin","只有主持人可以收回"));
+      return (K?Promise.resolve(K):openKey()).then(function(){var keys=Object.assign({},K.keys),kfp=Object.assign({},K.kfp);delete keys[uid];delete kfp[uid];
+        return keyDoc().update({keys:keys,kfp:kfp,ver:(K.ver||1)+1,updatedAt:x.TS()}).then(function(){K.keys=keys;K.kfp=kfp;K.ver=(K.ver||1)+1;});});}
+    /* ---------- 密文 ---------- */
+    function ready(){return K?Promise.resolve(K):openKey();}
+    function seal(obj){return ready().then(function(){return x.aesEnc(K.key,enc.encode(JSON.stringify(obj)));});}
+    function open(m){return ready().then(function(){return x.aesDec(K.key,{iv:m.iv,ct:m.ct});}).then(function(u){return JSON.parse(dec.decode(u));});}
+    function sub(id){return x.col("subjects").doc(id);}
+    function logWrite(id,act,ref){return sub(id).collection("log").add({uid:me(),at:x.TS(),act:act,ref:ref||""});}
+    /* ---------- 受試者（小文件，可更新，ver+1） ---------- */
+    function createSubject(id,d){
+      var doc=Object.assign({},d,{id:id}),v=SC.validateSubject(doc);if(!v.ok)return Promise.reject(err("invalid","受試者資料不合規則",v.errors));
+      return seal(doc).then(function(c){return sub(id).get().then(function(ex){if(ex.exists)throw err("exists","研究編號 "+id+" 已存在");
+        return sub(id).set({iv:c.iv,ct:c.ct,ver:1,createdAt:x.TS(),createdBy:me(),updatedAt:x.TS(),updatedBy:me()});});}).then(function(){return logWrite(id,"subject:create",id);}).then(function(){return {id:id,ver:1,warnings:v.warnings};});}
+    /* mutate(doc)→新文件。衝突（規則擋下 ver）時重讀再試，最多 3 次 */
+    function updateSubject(id,mutate,tries){tries=tries==null?3:tries;
+      return sub(id).get().then(function(d){if(!d.exists)throw err("missing","找不到受試者 "+id);var m=d.data();return open(m).then(function(cur){
+        var next=Object.assign({},mutate(JSON.parse(JSON.stringify(cur))),{id:id}),v=SC.validateSubject(next);if(!v.ok)throw err("invalid","受試者資料不合規則",v.errors);
+        return seal(next).then(function(c){return sub(id).update({iv:c.iv,ct:c.ct,ver:(m.ver||1)+1,updatedAt:x.TS(),updatedBy:me()});}).then(function(){return logWrite(id,"subject:update",id);}).then(function(){return {id:id,ver:(m.ver||1)+1,warnings:v.warnings};});});})
+      .catch(function(e){var retry=/permission|insufficient|aborted|failed-precondition/i.test(String((e&&e.code)||"")+" "+String((e&&e.message)||e));if(tries>1&&retry)return updateSubject(id,mutate,tries-1);throw e;});}
+    /* ---------- 事實與確認（只增不改） ---------- */
+    function write(store,id,kind,data,opt){
+      opt=opt||{};var v=SC.validateFact(kind,data);if(!v.ok)return Promise.reject(err("invalid","資料不合規則",v.errors));
+      var spec=SC.KINDS[kind];if(spec.store!==store)return Promise.reject(err("wrongStore","類別 "+kind+" 應存在 "+spec.store+"，不是 "+store));
+      var fid=opt.id||SC.newId(rnd,store==="facts"?"f":"c"),ref=sub(id).collection(store).doc(fid);
+      /* 指定 id（例如連點防護、重送）：已經寫過就視為成功，不重寫（規則也不允許更新） */
+      return (opt.id?ref.get():Promise.resolve({exists:false})).then(function(ex){if(ex.exists)return {id:fid,existed:true,warnings:v.warnings};
+        return seal(data).then(function(c){var doc={kind:kind,at:x.TS(),uid:me(),iv:c.iv,ct:c.ct};if(opt.supersedes)doc.supersedes=String(opt.supersedes);
+          return ref.set(doc).then(function(){return logWrite(id,store+":"+kind,fid);}).then(function(){return {id:fid,warnings:v.warnings};});});});}
+    function addFact(id,kind,data,opt){return write("facts",id,kind,data,opt);}
+    function addConfirm(id,kind,data,opt){return write("confirms",id,kind,data,opt);}
+    function correct(store,id,fid,kind,data){return write(store,id,kind,data,{supersedes:fid});}
+    function remove(store,id,fid,kind,reason){return write(store,id,kind,reason?{deleted:true,reason:String(reason)}:{deleted:true},{supersedes:fid});}
+    /* ---------- 讀取 ---------- */
+    function readCol(id,store){return sub(id).collection(store).get().then(function(qs){var out=[],bad=0;
+      return Promise.all(qs.docs.map(function(d){var m=d.data();return open(m).then(function(data){out.push({id:d.id,kind:m.kind,at:ms(m.at),uid:m.uid,supersedes:m.supersedes||null,data:data});},function(){bad++;});})).then(function(){return {items:out,undecryptable:bad};});});}
+    /* known＝{doc,ver}（loadList 剛讀過的受試者）：不再重讀與重解受試者文件，每位少 1 次讀取（首頁逐位載入時省 1/3 次數） */
+    function loadSubject(id,known){
+      var head=known&&known.doc?Promise.resolve({doc:known.doc,ver:known.ver||1}):sub(id).get().then(function(d){if(!d.exists)throw err("missing","找不到受試者 "+id);var m=d.data();return open(m).then(function(doc){return {doc:doc,ver:m.ver||1};});});
+      return Promise.all([head,readCol(id,"facts"),readCol(id,"confirms")]).then(function(r){return {id:id,ver:r[0].ver,doc:r[0].doc,facts:r[1].items,confirms:r[2].items,undecryptable:r[1].undecryptable+r[2].undecryptable};});}
+    function loadList(){return x.col("subjects").get().then(function(qs){var out=[],bad=0;
+      return Promise.all(qs.docs.map(function(d){var m=d.data();return open(m).then(function(doc){out.push({id:d.id,ver:m.ver||1,doc:doc});},function(){bad++;});})).then(function(){out.sort(function(a,b){return a.id<b.id?-1:a.id>b.id?1:0;});return {subjects:out,undecryptable:bad};});});}
+    /* 載入後直接算時間軸（today 由呼叫端給台北日曆日） */
+    function timelineOf(id,today,cfg,known){return loadSubject(id,known).then(function(s){var a=SC.assemble({subject:s.doc,facts:s.facts,confirms:s.confirms});return {assembled:a,timeline:TLm?TLm.timeline(a.subject,cfg||null,today):null,undecryptable:s.undecryptable};});}
+    function lock(){K=null;}
+    return {openKey:openKey,createKey:createKey,grant:grant,revoke:revoke,seal:seal,open:open,createSubject:createSubject,updateSubject:updateSubject,addFact:addFact,addConfirm:addConfirm,
+      correctFact:function(id,fid,kind,data){return correct("facts",id,fid,kind,data);},correctConfirm:function(id,fid,kind,data){return correct("confirms",id,fid,kind,data);},
+      deleteFact:function(id,fid,kind,reason){return remove("facts",id,fid,kind,reason);},deleteConfirm:function(id,fid,kind,reason){return remove("confirms",id,fid,kind,reason);},
+      loadSubject:loadSubject,loadList:loadList,timelineOf:timelineOf,lock:lock,_k:function(){return K;}};
+  }
+  /* ---------- 備份／還原（純函式，只碰密文；2026-10-05） ----------
+     備份格式（cloud_module 的 v4 備份裡的 irae 區段）：{format:"irae-dump",v:1,subjects:{id:{doc,facts:{},confirms:{},raw:{},log:{}}},assays:{}}
+     每份文件原樣保存（密文＋明文欄位）；時間戳存成 {seconds,nanoseconds}（與 JSON.stringify 對 Firestore Timestamp 的結果相同），還原時換回 Timestamp。
+     還原不經規則（規則不允許 at!=request.time、更新事實等）——走維護者工具 tools/irae_restore.mjs（admin 權限）。 */
+  var SUBS=["facts","confirms","raw","log"];
+  function err(code,msg,extra){var e=new Error(msg);e.code=code;if(extra)e.detail=extra;return e;}
+  function isTsObj(v){if(!v||typeof v!=="object"||Array.isArray(v))return false;var k=Object.keys(v).filter(function(q){return q!=="type";});return k.length===2&&typeof v.seconds==="number"&&typeof v.nanoseconds==="number";}
+  function serTs(t){if(t&&typeof t.seconds==="number"&&typeof t.nanoseconds==="number")return {seconds:t.seconds,nanoseconds:t.nanoseconds};var ms=t.toMillis();var sec=Math.floor(ms/1000);return {seconds:sec,nanoseconds:(ms-sec*1000)*1e6};}
+  function ser(v){if(v===null||typeof v!=="object")return v;if(typeof v.toMillis==="function"||isTsObj(v))return serTs(v);if(Array.isArray(v))return v.map(ser);var o={};Object.keys(v).forEach(function(k){o[k]=ser(v[k]);});return o;}
+  function hydrate(v,mkTs){if(v===null||typeof v!=="object")return v;if(isTsObj(v))return mkTs(v.seconds,v.nanoseconds);if(Array.isArray(v))return v.map(function(q){return hydrate(q,mkTs);});var o={};Object.keys(v).forEach(function(k){o[k]=hydrate(v[k],mkTs);});return o;}
+  function mapPool(arr,n,f){var i=0,out=new Array(arr.length);function next(){if(i>=arr.length)return Promise.resolve();var k=i++;return f(arr[k],k).then(function(r){out[k]=r;return next();});}var w=[];for(var j=0;j<Math.min(n,arr.length);j++)w.push(next());return Promise.all(w).then(function(){return out;});}
+  function snapMap(qs){var o={};qs.forEach(function(d){o[d.id]=ser(d.data());});return o;}
+  /* x.col 讀出整份 irAE 資料（密文）。pool：同時進行的受試者數（預設 8）；每位受試者 4 次子集合讀取 */
+  function exportAll(x,opt){opt=opt||{};var pool=opt.pool||8;
+    return Promise.all([x.col("subjects").get(),x.col("assays").get()]).then(function(r){var ids=[],docs={};r[0].forEach(function(d){ids.push(d.id);docs[d.id]=ser(d.data());});ids.sort();
+      return mapPool(ids,pool,function(id){var ref=x.col("subjects").doc(id);return Promise.all(SUBS.map(function(c){return ref.collection(c).get();})).then(function(q){var o={doc:docs[id]};SUBS.forEach(function(c,i){o[c]=snapMap(q[i]);});return o;});}).then(function(list){
+        var subjects={};ids.forEach(function(id,i){subjects[id]=list[i];});return {format:"irae-dump",v:1,subjects:subjects,assays:snapMap(r[1])};});});}
+  function countsOf(b){var c={subjects:0,facts:0,confirms:0,raw:0,log:0,assays:0};Object.keys((b&&b.subjects)||{}).forEach(function(id){var s=b.subjects[id];c.subjects++;SUBS.forEach(function(k){c[k]+=Object.keys(s[k]||{}).length;});});c.assays=Object.keys((b&&b.assays)||{}).length;return c;}
+  function badId(id){return typeof id!=="string"||!id||/[\/\s]/.test(id)||id==="."||id===".."||id.length>1500;}
+  /* 還原前檢查：結構、文件 ID、每份文件有 iv／ct 字串與必要欄位。回傳 {ok,errors,counts} */
+  function checkDump(b){var errs=[];if(!b||b.format!=="irae-dump"||b.v!==1||typeof b.subjects!=="object"){return {ok:false,errors:["不是 irae-dump v1"],counts:null};}
+    Object.keys(b.subjects).forEach(function(id){var s=b.subjects[id];if(badId(id)){errs.push("受試者 ID 不合："+id);return;}
+      if(!s||!s.doc||typeof s.doc.iv!=="string"||typeof s.doc.ct!=="string"||typeof s.doc.ver!=="number")errs.push(id+"：受試者文件缺 iv／ct／ver");
+      SUBS.forEach(function(c){if(s[c]===undefined){errs.push(id+"：缺 "+c+" 區段");return;}Object.keys(s[c]).forEach(function(k){var d=s[c][k];if(badId(k))errs.push(id+"/"+c+"：文件 ID 不合 "+k);
+        else if(c==="log"){if(!d||typeof d.uid!=="string"||!isTsObj(d.at))errs.push(id+"/log/"+k+"：缺 uid／at");}
+        else if(!d||typeof d.iv!=="string"||typeof d.ct!=="string"||!isTsObj(d.at))errs.push(id+"/"+c+"/"+k+"：缺 iv／ct／at");});});});
+    if(b.assays&&typeof b.assays!=="object")errs.push("assays 不是物件");return {ok:!errs.length,errors:errs,counts:countsOf(b)};}
+  /* 攤平成 [{path,data}]（相對研究空間；時間戳仍是 {seconds,nanoseconds}，由寫入端換成 Timestamp 或 REST timestampValue） */
+  function flatten(b){var out=[];Object.keys(b.subjects).sort().forEach(function(id){var s=b.subjects[id];out.push({path:"subjects/"+id,data:s.doc});SUBS.forEach(function(c){Object.keys(s[c]).sort().forEach(function(k){out.push({path:"subjects/"+id+"/"+c+"/"+k,data:s[c][k]});});});});
+    Object.keys(b.assays||{}).sort().forEach(function(k){out.push({path:"assays/"+k,data:b.assays[k]});});return out;}
+  /* io:{set(path,data):Promise, listSubjects():Promise<string[]>}。目標空間已有受試者就拒絕（除非 opt.force）：還原是為了空的空間，不是覆蓋在現有資料上 */
+  function restoreAll(b,io,opt){opt=opt||{};var ck=checkDump(b);if(!ck.ok)return Promise.reject(err("baddump","備份檔不完整："+ck.errors.slice(0,3).join("；"),ck.errors));
+    return io.listSubjects().then(function(ex){if(ex.length&&!opt.force)throw err("notempty","目標空間已有 "+ex.length+" 位受試者；還原只用於空的空間（確定要覆蓋才加 force）");
+      var rows=flatten(b);return mapPool(rows,opt.pool||16,function(r){return io.set(r.path,r.data);}).then(function(){return {written:rows.length,counts:ck.counts};});});}
+  /* 離線讀取：把備份區段包成 x.col 形狀（唯讀）。meta 取自備份的 meta；時間戳換成有 toMillis 的物件 */
+  function dumpReader(b,meta){var mk=function(s,n){return {seconds:s,nanoseconds:n,toMillis:function(){return s*1000+Math.floor(n/1e6);}};};
+    function snap(p,data){return {exists:data!==undefined,id:p.split("/").pop(),data:function(){return hydrate(JSON.parse(JSON.stringify(data)),mk);}};}
+    function colOf(map){return {get:function(){var docs=Object.keys(map).sort().map(function(id){return snap(id,map[id]);});return Promise.resolve({docs:docs,forEach:function(f){docs.forEach(f);},metadata:{}});},doc:function(id){return docOf(map,id);}};}
+    function docOf(map,id){return {id:id,get:function(){return Promise.resolve(snap(id,map[id]));},collection:function(c){var s=b.subjects[id];return colOf((s&&s[c])||{});},set:rej,update:rej,add:rej};}
+    function rej(){return Promise.reject(err("readonly","離線備份檢視是唯讀的"));}
+    var docs={};Object.keys(b.subjects).forEach(function(id){docs[id]=b.subjects[id].doc;});
+    return {col:function(n){if(n==="subjects")return colOf(docs);if(n==="meta")return colOf(meta||{});if(n==="assays")return colOf(b.assays||{});return colOf({});}};}
+  return {make:make,exportAll:exportAll,countsOf:countsOf,checkDump:checkDump,flatten:flatten,restoreAll:restoreAll,hydrate:hydrate,dumpReader:dumpReader,SUBS:SUBS};
+})();
+if(typeof module==="object"&&module.exports)module.exports=IRAE_STORE;
+
+/* ====== irAE 登錄（M1-a，2026-10-05）：研究空間 mode:"irae" 的畫面 ======
+   依 docs/IRAE_STORAGE_ROLES_20261005.md、docs/IRAE_REGISTRY_MVP_20261004.md。
+   資料層是 irae_store.js（金鑰、受試者、事實與確認只增不改）；時間軸與下次抽血是 irae_timeline.js；資料字典與組裝是 irae_schema.js。
+   角色：主持人與研究助理(abstractor)可登錄事實；醫師與主持人可寫「治療結束日確認」；護理師看不到（規則層擋）。
+   畫面只在 mode==="irae" 的空間出現；ESCC 與門診 PROM 空間完全不受影響。
+   疑問處的預設值掛 Q-M1 代碼（docs/IRAE_M1_OPEN_QUESTIONS_20261005.md），在時間軸表格旁以「備註」呈現。 */
+var IRAE=(function(){
+var X=null,ST=null,LIST=[],SUMS={},CUR=null,CD=null,SEQ=0,OFF=null;
+var QN={"Q-M1-01":"T0「治療前」包含首劑當日（資料只有日期，無法驗證先後）","Q-M1-02":"「+3／+6／+12 個月」以曆月計，月底夾取","Q-M1-03":"T1–T4 以「人確認的治療結束日」為錨點",
+  "Q-M1-04":"T1 窗＝結束日起 14 天（草案）","Q-M1-05":"末劑後超過 2 倍預期間隔，提示確認是否已結束（只提示，不自動認定）","Q-M1-06":"只對第一條療程產生 5 個時點",
+  "Q-M1-07":"納入時已在用藥者 T0 判「不適用」","Q-M1-08":"返診加抽／不良事件觸發預設停用，待 IRB 變更","Q-M1-09":"窗尾前 7 天標「即將到期」","Q-M1-11":"窗尾超過同意書資料期間止日（2028-12-31）時加旗標"};
+function x(){if(!X)X=SEC._x;return X;}
+function S(){return SEC.session();}
+function iraeSpace(){var s=S();return !!s&&s.mode==="irae";}
+function store(){if(!ST){var xx=x();if(OFF)xx=Object.assign({},xx,{col:IRAE_STORE.dumpReader(OFF.irae,OFF.meta).col});ST=IRAE_STORE.make(xx,{uid:function(){return S().uid;}});}return ST;}
+/* 離線備份檢視（唯讀）：備份檔的 irae 區段＋meta（含 iraekey）包成唯讀的 x.col，讀取走同一套 store */
+function loadFromBackup(B){OFF={irae:B.irae,meta:B.meta||{}};ST=null;LIST=[];SUMS={};}
+function canWrite(){var s=S();return !!s&&!s.offline&&(s.role==="manager"||s.role==="abstractor");}
+function canConfirm(){var s=S();return !!s&&!s.offline&&(s.role==="manager"||s.role==="doctor");}
+function today(){return IRAE_TL.todayTaipei(Date.now());}
+function main(){return $("#main");}
+function z(n){return (n<10?"0":"")+n;}
+function loading(m){main().innerHTML='<section class="sheet report ir"><p class="desc">'+esc(m)+'</p></section>';}
+function msgOf(e){return (e&&e.code==="invalid"&&e.detail?"資料不合規則："+e.detail.map(function(d){return d.path+"（"+d.code+"）";}).join("、"):(e&&e.message)||x().cErr(e));}
+function fail(e){main().innerHTML='<section class="sheet report ir"><h2>irAE 登錄</h2><p class="desc">'+esc(msgOf(e))+'</p><p><button class="btn" type="button" id="irRetry">重試</button></p></section>';var b=$("#irRetry");if(b)b.onclick=home;}
+function pool(items,n,fn){var i=0,run=function(){if(i>=items.length)return Promise.resolve();var it=items[i++];return fn(it).then(run);};var w=[];for(var k=0;k<Math.min(n,items.length);k++)w.push(run());return Promise.all(w);}
+function st(s){return '<span class="ir-st ir-'+s+'">'+esc(IRAE_TL.STATUS_ZH[s]||s)+'</span>';}
+function dd(s){return s?esc(s):"—";}
+function notesOf(arr){var out=[];(arr||[]).forEach(function(c){if(QN[c])out.push('<abbr class="ir-q" title="'+esc(QN[c])+'">'+esc(c)+'</abbr>');});return out.join(" ");}
+function nextText(r){var n=r&&r.nextDraw;if(!n)return "—";if(!n.target)return esc(IRAE_TL.STATUS_ZH[n.status]||n.status);var sl=r.slots.filter(function(q){return q.key===n.slotKey;})[0];
+  return esc(n.target)+"　"+esc(sl?sl.label:"")+"　"+st(n.status);}
+function statusText(d){var s=d&&d.status;if(!s||s.kind==="active")return "進行中";return ({withdrawn:"退出",dead:"死亡",lost:"失聯"}[s.kind]||s.kind)+(s.date?"　"+esc(s.date):"");}
+function sexText(v){return ({F:"女",M:"男",U:"不詳"}[v])||"—";}
+
+/* ---------- 首頁：下次抽血清單＋受試者清單 ---------- */
+function home(){if(!iraeSpace())return Promise.resolve();var my=++SEQ;CUR=null;CD=null;
+  if(S().offline&&!OFF){main().innerHTML='<section class="sheet report ir"><p class="desc">這份備份沒有 irAE 登錄資料（需 2026-10-05 之後、在 irAE 空間下載的備份）。</p></section>';return Promise.resolve();}
+  loading("讀取 irAE 登錄中…");
+  return store().openKey().then(function(){return store().loadList();}).then(function(r){if(my!==SEQ)return;LIST=r.subjects;SUMS={};var t=today();
+    return pool(LIST,16,function(s){return store().timelineOf(s.id,t,null,s).then(function(v){SUMS[s.id]=v;},function(){SUMS[s.id]={err:true};});}).then(function(){if(my===SEQ){drawHome(r.undecryptable);if(SEC.backupBar)SEC.backupBar();}});}).catch(function(e){if(my===SEQ)fail(e);});}
+function drawHome(bad){
+  var t=today(),tls=LIST.map(function(s){return SUMS[s.id]&&SUMS[s.id].timeline;}).filter(Boolean),dl=IRAE_TL.dueList(tls,t,7),c=dl.counts;
+  var rows=dl.rows.map(function(r){return '<tr class="ir-row" data-id="'+esc(r.subjectId)+'"><td><b>'+esc(r.subjectId)+'</b></td><td>'+esc(r.label)+'</td><td>'+esc(r.target)+'</td><td>'+dd(r.windowStart)+" ～ "+dd(r.windowEnd)+'</td><td>'+st(r.status)+'</td></tr>';}).join("");
+  var srows=LIST.map(function(s){var v=SUMS[s.id]||{},r=v.timeline,a=v.assembled;return '<tr class="ir-row" data-id="'+esc(s.id)+'"><td><b>'+esc(s.id)+'</b></td><td>'+dd(s.doc.consentDate)+'</td><td>'+statusText(s.doc)+'</td><td>'+(v.err?'<span class="ir-st ir-overdue">讀取失敗</span>':nextText(r))+'</td><td>'+(a?a.counts.facts:"—")+'</td></tr>';}).join("");
+  main().innerHTML='<section class="sheet report ir"><div class="ir-top"><h2>irAE 登錄</h2><div class="ir-act">'+(canWrite()?'<button class="btn go" type="button" id="irNew">新增受試者</button>':"")+(x().isAdmin()&&!S().offline?'<button class="btn" type="button" id="irBackup" title="下載加密備份（含受試者、事實、確認、稽核與金鑰）">下載加密備份</button>':"")+'<button class="btn" type="button" id="irReload">重新整理</button></div></div>'+
+    '<p class="ir-kpi" id="irKpi">今日 <b>'+c.today+'</b>　本週 <b>'+c.week+'</b>　逾期 <b>'+c.overdue+'</b>　目前可抽 <b>'+c.openNow+'</b>　<span class="mini">（今天 '+esc(t)+'，台北日曆日）</span>'+(x().isAdmin()&&!S().offline?'　<span class="mini" id="irBk">'+bkText()+'</span>':"")+'</p>'+
+    (bad?'<p class="ir-warn">有 '+bad+' 位受試者的文件無法以您目前的金鑰解開，請通知主持人。</p>':"")+
+    '<h3>下次抽血清單</h3><div class="ir-scroll"><table id="irDue"><thead><tr><th>研究編號</th><th>時點</th><th>目標日</th><th>可抽的窗</th><th>狀態</th></tr></thead><tbody>'+(rows||'<tr><td colspan="5" class="mini">目前沒有待抽血的受試者。</td></tr>')+'</tbody></table></div>'+
+    '<h3>受試者（'+LIST.length+'）</h3><div class="ir-scroll"><table id="irSubj"><thead><tr><th>研究編號</th><th>同意日</th><th>狀態</th><th>下次抽血</th><th>事實數</th></tr></thead><tbody>'+(srows||'<tr><td colspan="5" class="mini">尚無受試者。請按「新增受試者」。</td></tr>')+'</tbody></table></div>'+
+    '<p class="mini">預設時點＝同意書 v3.0 現行 5 個時點（治療前、治療結束後、+3、+6、+12 個月）。每項預設的理由與改選影響見備註表 Q-M1。資料在瀏覽器內加密後才上傳；本空間不存姓名與病歷號。</p></section>';
+  $$("#irDue tr.ir-row,#irSubj tr.ir-row").forEach(function(tr){tr.onclick=function(){openSubject(tr.dataset.id);};});
+  $("#irReload").onclick=home;var nb=$("#irNew");if(nb)nb.onclick=newSubject;
+  var bb=$("#irBackup");if(bb)bb.onclick=function(){var t0=bb.textContent;bb.disabled=true;bb.textContent="備份中…（受試者多時要十幾秒）";var done=function(){setTimeout(function(){var q=$("#irBk");if(q)q.textContent=bkText();bb.disabled=false;bb.textContent=t0;},1500);};Promise.resolve(SEC.doBackup()).then(done,done);};}
+function bkText(){var d=SEC.lastBackup&&SEC.lastBackup();if(!d)return "備份：尚無（建議每 7 天一次）";var n=Math.floor((Date.now()-d.getTime())/86400000);return "上次備份："+IRAE_TL.todayTaipei(d.getTime())+"（"+(n<=0?"今天":n+" 天前")+"）";}
+function newSubject(){
+  dialog({title:"新增受試者",msg:"研究編號是假名（例如 IRAE0001），不得填姓名或病歷號。日期格式 YYYY-MM-DD。",fields:[
+    {k:"id",label:"研究編號",req:true},{k:"consentDate",label:"同意書簽署日（YYYY-MM-DD）",value:today()},{k:"sex",label:"生理性別",type:"select",options:["女","男","不詳"]},{k:"cancer",label:"癌別（ICD-O-3 或文字）"},
+    {k:"priorIci",label:"先前免疫治療",type:"select",options:["無","有","不明"]},{k:"autoimmune",label:"自體免疫病史",type:"select",options:["無","有","不明"]},{k:"note",label:"備註",type:"textarea"}],ok:"建立"}).then(function(v){if(!v)return;
+    var d={},id=String(v.id).replace(/\s+/g,"");if(v.consentDate)d.consentDate=v.consentDate;if(v.sex)d.sex={"女":"F","男":"M","不詳":"U"}[v.sex];if(v.cancer)d.cancer=v.cancer;
+    if(v.priorIci)d.priorIci={"無":"no","有":"yes","不明":"unknown"}[v.priorIci];if(v.autoimmune)d.autoimmune={"無":"no","有":"yes","不明":"unknown"}[v.autoimmune];if(v.note)d.note=v.note;d.status={kind:"active"};
+    store().createSubject(id,d).then(function(r){toast("已建立 "+id+(r.warnings&&r.warnings.length?"（建議補：「"+r.warnings.map(function(w){return ({consentDate:"同意日",sex:"性別",cancer:"癌別"}[w.path]||w.path);}).join("、")+"」）":""));return openSubject(id);}).catch(function(e){toast(msgOf(e));});});}
+
+/* ---------- 受試者頁 ---------- */
+function openSubject(id){var my=++SEQ;CUR=id;loading("讀取 "+id+"…");
+  return store().loadSubject(id).then(function(s){if(my!==SEQ)return;CD=s;var a=IRAE_SCHEMA.assemble({subject:s.doc,facts:s.facts,confirms:s.confirms});CD.asm=a;CD.tl=IRAE_TL.timeline(a.subject,null,today());drawSubject();}).catch(function(e){if(my===SEQ)fail(e);});}
+function cur(items,kind){return IRAE_SCHEMA.current(items).filter(function(f){return f.kind===kind;});}
+function reopen(){return CUR?openSubject(CUR):home();}
+function drawSubject(){
+  var s=CD,id=s.id,d=s.doc,tl=s.tl,facts=cur(s.facts,"ici_dose"),courses=cur(s.facts,"course"),draws=cur(s.facts,"draw").sort(function(a,b){return a.data.date<b.data.date?-1:a.data.date>b.data.date?1:0;}),
+      waivers=cur(s.facts,"waiver"),ends=cur(s.confirms,"end"),w=canWrite(),cf=canConfirm();
+  var noteCodes={};tl.slots.forEach(function(q){(q.notes||[]).forEach(function(c){noteCodes[c]=1;});});tl.tasks.forEach(function(q){(q.notes||[]).forEach(function(c){noteCodes[c]=1;});});
+  var slotRows=tl.slots.map(function(q){return '<tr><td>'+esc(q.courseId||"")+" "+esc(q.label)+'</td><td>'+dd(q.target)+'</td><td>'+dd(q.windowStart)+" ～ "+dd(q.windowEnd)+'</td><td>'+st(q.status)+(q.reason?'<span class="mini"> '+esc(q.reason)+'</span>':"")+(q.flags&&q.flags.length?'<span class="mini"> ⚑'+esc(q.flags.join("、"))+'</span>':"")+'</td><td>'+(q.drawId?esc((draws.filter(function(r){return r.id===q.drawId;})[0]||{data:{}}).data.date||q.drawId):"—")+'</td><td>'+notesOf(q.notes)+'</td></tr>';}).join("");
+  var tasks=tl.tasks.filter(function(q){return q.type==="confirmEnd"||q.type==="fillBasics"||q.type==="deviationReason";}).map(function(q){
+    if(q.type==="confirmEnd")return '<div class="ir-sugg">療程 '+esc(q.courseId)+'：最後一劑 '+esc(q.lastDose)+'，已過 '+q.daysSince+' 天（預期間隔約 '+q.intervalDays+' 天）。請確認治療是否已結束。'+(cf?' <button class="btn sm" type="button" data-end="'+esc(q.courseId)+'">確認結束日</button>':'（需醫師或主持人確認）')+' '+notesOf(q.notes)+'</div>';
+    if(q.type==="fillBasics")return '<div class="ir-sugg">請補登：'+esc(({consentDate:"同意書簽署日",course:"免疫治療療程"})[q.what]||q.what)+'</div>';
+    return '<div class="ir-sugg">偏差未填原因：'+esc(q.slotKey)+'</div>';}).join("");
+  var issues=(tl.issues||[]).concat(s.asm.issues||[]).map(function(q){return '<li>'+esc(({consentAfterDay0:"納入（同意）晚於首劑：T0 不適用",drawOutsideWindows:"有抽血不在任何時點的窗內（可明確指定時點並填偏差原因）",extraDraw:"同一時點有多次抽血",overCap:"抽血次數超過同意書上限",drawBeforeConsent:"有抽血早於同意日",drawAfterTerminal:"終止後仍有抽血",endBeforeLastDose:"結束日早於最後一劑",doseWithoutCourse:"有給藥但沒有療程資料",unknownSlot:"抽血指定了不存在的時點"})[q.code]||q.code)+(q.drawId?"（抽血 "+esc(q.drawId)+"）":"")+'</li>';}).join("");
+  var courseIds={};courses.forEach(function(c){courseIds[c.data.courseId]=c;});facts.forEach(function(f){courseIds[f.data.courseId]=courseIds[f.data.courseId]||{data:{courseId:f.data.courseId},id:null};});
+  var cids=Object.keys(courseIds).sort();
+  var courseHtml=cids.map(function(cid){var c=courseIds[cid].data,ds=facts.filter(function(f){return f.data.courseId===cid;}).sort(function(a,b){return a.data.date<b.data.date?-1:a.data.date>b.data.date?1:0;}),en=ends.filter(function(e){return e.data.courseId===cid;})[0];
+    return '<div class="ir-course"><h4>療程 '+esc(cid)+'　<span class="mini">'+esc((c.drugs||[]).join("、"))+(c.plannedStart?"　預定首劑 "+esc(c.plannedStart):"")+'</span></h4>'+
+      '<div class="ir-scroll"><table><thead><tr><th>給藥日</th><th>藥名</th><th>劑量</th><th></th></tr></thead><tbody>'+(ds.map(function(f){return '<tr><td>'+esc(f.data.date)+(f.data.status&&f.data.status!=="given"?' <span class="mini">'+esc(f.data.status)+'</span>':"")+'</td><td>'+esc(f.data.drug)+'</td><td>'+(f.data.dose!=null?esc(f.data.dose)+" "+esc(f.data.unit||""):"—")+'</td><td>'+(w?'<button class="btn sm" type="button" data-cdose="'+esc(f.id)+'">更正</button> <button class="btn sm" type="button" data-ddose="'+esc(f.id)+'">刪除</button>':"")+'</td></tr>';}).join("")||'<tr><td colspan="4" class="mini">尚無給藥紀錄。</td></tr>')+'</tbody></table></div>'+
+      '<p class="ir-act">'+(w?'<button class="btn sm" type="button" data-adose="'+esc(cid)+'">新增給藥</button>':"")+(en?'治療結束日 <b>'+esc(en.data.endDate)+'</b> <span class="mini">（'+esc(({lastDose:"末劑日",stopDecision:"停藥決定日",other:"其他"})[en.data.basis]||"")+'）</span>'+(cf?' <button class="btn sm" type="button" data-rend="'+esc(en.id)+'">撤回結束日確認</button>':""):(cf?'<button class="btn sm" type="button" data-end="'+esc(cid)+'">確認治療結束日</button>':'<span class="mini">治療結束日尚未確認</span>'))+'</p></div>';}).join("");
+  var drawRows=draws.map(function(r){var q=tl.slots.filter(function(k){return k.drawId===r.id;})[0];return '<tr><td>'+esc(r.data.date)+'</td><td>'+(q?esc(q.courseId+" "+q.label):'<span class="mini">未歸屬</span>')+'</td><td class="wrap">'+esc(r.data.note||"")+(r.data.preDose?'<span class="mini"> 給藥前：'+esc(({yes:"是",no:"否",unknown:"不確定"})[r.data.preDose])+'</span>':"")+'</td><td class="wrap">'+esc(r.data.deviationReason||"")+'</td><td>'+(w?'<button class="btn sm" type="button" data-cdraw="'+esc(r.id)+'">更正</button> <button class="btn sm" type="button" data-ddraw="'+esc(r.id)+'">刪除</button>':"")+'</td></tr>';}).join("");
+  var wvRows=waivers.map(function(r){return '<li>'+esc(r.data.slotKey)+'：'+esc(r.data.reason||"（未填原因）")+(w?' <button class="btn sm" type="button" data-dwv="'+esc(r.id)+'">撤回放棄</button>':"")+'</li>';}).join("");
+  main().innerHTML='<section class="sheet report ir"><div class="ir-top"><h2>'+esc(id)+'</h2><div class="ir-act"><button class="btn" type="button" id="irBack">← 清單</button><button class="btn" type="button" id="irRel">重新整理</button></div></div>'+
+    '<p class="mini">同意日 '+dd(d.consentDate)+'（'+esc(d.consentVersion||"版本未填")+'）　性別 '+sexText(d.sex)+'　癌別 '+dd(d.cancer)+'　先前免疫治療 '+esc(({yes:"有",no:"無",unknown:"不明"})[d.priorIci]||"—")+'　自體免疫 '+esc(({yes:"有",no:"無",unknown:"不明"})[d.autoimmune]||"—")+'　狀態 <b>'+statusText(d)+'</b>'+(w?'　<button class="btn sm" type="button" id="irEdit">編輯基本資料</button> <button class="btn sm" type="button" id="irStatus">變更狀態</button>':"")+'</p>'+
+    (d.note?'<p class="mini">備註：'+esc(d.note)+'</p>':"")+tasks+
+    '<h3>抽血時間軸　<span class="mini">今天 '+esc(today())+'</span></h3><div class="ir-scroll"><table id="irSlots"><thead><tr><th>時點</th><th>目標日</th><th>可抽的窗</th><th>狀態</th><th>抽血日</th><th>備註</th></tr></thead><tbody>'+(slotRows||'<tr><td colspan="6" class="mini">尚無療程，沒有時點。請先新增療程。</td></tr>')+'</tbody></table></div>'+
+    '<p class="mini">下次抽血：'+nextText(tl)+'</p>'+(issues?'<ul class="ir-iss">'+issues+'</ul>':"")+
+    '<h3>免疫治療療程與給藥</h3>'+(courseHtml||'<p class="mini">尚無療程。</p>')+(w?'<p><button class="btn" type="button" id="irAddCourse">新增療程</button></p>':"")+
+    '<h3>抽血登錄</h3><div class="ir-scroll"><table id="irDraws"><thead><tr><th>抽血日</th><th>歸屬時點</th><th>管別／備註</th><th>偏差原因</th><th></th></tr></thead><tbody>'+(drawRows||'<tr><td colspan="5" class="mini">尚無抽血紀錄。</td></tr>')+'</tbody></table></div>'+
+    '<p class="ir-act">'+(w?'<button class="btn go" type="button" id="irAddDraw">登錄抽血</button> <button class="btn" type="button" id="irAddWv">放棄某時點</button>':"")+'</p>'+(wvRows?'<ul class="ir-iss">'+wvRows+'</ul>':"")+
+    '<h3>備註</h3><ul class="ir-iss">'+(Object.keys(noteCodes).sort().map(function(c){return '<li><b>'+esc(c)+'</b>　'+esc(QN[c]||"")+'</li>';}).join("")||'<li class="mini">無</li>')+'</ul>'+
+    '<p class="mini">所有日期與內容在瀏覽器內加密後才上傳；稽核只記動作與文件編號。事實只增不改：更正與刪除會留下紀錄。</p></section>';
+  wire();}
+function find(arr,id){return arr.filter(function(f){return f.id===id;})[0];}
+function wire(){
+  $("#irBack").onclick=home;$("#irRel").onclick=reopen;var s=CD,id=s.id;
+  var on=function(sel,fn){$$(sel).forEach(function(b){b.onclick=function(){fn(b);};});};
+  var ok=function(p,m){return p.then(function(){toast(m);return reopen();}).catch(function(e){toast(msgOf(e));});};
+  var ed=$("#irEdit");if(ed)ed.onclick=function(){editBasics();};var stb=$("#irStatus");if(stb)stb.onclick=function(){editStatus();};
+  var ac=$("#irAddCourse");if(ac)ac.onclick=function(){addCourse();};var ad=$("#irAddDraw");if(ad)ad.onclick=function(){addDraw();};var aw=$("#irAddWv");if(aw)aw.onclick=function(){addWaiver();};
+  on("[data-adose]",function(b){addDose(b.dataset.adose);});
+  on("[data-cdose]",function(b){var f=find(s.facts,b.dataset.cdose);if(!f)return;dialog({title:"更正給藥",fields:[{k:"date",label:"給藥日（YYYY-MM-DD）",value:f.data.date,req:true},{k:"drug",label:"藥名",value:f.data.drug,req:true},{k:"dose",label:"劑量（數字）",value:f.data.dose!=null?String(f.data.dose):""},{k:"unit",label:"單位",value:f.data.unit||""}],ok:"更正"}).then(function(v){if(!v)return;
+    var nd=Object.assign({},f.data,{date:v.date,drug:v.drug});if(v.dose!=="")nd.dose=Number(v.dose);else delete nd.dose;if(v.unit)nd.unit=v.unit;else delete nd.unit;ok(store().correctFact(id,f.id,"ici_dose",nd),"已更正（舊紀錄保留）");});});
+  on("[data-ddose]",function(b){ask("刪除這筆給藥紀錄？（會留下刪除紀錄，不是真的消失）").then(function(y){if(y)ok(store().deleteFact(id,b.dataset.ddose,"ici_dose","手動刪除"),"已刪除");});});
+  on("[data-cdraw]",function(b){var f=find(s.facts,b.dataset.cdraw);if(!f)return;dialog({title:"更正抽血",fields:[{k:"date",label:"抽血日（YYYY-MM-DD）",value:f.data.date,req:true},{k:"note",label:"管別／備註",value:f.data.note||""},{k:"dev",label:"偏差原因（若不在窗內）",value:f.data.deviationReason||""}],ok:"更正"}).then(function(v){if(!v)return;
+    var nd=Object.assign({},f.data,{date:v.date});if(v.note)nd.note=v.note;else delete nd.note;if(v.dev)nd.deviationReason=v.dev;else delete nd.deviationReason;ok(store().correctFact(id,f.id,"draw",nd),"已更正（舊紀錄保留）");});});
+  on("[data-ddraw]",function(b){ask("刪除這筆抽血紀錄？（會留下刪除紀錄）").then(function(y){if(y)ok(store().deleteFact(id,b.dataset.ddraw,"draw","手動刪除"),"已刪除");});});
+  on("[data-dwv]",function(b){ok(store().deleteFact(id,b.dataset.dwv,"waiver","撤回"),"已撤回放棄");});
+  on("[data-end]",function(b){confirmEnd(b.dataset.end);});
+  on("[data-rend]",function(b){ask("撤回治療結束日確認？時間軸會回到「待治療結束」。").then(function(y){if(y)ok(store().deleteConfirm(id,b.dataset.rend,"end","撤回"),"已撤回");});});}
+function ok2(p,m){return p.then(function(){toast(m);return reopen();}).catch(function(e){toast(msgOf(e));});}
+function editBasics(){var d=CD.doc,rv=function(m,v){var o={};Object.keys(m).forEach(function(k){o[m[k]]=k;});return o[v]||"";};
+  var SX={"女":"F","男":"M","不詳":"U"},YN={"無":"no","有":"yes","不明":"unknown"};
+  dialog({title:"編輯基本資料 "+CD.id,fields:[{k:"consentDate",label:"同意書簽署日（YYYY-MM-DD）",value:d.consentDate||""},{k:"consentVersion",label:"同意書版本",value:d.consentVersion||""},{k:"sex",label:"生理性別",type:"select",options:["女","男","不詳"]},{k:"cancer",label:"癌別",value:d.cancer||""},{k:"priorIci",label:"先前免疫治療",type:"select",options:["無","有","不明"]},{k:"autoimmune",label:"自體免疫病史",type:"select",options:["無","有","不明"]},{k:"note",label:"備註",type:"textarea",value:d.note||""}],ok:"儲存"}).then(function(v){if(!v)return;
+    ok2(store().updateSubject(CD.id,function(cur){var n=Object.assign({},cur);["consentDate","consentVersion","cancer","note"].forEach(function(k){if(v[k])n[k]=v[k];else delete n[k];});if(v.sex)n.sex=SX[v.sex];if(v.priorIci)n.priorIci=YN[v.priorIci];if(v.autoimmune)n.autoimmune=YN[v.autoimmune];return n;}),"已儲存");});}
+function editStatus(){dialog({title:"變更受試者狀態",msg:"退出、死亡、失聯之後，不會再有抽血機會的時點會標為「不適用」。",fields:[{k:"kind",label:"狀態",type:"select",options:["進行中","退出","死亡","失聯"],req:true},{k:"date",label:"日期（進行中可空白；其他必填，YYYY-MM-DD）"}],ok:"儲存"}).then(function(v){if(!v)return;
+    var k={"進行中":"active","退出":"withdrawn","死亡":"dead","失聯":"lost"}[v.kind],stt={kind:k};if(v.date)stt.date=v.date;ok2(store().updateSubject(CD.id,function(cur){return Object.assign({},cur,{status:stt});}),"已更新狀態");});}
+function addCourse(){var ids=cur(CD.facts,"course").map(function(c){return c.data.courseId;}).concat(cur(CD.facts,"ici_dose").map(function(c){return c.data.courseId;})),n=1;while(ids.indexOf("c"+n)>=0)n++;
+  dialog({title:"新增免疫治療療程",msg:"同意書的 5 個時點只對「第一條療程」產生（預設，見備註 Q-M1-06）。",fields:[{k:"courseId",label:"療程代號",value:"c"+n,req:true},{k:"drugs",label:"藥名（用逗號分隔，例如 pembrolizumab）"},{k:"plannedStart",label:"預定首劑日（尚未給藥時填，YYYY-MM-DD）"}],ok:"新增"}).then(function(v){if(!v)return;
+    var d={courseId:v.courseId};if(v.drugs)d.drugs=v.drugs.split(/[,，、]/).map(function(q){return q.trim();}).filter(Boolean);if(v.plannedStart)d.plannedStart=v.plannedStart;ok2(store().addFact(CD.id,"course",d),"已新增療程");});}
+function addDose(cid){var c=cur(CD.facts,"course").filter(function(f){return f.data.courseId===cid;})[0],dr=c&&c.data.drugs&&c.data.drugs[0]||"";
+  dialog({title:"新增給藥（療程 "+cid+"）",fields:[{k:"date",label:"給藥日（YYYY-MM-DD）",value:today(),req:true},{k:"drug",label:"藥名",value:dr,req:true},{k:"dose",label:"劑量（數字，可空）"},{k:"unit",label:"單位（例如 mg）"}],ok:"新增"}).then(function(v){if(!v)return;
+    var d={courseId:cid,date:v.date,drug:v.drug,status:"given"};if(v.dose!=="")d.dose=Number(v.dose);if(v.unit)d.unit=v.unit;ok2(store().addFact(CD.id,"ici_dose",d),"已新增給藥");});}
+function addDraw(){var opts=["（自動歸屬）"].concat(CD.tl.slots.map(function(q){return q.key+" "+q.label;}));
+  dialog({title:"登錄抽血",msg:"同意書每次 10 cc、共 5 次。管別與管數的標準做法待 pilot 後定，先用備註自由填寫。",fields:[{k:"date",label:"抽血日（YYYY-MM-DD）",value:today(),req:true},{k:"note",label:"管別／管數／備註（自由填寫）"},
+    {k:"pre",label:"給藥前抽血？（T0 用）",type:"select",options:["是","否","不確定"]},{k:"slot",label:"指定歸屬時點（通常不用選；窗外的抽血要選並填原因）",type:"select",options:opts},{k:"dev",label:"偏差原因（指定時點且不在窗內時必填）"}],ok:"登錄"}).then(function(v){if(!v)return;
+    var d={date:v.date};if(v.note)d.note=v.note;if(v.pre)d.preDose={"是":"yes","否":"no","不確定":"unknown"}[v.pre];if(v.slot&&v.slot!==opts[0])d.slotKey=v.slot.split(" ")[0];if(v.dev)d.deviationReason=v.dev;ok2(store().addFact(CD.id,"draw",d),"已登錄抽血");});}
+function addWaiver(){var opts=CD.tl.slots.map(function(q){return q.key+" "+q.label;});if(!opts.length){toast("尚無時點");return;}
+  dialog({title:"放棄某個抽血時點",msg:"例如病人拒絕或無法抽血；原因必填，之後可撤回。",fields:[{k:"slot",label:"時點",type:"select",options:opts,req:true},{k:"reason",label:"原因",req:true}],ok:"放棄"}).then(function(v){if(!v)return;ok2(store().addFact(CD.id,"waiver",{slotKey:v.slot.split(" ")[0],reason:v.reason}),"已登錄放棄");});}
+function confirmEnd(cid){var ds=cur(CD.facts,"ici_dose").filter(function(f){return f.data.courseId===cid;}).map(function(f){return f.data.date;}).sort(),last=ds[ds.length-1]||"";
+  dialog({title:"確認治療結束日（療程 "+cid+"）",msg:"只有醫師或主持人能確認。T1–T4 會依這一天重算。預設帶入最後一劑日，可改為停藥決定日。",fields:[{k:"date",label:"治療結束日（YYYY-MM-DD）",value:last,req:true},{k:"basis",label:"依據",type:"select",options:["末劑日","停藥決定日","其他"],req:true},{k:"note",label:"備註"}],ok:"確認"}).then(function(v){if(!v)return;
+    var d={courseId:cid,endDate:v.date,basis:{"末劑日":"lastDose","停藥決定日":"stopDecision","其他":"other"}[v.basis]};if(v.note)d.note=v.note;var prev=cur(CD.confirms,"end").filter(function(e){return e.data.courseId===cid;})[0];
+    ok2(prev?store().correctConfirm(CD.id,prev.id,"end",d):store().addConfirm(CD.id,"end",d),"已確認治療結束日");});}
+
+/* ---------- 空間入口（主持人）與生命週期 ---------- */
+function ensureMk(){var s=S(),b=$("#bIraeMk"),has=x().studies().some(function(q){return q.mode==="irae";});
+  if(!s||s.offline||!x().isAdmin()||s.mode||has){if(b)b.hidden=true;return;}
+  if(!b){b=document.createElement("button");b.className="btn";b.type="button";b.id="bIraeMk";b.textContent="＋irAE 登錄空間";var u=$("#acctBox")||$("#bUsers");u.parentNode.insertBefore(b,u);
+    b.onclick=function(){ask("建立「irAE 登錄」研究空間？建立後請按「切換作業」進入；成員（研究助理、醫師）要在那個空間的「帳號管理」加入並授權金鑰。").then(function(y){if(!y)return;b.disabled=true;x().createIraeSpace().then(function(r){toast(r.existed?"irAE 登錄空間已存在":"已建立 irAE 登錄空間，請按「切換作業」進入");b.hidden=true;},function(e){b.disabled=false;toast(e.message||x().cErr(e));});});};}
+  b.hidden=false;b.disabled=false;}
+function onSession(){var s=S();if(!s)return;var ir=iraeSpace();document.body.classList.toggle("irae-space",ir);var h1=document.querySelector("h1");
+  if(ir){if(h1){if(!h1.dataset.orig)h1.dataset.orig=h1.textContent;h1.textContent="irAE 登錄";}home();}else{ensureMk();}}
+function onLock(){SEQ++;CUR=null;CD=null;LIST=[];SUMS={};ST=null;X=null;OFF=null;document.body.classList.remove("irae-space");var b=$("#bIraeMk");if(b)b.hidden=true;var h1=document.querySelector("h1");if(h1&&h1.dataset.orig&&h1.textContent==="irAE 登錄")h1.textContent=h1.dataset.orig;}
+function grantOne(uid){return store().openKey().then(function(){return store().grant(uid);});}
+function revokeOne(uid){return store().openKey().then(function(){return store().revoke(uid);});}
+function grantKeys(){return store().openKey().then(function(){var M=x().members(),U=x().users(),jobs=[];Object.keys(M).forEach(function(uid){var m=M[uid];if(!(m.role==="abstractor"||m.role==="doctor"))return;var u=U[uid];if(!u||!u.pub||u.role!=="user")return;
+  var k=store()._k();if(k&&k.keys[uid]&&k.kfp&&k.kfp[uid])jobs.push(x().fpOf(u.pub).then(function(fp){return k.kfp[uid]===fp?0:store().grant(uid).then(function(){return 1;});}));else jobs.push(store().grant(uid).then(function(){return 1;}));});
+  return Promise.all(jobs).then(function(a){return a.reduce(function(n,v){return n+v;},0);});});}
+return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:function(){return LIST.length;},home:home,openSubject:openSubject,grantKeys:grantKeys,grantOne:grantOne,revokeOne:revokeOne,store:store,
+  _t:{list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
 /* ---------- init ---------- */
