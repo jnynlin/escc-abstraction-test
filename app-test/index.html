@@ -1750,17 +1750,19 @@ var SEC=(function(){
       return start(u,p);});
   }
   /* 申請身份：只是「申請」，供主持人核准時參考；實際權限由主持人決定。附加在顯示名稱裡（不新增資料欄位、規則不用改）。 */
-  var APPLY=["PI","sub-PI","醫師","護理師／個管師","研究助理"];
-  function composeName(n,sel,unit){var tag=sel&&sel.length?"申請："+sel.join("、"):"",extra=[tag,unit].filter(Boolean).join("｜"),out=extra?n+"（"+extra+"）":n;return out.slice(0,80);}
+  var APPLY=["PI","sub-PI","醫師","護理長／護理師／個管師","研究助理"],TITLES=["教授","副教授","助理教授","老師","醫師","護理長","護理師","個管師","研究助理"],UNITS=["學校","醫院","其他"];
+  function composeName(n,sel,unit,title,utype){var tag=sel&&sel.length?"申請："+sel.join("、"):"",place=unit?(utype?utype+"："+unit:unit):(utype||""),extra=[tag,title,place].filter(Boolean).join("｜"),out=extra?n+"（"+extra+"）":n;return out.slice(0,80);}
   function showFirst(u,pw){
     $("#aSub").textContent="首次登入：建立您的加密金鑰";
     form('<form><p class="adesc">您的金鑰以您的登入密碼保護，僅您本人可開啟。建立後須待主持人核准，方可開始作業。</p>'+
       '<label class="mf"><span>您的姓名（供主持人辨識）</span><input name="n" required maxlength="30"></label>'+
       '<fieldset style="border:0;padding:0;margin:8px 0"><legend style="padding:0"><b>申請身份</b>（可複選；僅供主持人核准時參考，實際權限由主持人決定）</legend>'+
       APPLY.map(function(x){return '<label class="ck" style="min-height:40px"><input type="checkbox" name="ap" value="'+esc(x)+'"> '+esc(x)+'</label>';}).join("")+'</fieldset>'+
-      '<label class="mf"><span>所屬單位／職稱（選填）</span><input name="u" maxlength="30"></label>'+
+      '<label class="mf"><span>職稱（選填；可選也可自己填）</span><input name="t" list="aTitles" maxlength="12" autocomplete="off"><datalist id="aTitles">'+TITLES.map(function(x){return '<option value="'+esc(x)+'">';}).join("")+'</datalist></label>'+
+      '<fieldset style="border:0;padding:0;margin:8px 0"><legend style="padding:0"><b>所屬單位</b>（選填）</legend>'+UNITS.map(function(x){return '<label class="ck" style="display:inline-flex;margin-right:14px;min-height:40px"><input type="radio" name="ut" value="'+esc(x)+'"> '+esc(x)+'</label>';}).join("")+'</fieldset>'+
+      '<label class="mf"><span>單位名稱（選填）</span><input name="u" maxlength="30"></label>'+
       '<details style="margin:10px 0"><summary class="adesc">系統主持人首次設定（一般使用者請勿展開）</summary><label class="ck"><input type="checkbox" name="pi"> 我是系統主持人（僅限首位建立系統的人；會多產生一組復原碼）</label></details>'+
-      '<button class="btn go" type="submit">建立金鑰</button></form>',function(f){var n0=val(f,"n"),unit=val(f,"u"),pi=f.elements.pi.checked,sel=[].slice.call(f.querySelectorAll("input[name=ap]:checked")).map(function(c){return c.value;});if(!n0)return err("請填名字");var n=composeName(n0,sel,unit);busy(f,true,"建立中…");
+      '<button class="btn go" type="submit">建立金鑰</button></form>',function(f){var n0=val(f,"n"),unit=val(f,"u"),title=val(f,"t"),utEl=f.querySelector("input[name=ut]:checked"),utype=utEl?utEl.value:"",pi=f.elements.pi.checked,sel=[].slice.call(f.querySelectorAll("input[name=ap]:checked")).map(function(c){return c.value;});if(!n0)return err("請填名字");var n=composeName(n0,sel,unit,title,utype);busy(f,true,"建立中…");
       createProfile(u,pw,n,pi).then(function(rec){if(rec)return showRecovery(rec,u);return showPending(u,{name:n});}).catch(function(e){busy(f,false,"建立金鑰");err(cErr(e));});});
   }
   function showRecovery(rec,u){
