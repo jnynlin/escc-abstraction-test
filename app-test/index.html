@@ -353,7 +353,7 @@ h3{font-size:1rem;color:var(--ink);}
 #modal .pmcards{grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr));}
 #modal .mini,#modal .desc,#modal .pmcard .mini{font-size:.92rem;}
 .prom .desc,.prom td.desc{font-size:.95rem;}
-/* P10 門診 PROM 空間：沒有摘錄側欄、分派；PROM 是唯一作業。小卡與列印 */
+/* P10 門診 ePRO 空間：沒有摘錄側欄、分派；PROM 是唯一作業。小卡與列印 */
 .prom-space .rail,.prom-space #dock,.prom-space #bAssign{display:none!important;} .prom-space .shell{display:block;}
 .pmcode{font:600 1.5rem/1.25 ui-monospace,Consolas,monospace;letter-spacing:.06em;text-align:center;margin:4px 0 6px;color:var(--ink);}
 .pmcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin:8px 0;} .pmcard{border:1px dashed var(--rule);border-radius:8px;padding:8px;text-align:center;background:var(--sheet);} .pmcard .pmcode{font-size:1.1rem;} .pmcard svg{width:130px;height:auto;background:#fff;padding:4px;border-radius:4px;} .pmcard .mini{margin:4px 0 0;}
@@ -1426,8 +1426,8 @@ var SEC=(function(){
   var ITER=600000,IDLE_MS=15*60*1000,DEBOUNCE=3000;
   /* this page's disease module; each study (research space) under /studies/{sid} belongs to one module */
   var MODULE="escc",DEFAULT_SID="ESCC",DEFAULT_NAME="食道鱗狀細胞癌(ESCC)";
-  /* 2026-10-03 P10：「門診 PROM」是另一個研究空間（mode:"prom"）：自己的成員、PROM 金鑰、權杖與紀錄，病人不需要研究編號；登入後在「選擇作業」挑 */
-  var CLINIC_SID="CLINIC",CLINIC_NAME="門診 PROM",IRAE_SID="IRAE",IRAE_NAME="irAE 登錄",STUDIES=[],CHOOSER_USER=null;
+  /* 2026-10-03 P10：「門診 ePRO」是另一個研究空間（mode:"prom"）：自己的成員、PROM 金鑰、權杖與紀錄，病人不需要研究編號；登入後在「選擇作業」挑 */
+  var CLINIC_SID="CLINIC",CLINIC_NAME="門診 ePRO",IRAE_SID="IRAE",IRAE_NAME="irAE 登錄",STUDIES=[],CHOOSER_USER=null;
   function modeRank(m){return m==="prom"?2:m==="irae"?1:0;}
   function byMode(a,b){return modeRank(a.mode)-modeRank(b.mode)||String(a.name).localeCompare(String(b.name));}
   var enc=new TextEncoder(),dec=new TextDecoder();
@@ -1550,7 +1550,7 @@ var SEC=(function(){
       if(L.length===1)return enter(u,p,L[0]);
       $("#aSub").textContent=L.some(function(x){return x.mode==="prom"||x.mode==="irae";})?"選擇作業":"選擇研究";  /* 只有研究空間時沿用原標題（e1 測試也驗這個） */
       $("#aBody").innerHTML=L.map(function(x,i){return '<p><button class="btn go" type="button" data-st="'+i+'">'+esc(x.name)+'</button><span class="adesc" style="display:block;margin:3px 0 0">'+(x.mode==="prom"?"門診病人的症狀紀錄，無須研究編號":x.mode==="irae"?"免疫治療受試者登錄：同意、給藥、抽血時間軸與提醒（研究編號）":"研究：病歷摘錄與 PROM 症狀（研究編號）")+'</span></p>';}).join("")+
-        (p.role==="admin"&&!L.some(function(x){return x.mode==="prom";})?'<p><button class="btn" type="button" id="aMkClinic">＋建立「門診 PROM」空間</button></p>':"")+
+        (p.role==="admin"&&!L.some(function(x){return x.mode==="prom";})?'<p><button class="btn" type="button" id="aMkClinic">＋建立「門診 ePRO」空間</button></p>':"")+
         (p.role==="admin"&&!L.some(function(x){return x.mode==="irae";})?'<p><button class="btn" type="button" id="aMkIrae">＋建立「irAE 登錄」空間</button></p>':"");
       $$("[data-st]",$("#aBody")).forEach(function(b){b.onclick=function(){enter(u,p,L[+b.dataset.st]);};});
       var mk=$("#aMkClinic");if(mk)mk.onclick=function(){mk.disabled=true;createPromSpace().then(function(){return start(u,p);},function(e){mk.disabled=false;err(cErr(e));});};
@@ -1560,7 +1560,7 @@ var SEC=(function(){
     return col("studies").doc(CLINIC_SID).get().then(function(d){if(d.exists&&d.data().mode==="prom")return {sid:CLINIC_SID,name:d.data().name||CLINIC_NAME,mode:"prom",existed:true};
       if(d.exists)throw new Error("代號 "+CLINIC_SID+" 已被別的空間使用");
       return col("studies").doc(CLINIC_SID).set({name:CLINIC_NAME,module:MODULE,mode:"prom",created:TS()}).then(function(){return {sid:CLINIC_SID,name:CLINIC_NAME,mode:"prom"};});})
-    .then(function(st){if(!STUDIES.some(function(z){return z.sid===st.sid;})){STUDIES=STUDIES.concat([st]).sort(byMode);}var sw=$("#bSwitch");if(sw&&SESSION&&!SESSION.offline)sw.hidden=STUDIES.length<2;if(SESSION)secLog("建立門診 PROM 空間 "+st.sid);return st;});}
+    .then(function(st){if(!STUDIES.some(function(z){return z.sid===st.sid;})){STUDIES=STUDIES.concat([st]).sort(byMode);}var sw=$("#bSwitch");if(sw&&SESSION&&!SESSION.offline)sw.hidden=STUDIES.length<2;if(SESSION)secLog("建立門診 ePRO 空間 "+st.sid);return st;});}
   /* irAE 登錄空間（M1-a，2026-10-05）：mode:"irae"；自己的成員、金鑰、受試者、事實、確認，不碰 ESCC 病歷摘錄。 */
   function createIraeSpace(){if(!isAdmin())return Promise.reject(new Error("只有主持人可以建立"));
     return col("studies").doc(IRAE_SID).get().then(function(d){if(d.exists&&d.data().mode==="irae")return {sid:IRAE_SID,name:d.data().name||IRAE_NAME,mode:"irae",existed:true};
@@ -6147,7 +6147,7 @@ function ago(ms){if(!ms)return "";var h=(Date.now()-ms)/36e5;return h<1?"剛剛"
 function render(){VIEW=true;document.body.classList.add("prom-view");if(typeof cur!=="undefined")cur=null;var dk=$("#dock");if(dk)dk.hidden=true;EN=ens();
   var m=$("#main"),s=S(),r=role(),rn={manager:"主持人",nurse:"個管師",doctor:"醫師"}[r]||r;
   m.innerHTML='<section class="sheet report prom"><div class="phead"><h3 title="'+E(rn+'　'+s.name+'　CTCAE '+PROM_PANEL.ctcae_version+'・題庫 v'+PROM_PANEL.version)+'">PROM 症狀清單・'+E(s.studyName||s.sid)+'</h3>'+
-    '<span class="sp"></span>'+(s.offline?'<span class="kbd">離線備份檢視・唯讀</span>':'<button class="btn" type="button" id="pmTok">發權杖給病人</button><button class="btn" type="button" id="pmFont" title="切換字級：標準／大／特大">字級 <b>'+FSN[FSI]+'</b></button><details class="pm-more" id="pmMoreBox"><summary class="btn" id="pmMore">更多 ▾</summary><div class="pm-menu"><button class="btn" type="button" id="pmTokMgr">權杖管理</button>'+(canConfirm()||canReview()?'<button class="btn" type="button" id="pmQr">貼上交接碼</button><button class="btn" type="button" id="pmInbox">再收件一次</button>':'')+'<button class="btn" type="button" id="pmRef">重新整理</button>'+(x().isAdmin()?(promSpace()?'':'<button class="btn" type="button" id="pmDemo">載入示範資料（合成）</button>')+'<button class="btn" type="button" id="pmClean">清除測試資料…</button>'+(!promSpace()&&!x().studies().some(function(z){return z.mode==="prom";})?'<button class="btn" type="button" id="pmMkSpace">建立「門診 PROM」空間…</button>':''):'')+'</div></details>')+'</div>'+
+    '<span class="sp"></span>'+(s.offline?'<span class="kbd">離線備份檢視・唯讀</span>':'<button class="btn" type="button" id="pmTok">發權杖給病人</button><button class="btn" type="button" id="pmFont" title="切換字級：標準／大／特大">字級 <b>'+FSN[FSI]+'</b></button><details class="pm-more" id="pmMoreBox"><summary class="btn" id="pmMore">更多 ▾</summary><div class="pm-menu"><button class="btn" type="button" id="pmTokMgr">權杖管理</button>'+(canConfirm()||canReview()?'<button class="btn" type="button" id="pmQr">貼上交接碼</button><button class="btn" type="button" id="pmInbox">再收件一次</button>':'')+'<button class="btn" type="button" id="pmRef">重新整理</button>'+(x().isAdmin()?(promSpace()?'':'<button class="btn" type="button" id="pmDemo">載入示範資料（合成）</button>')+'<button class="btn" type="button" id="pmClean">清除測試資料…</button>'+(!promSpace()&&!x().studies().some(function(z){return z.mode==="prom";})?'<button class="btn" type="button" id="pmMkSpace">建立「門診 ePRO」空間…</button>':''):'')+'</div></details>')+'</div>'+
     '<div class="pm-sumline" id="pmKpi"></div>'+'<div class="pm-shell"><div class="pm-rail"><div class="lbar" id="pmBar"></div><div class="pm-list"><table id="pmTbl"></table></div><div class="kbd pm-ccdstat" id="pmCcdStat"></div></div><div class="pm-main" id="pmDet"></div></div></section>';
   var rf=$("#pmRef");if(rf)rf.onclick=function(){$("#pmDet").innerHTML="";SEL=null;loadAll().then(render,function(e){toast(x().cErr(e));});};
   var q=$("#pmQr");if(q)q.onclick=function(){dialog({title:"貼上交接碼",msg:"請以桌上條碼掃描器掃描病人手機顯示的 QR 碼，內容將輸入此欄位（掃描器的作用等同鍵盤輸入）。",fields:[{k:"s",label:"交接碼",type:"textarea",req:1}],ok:"登錄"}).then(function(v){if(!v)return;
@@ -6158,7 +6158,7 @@ function render(){VIEW=true;document.body.classList.add("prom-view");if(typeof c
   var d=$("#pmDemo");if(d)d.onclick=function(){ask("載入 12 筆合成示範紀錄（研究編號 ESCC9001–9011，皆為虛構資料；最後三筆採 v3 食道癌題目）？").then(function(ok){if(!ok)return;loadDemo().then(function(n){toast("已載入 "+n+" 筆");render();}).catch(function(e){toast(e.message||x().cErr(e));});});};
   if(NOTES.length){toast(NOTES.join("；"));NOTES=[];}
   var cln=$("#pmClean");if(cln)cln.onclick=openCleanTest;
-  var mks=$("#pmMkSpace");if(mks)mks.onclick=function(){ask("建立獨立的「門診 PROM」空間？\n病人無須研究編號；成員、PROM 金鑰、權杖與紀錄皆與 ESCC 研究分開。建立後請由右上角「切換作業」進入，再至「帳號管理」加入個管師／醫師。").then(function(ok){if(!ok)return;x().createPromSpace().then(function(st){toast(st.existed?"「門診 PROM」空間已存在":"已建立「門診 PROM」空間；請由右上角「切換作業」進入");render();}).catch(function(e){toast(e.message||x().cErr(e));});});};
+  var mks=$("#pmMkSpace");if(mks)mks.onclick=function(){ask("建立獨立的「門診 ePRO」空間？\n病人無須研究編號；成員、PROM 金鑰、權杖與紀錄皆與 ESCC 研究分開。建立後請由右上角「切換作業」進入，再至「帳號管理」加入個管師／醫師。").then(function(ok){if(!ok)return;x().createPromSpace().then(function(st){toast(st.existed?"「門診 ePRO」空間已存在":"已建立「門診 ePRO」空間；請由右上角「切換作業」進入");render();}).catch(function(e){toast(e.message||x().cErr(e));});});};
   var fb=$("#pmFont");if(fb)fb.onclick=function(){FSI=(FSI+1)%FSV.length;try{localStorage.setItem("promFs",String(FSI));}catch(e){}applyFs();fb.innerHTML='字級 <b>'+FSN[FSI]+'</b>';};
   $$("#pmMoreBox .pm-menu button").forEach(function(bt){bt.addEventListener("click",function(){var bx=$("#pmMoreBox");if(bx)bx.removeAttribute("open");});});
   var pbt=$("#bProm");if(pbt)pbt.classList.add("on");applyFs();NOAUTO=false;
@@ -6280,7 +6280,7 @@ function ensureButton(){if($("#bProm"))return;var b=document.createElement("butt
 function tidyHeader(){var lk=$("#bLock");if(!lk||$("#acctBox"))return;var items=["#bUsers","#bRec","#bPw"].map(function(q){return $(q);}).filter(Boolean);if(items.length<2)return;
   var d=document.createElement("details");d.className="pm-more";d.id="acctBox";d.innerHTML='<summary class="btn" id="acctSum">帳號 ▾</summary><div class="pm-menu"></div>';lk.parentNode.insertBefore(d,lk);var m=d.querySelector(".pm-menu");items.forEach(function(b){m.appendChild(b);b.addEventListener("click",function(){d.removeAttribute("open");});});}
 function onSession(){var s=S();if(!s)return;if(s.mode==="irae")return;   /* irAE 登錄空間由 IRAE 模組負責（醫師角色不可落入 PROM 畫面） */
-VIEW=false;var h1=document.querySelector("h1");if(h1){if(!h1.dataset.orig)h1.dataset.orig=h1.textContent;h1.textContent=promSpace()?"門診 PROM":clin()?"PROM 症狀":h1.dataset.orig;}
+VIEW=false;var h1=document.querySelector("h1");if(h1){if(!h1.dataset.orig)h1.dataset.orig=h1.textContent;h1.textContent=promSpace()?"門診 ePRO":clin()?"PROM 症狀":h1.dataset.orig;}
   document.body.classList.toggle("prom-space",promSpace());
   if(x().isAdmin())tidyHeader();
   if(clin()){document.body.classList.add("prom-only");render();}else{document.body.classList.remove("prom-only");if(x().isAdmin())ensureButton();var b=$("#bProm");if(b)b.hidden=!x().isAdmin()||(!!s.offline&&!LOADED);
@@ -6727,7 +6727,7 @@ if(typeof module==="object"&&module.exports)module.exports=IRAE_STORE;
    依 docs/IRAE_STORAGE_ROLES_20261005.md、docs/IRAE_REGISTRY_MVP_20261004.md。
    資料層是 irae_store.js（金鑰、受試者、事實與確認只增不改）；時間軸與下次抽血是 irae_timeline.js；資料字典與組裝是 irae_schema.js。
    角色：主持人與研究助理(abstractor)可登錄事實；醫師與主持人可寫「治療結束日確認」；護理師看不到（規則層擋）。
-   畫面只在 mode==="irae" 的空間出現；ESCC 與門診 PROM 空間完全不受影響。
+   畫面只在 mode==="irae" 的空間出現；ESCC 與門診 ePRO 空間完全不受影響。
    疑問處的預設值掛 Q-M1 代碼（docs/IRAE_M1_OPEN_QUESTIONS_20261005.md），在時間軸表格旁以「備註」呈現。 */
 var IRAE=(function(){
 var X=null,ST=null,LIST=[],SUMS={},CUR=null,CD=null,SEQ=0,OFF=null,NEXTACT=null;
