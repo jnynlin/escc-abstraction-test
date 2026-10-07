@@ -1749,12 +1749,18 @@ var SEC=(function(){
       if(p.role==="pending"){PROFILE=p;return showPending(u,p);}
       return start(u,p);});
   }
+  /* 申請身份：只是「申請」，供主持人核准時參考；實際權限由主持人決定。附加在顯示名稱裡（不新增資料欄位、規則不用改）。 */
+  var APPLY=["PI","sub-PI","醫師","護理師／個管師","研究助理"];
+  function composeName(n,sel,unit){var tag=sel&&sel.length?"申請："+sel.join("、"):"",extra=[tag,unit].filter(Boolean).join("｜"),out=extra?n+"（"+extra+"）":n;return out.slice(0,80);}
   function showFirst(u,pw){
     $("#aSub").textContent="首次登入：建立您的加密金鑰";
     form('<form><p class="adesc">您的金鑰以您的登入密碼保護，僅您本人可開啟。建立後須待主持人核准，方可開始作業。</p>'+
-      '<label class="mf"><span>您的姓名（供主持人辨識）</span><input name="n" required></label>'+
-      '<label class="ck"><input type="checkbox" name="pi"> 我是本研究的主持人（系統將多產生一組復原碼）</label>'+
-      '<button class="btn go" type="submit">建立金鑰</button></form>',function(f){var n=val(f,"n"),pi=f.elements.pi.checked;if(!n)return err("請填名字");busy(f,true,"建立中…");
+      '<label class="mf"><span>您的姓名（供主持人辨識）</span><input name="n" required maxlength="30"></label>'+
+      '<fieldset style="border:0;padding:0;margin:8px 0"><legend style="padding:0"><b>申請身份</b>（可複選；僅供主持人核准時參考，實際權限由主持人決定）</legend>'+
+      APPLY.map(function(x){return '<label class="ck" style="min-height:40px"><input type="checkbox" name="ap" value="'+esc(x)+'"> '+esc(x)+'</label>';}).join("")+'</fieldset>'+
+      '<label class="mf"><span>所屬單位／職稱（選填）</span><input name="u" maxlength="30"></label>'+
+      '<details style="margin:10px 0"><summary class="adesc">系統主持人首次設定（一般使用者請勿展開）</summary><label class="ck"><input type="checkbox" name="pi"> 我是系統主持人（僅限首位建立系統的人；會多產生一組復原碼）</label></details>'+
+      '<button class="btn go" type="submit">建立金鑰</button></form>',function(f){var n0=val(f,"n"),unit=val(f,"u"),pi=f.elements.pi.checked,sel=[].slice.call(f.querySelectorAll("input[name=ap]:checked")).map(function(c){return c.value;});if(!n0)return err("請填名字");var n=composeName(n0,sel,unit);busy(f,true,"建立中…");
       createProfile(u,pw,n,pi).then(function(rec){if(rec)return showRecovery(rec,u);return showPending(u,{name:n});}).catch(function(e){busy(f,false,"建立金鑰");err(cErr(e));});});
   }
   function showRecovery(rec,u){
@@ -1796,7 +1802,7 @@ var SEC=(function(){
       else if(u.role==="disabled")act='<button class="btn" type="button" data-on="'+uid+'">恢復帳號</button>';
       else if(u.role==="user")act=(inS?'<button class="btn" type="button" data-leave="'+uid+'">移出本研究</button> ':joinBtns(uid,"加入為"))+'<button class="btn warn" type="button" data-off="'+uid+'">停用帳號</button>';
       return '<tr><td>'+esc(u.name||"")+'<br><span class="desc">'+esc(u.email||"")+'</span></td><td>'+esc(RN[u.role]||u.role)+'</td><td>'+(u.role==="admin"?"全部":inS?"✓ "+esc(RN[mb.role]||mb.role):"—")+'</td><td>'+(inS||n?n:"")+'</td><td>'+act+'</td></tr>';}).join("");
-    m.innerHTML='<section class="sheet report"><h3>帳號管理・'+sn+'</h3><p class="desc">新帳號請先於 Firebase 主控台 → Authentication 建立（電子郵件＋初始密碼）。對方首次登入後，帳號將出現於此，請按「核准並加入本研究」。同一帳號可加入多個研究；「移出本研究」僅影響本研究，「停用帳號」則使該人員在所有研究中皆無法讀取任何病人。</p>'+
+    m.innerHTML='<section class="sheet report"><h3>帳號管理・'+sn+'</h3><p class="desc">新帳號請先於 Firebase 主控台 → Authentication 建立（電子郵件＋初始密碼）。對方首次登入後，帳號將出現於此，請按「核准並加入本研究」。顯示名稱裡的「申請：…」是對方自己勾選的身份，僅供參考；請依實際身份選角色（PI／sub-PI 目前先在顯示名稱標示）。同一帳號可加入多個研究；「移出本研究」僅影響本研究，「停用帳號」則使該人員在所有研究中皆無法讀取任何病人。</p>'+
       '<div class="tw"><table><thead><tr><th>帳號</th><th>帳號狀態</th><th>本研究成員</th><th>分派人數</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
       '<h3>安全紀錄(本研究最近 50 筆)</h3><div class="tw" id="seclog"><p class="desc">讀取中…</p></div></section>';
     $$("[data-ok]",m).forEach(function(b){b.onclick=function(){var uid=b.dataset.ok,mr=b.dataset.mr||"abstractor";dialog({title:"加入「"+(SESSION.studyName||SESSION.sid)+"」為"+RN[mr]+":"+(USERS[uid].email||""),msg:mr==="abstractor"?"登錄人員僅能檢視分派給自己的病歷摘錄，無法檢視 PROM。":"個管師／醫師可檢視本研究全部 PROM 症狀紀錄，但無法檢視病歷摘錄。",fields:[{k:"n",label:"顯示名稱",value:USERS[uid].name||"",req:1}],ok:"加入"})
