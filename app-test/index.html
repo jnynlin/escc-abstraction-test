@@ -1426,7 +1426,7 @@ var SEC=(function(){
   var ITER=600000,IDLE_MS=15*60*1000,DEBOUNCE=3000;
   /* this page's disease module; each study (research space) under /studies/{sid} belongs to one module */
   var MODULE="escc",DEFAULT_SID="ESCC",DEFAULT_NAME="食道鱗狀細胞癌(ESCC)";
-  /* 2026-10-03 P10：「門診 ePRO」是另一個研究空間（mode:"prom"）：自己的成員、PROM 金鑰、權杖與紀錄，病人不需要研究編號；登入後在「選擇作業」挑 */
+  /* 2026-10-03 P10：「門診 ePRO」是另一個研究空間（mode:"prom"）：自己的成員、ePRO 金鑰、權杖與紀錄，病人不需要研究編號；登入後在「選擇作業」挑 */
   var CLINIC_SID="CLINIC",CLINIC_NAME="門診 ePRO",IRAE_SID="IRAE",IRAE_NAME="irAE 登錄",STUDIES=[],CHOOSER_USER=null;
   function modeRank(m){return m==="prom"?2:m==="irae"?1:0;}
   function byMode(a,b){return modeRank(a.mode)-modeRank(b.mode)||String(a.name).localeCompare(String(b.name));}
@@ -1491,7 +1491,7 @@ var SEC=(function(){
   function loadAll(progress){
     DB=emptyDB();DEKS={};DOCS={};conflicts={};
     if(SESSION.mode==="irae"&&!isAdmin())return Promise.resolve({n:0,miss:0,fromCache:false});   /* irAE 空間：沒有病歷摘錄，研究助理／醫師的資料由 IRAE 模組自己讀 */
-    if(SESSION.role==="nurse"||SESSION.role==="doctor")return PROM.loadAll(progress);  /* 個管師/醫師：只讀 PROM，讀不到病歷摘錄(規則也擋) */
+    if(SESSION.role==="nurse"||SESSION.role==="doctor")return PROM.loadAll(progress);  /* 個管師/醫師：只讀 ePRO，讀不到病歷摘錄(規則也擋) */
     var q=isAdmin()?col("patients"):col("patients").where("assignee","==",SESSION.uid);
     return q.get().then(function(qs){var docs=qs.docs,done=0,miss=0,out=[];
       var next=function(i){if(i>=docs.length)return Promise.resolve();return Promise.all(docs.slice(i,i+50).map(function(d){
@@ -1549,7 +1549,7 @@ var SEC=(function(){
       STUDIES=L;CHOOSER_USER=u;
       if(L.length===1)return enter(u,p,L[0]);
       $("#aSub").textContent=L.some(function(x){return x.mode==="prom"||x.mode==="irae";})?"選擇作業":"選擇研究";  /* 只有研究空間時沿用原標題（e1 測試也驗這個） */
-      $("#aBody").innerHTML=L.map(function(x,i){return '<p><button class="btn go" type="button" data-st="'+i+'">'+esc(x.name)+'</button><span class="adesc" style="display:block;margin:3px 0 0">'+(x.mode==="prom"?"門診病人的症狀紀錄，無須研究編號":x.mode==="irae"?"免疫治療受試者登錄：同意、給藥、抽血時間軸與提醒（研究編號）":"研究：病歷摘錄與 PROM 症狀（研究編號）")+'</span></p>';}).join("")+
+      $("#aBody").innerHTML=L.map(function(x,i){return '<p><button class="btn go" type="button" data-st="'+i+'">'+esc(x.name)+'</button><span class="adesc" style="display:block;margin:3px 0 0">'+(x.mode==="prom"?"門診病人的症狀紀錄，無須研究編號":x.mode==="irae"?"免疫治療受試者登錄：同意、給藥、抽血時間軸與提醒（研究編號）":"研究：病歷摘錄與 ePRO 症狀（研究編號）")+'</span></p>';}).join("")+
         (p.role==="admin"&&!L.some(function(x){return x.mode==="prom";})?'<p><button class="btn" type="button" id="aMkClinic">＋建立「門診 ePRO」空間</button></p>':"")+
         (p.role==="admin"&&!L.some(function(x){return x.mode==="irae";})?'<p><button class="btn" type="button" id="aMkIrae">＋建立「irAE 登錄」空間</button></p>':"");
       $$("[data-st]",$("#aBody")).forEach(function(b){b.onclick=function(){enter(u,p,L[+b.dataset.st]);};});
@@ -1612,8 +1612,8 @@ var SEC=(function(){
   function iraeGrant(uid){return typeof IRAE!=="undefined"?IRAE.grantOne(uid):Promise.resolve();}
   function leaveStudy(uid){if(!isAdmin())return Promise.reject(new Error("只有主持人可以設定"));
     return col("members").doc(uid).set({role:"disabled",at:TS()},{merge:true}).then(refreshUsers).then(function(){secLog("移出本研究 "+USERS[uid].email);}).then(function(){return SESSION.mode==="irae"&&typeof IRAE!=="undefined"?IRAE.revokeOne(uid).catch(function(e){console.warn("irAE 金鑰收回失敗",e);return 0;}):0;}).then(promRevokeStale);}
-  /* 收回已非個管師/醫師者的 PROM 金鑰；失敗不擋主要動作(規則本來就已擋讀)，下次主持人開 PROM 分頁會自動補收 */
-  function promRevokeStale(){return (typeof PROM!=="undefined"&&PROM.revokeStale)?PROM.revokeStale().catch(function(e){console.warn("PROM 金鑰收回失敗，下次開啟 PROM 分頁時將補行收回",e);return 0;}):Promise.resolve(0);}
+  /* 收回已非個管師/醫師者的 ePRO 金鑰；失敗不擋主要動作(規則本來就已擋讀)，下次主持人開 ePRO 分頁會自動補收 */
+  function promRevokeStale(){return (typeof PROM!=="undefined"&&PROM.revokeStale)?PROM.revokeStale().catch(function(e){console.warn("ePRO 金鑰收回失敗，下次開啟 ePRO 分頁時將補行收回",e);return 0;}):Promise.resolve(0);}
   function staleRegrant(){var jobs=[];DB.order.forEach(function(id){var d=DOCS[id],u=d&&d.assignee;if(!u||!USERS[u]||!d.kfp||!d.kfp[u])return;
       jobs.push(fpOf(USERS[u].pub).then(function(f){if(f!==d.kfp[u]&&USERS[u].role==="user"&&MEMBERS[u]&&MEMBERS[u].role==="abstractor")return setAssignee(id,u).then(function(){return 1;});return 0;}));});
     return Promise.all(jobs).then(function(a){return a.reduce(function(x,y){return x+y;},0);});}
@@ -1648,10 +1648,10 @@ var SEC=(function(){
       var pts={};r[0].forEach(function(d){pts[d.id]=d.data();});var us={};r[1].forEach(function(d){var x=d.data();us[d.id]={email:x.email,name:x.name,role:x.role,pub:x.pub};
         if(d.id===SESSION.uid){us[d.id].priv=x.priv;if(x.recPriv)us[d.id].recPriv=x.recPriv;}});
       var mt={};r[2].forEach(function(d){mt[d.id]=d.data();});
-      /* v3 (2026-10-01): 加入 PROM 症狀紀錄密文、權杖、尚未收件的收件匣(遺失一筆未收件＝遺失一份病人回報)；promkey/recipients 已在 meta */
+      /* v3 (2026-10-01): 加入 ePRO 症狀紀錄密文、權杖、尚未收件的收件匣(遺失一筆未收件＝遺失一份病人回報)；promkey/recipients 已在 meta */
       var pr={};r[3].forEach(function(d){pr[d.id]=d.data();});var tk={};r[4].forEach(function(d){tk[d.id]=d.data();});var ib={};r[5].forEach(function(d){var x=d.data();if(!x.consumed)ib[d.id]=x;});
       var b={kind:"escc-cloud-backup",v:irae?4:3,at:stamp(),by:SESSION.email,pi:SESSION.uid,study:SESSION.sid,studyName:SESSION.studyName,mode:SESSION.mode||"",module:MODULE,n:Object.keys(pts).length,nProm:Object.keys(pr).length,nTokens:Object.keys(tk).length,nInbox:Object.keys(ib).length,
-        note:"病人資料與 PROM 症狀紀錄均為密文。解密須同時具備：本檔案＋主持人的登入密碼（或復原碼）。",patients:pts,users:us,meta:mt,prom:pr,tokens:tk,inbox:ib};
+        note:"病人資料與 ePRO 症狀紀錄均為密文。解密須同時具備：本檔案＋主持人的登入密碼（或復原碼）。",patients:pts,users:us,meta:mt,prom:pr,tokens:tk,inbox:ib};
       var isub=[];
       if(irae){var ic=IRAE_STORE.countsOf(r[6]),mb={};r[7].forEach(function(d){mb[d.id]=d.data();});isub=Object.keys(r[6].subjects);
         b.irae=r[6];b.nSubjects=ic.subjects;b.nIraeFacts=ic.facts;b.nIraeConfirms=ic.confirms;b.nIraeRaw=ic.raw;b.nIraeLog=ic.log;b.members=mb;b.studyDoc=r[8]&&r[8].exists?r[8].data():null;}
@@ -1659,13 +1659,13 @@ var SEC=(function(){
       if(!ids.length&&!(pk&&pids.length)&&!isub.length){if(irae)b.selfcheckIrae="empty";return b;}
       return unwrap(us[SESSION.uid].priv,PW).then(importPriv).then(function(k){
         var c1=ids.length?crypto.subtle.decrypt({name:"RSA-OAEP"},k,ub64(pts[ids[0]].keys[SESSION.uid])).then(function(raw){return aesKey(new Uint8Array(raw));}).then(function(kk){return aesDec(kk,pts[ids[0]]);}):Promise.resolve();
-        /* 自我檢查也解一筆 PROM：備份若解不開 PROM，就不能說它涵蓋 PROM */
+        /* 自我檢查也解一筆 ePRO：備份若解不開 ePRO，就不能說它涵蓋 ePRO */
         var c2=(pk&&pids.length&&pk.keys&&pk.keys[SESSION.uid])?crypto.subtle.decrypt({name:"RSA-OAEP"},k,ub64(pk.keys[SESSION.uid])).then(function(raw){return aesKey(new Uint8Array(raw));}).then(function(kk){return aesDec(kk,pr[pids[0]]);}):Promise.resolve();
-        /* irAE：金鑰沒有包給這位主持人＝備份打不開，視為失敗（不像 PROM 那樣略過）；再把每份密文都試解一次，解不開的只計數、不擋備份（壞文件本身就是要留下的證據） */
+        /* irAE：金鑰沒有包給這位主持人＝備份打不開，視為失敗（不像 ePRO 那樣略過）；再把每份密文都試解一次，解不開的只計數、不擋備份（壞文件本身就是要留下的證據） */
         var c3=isub.length?iraeCheck(k,mt.iraekey,r[6],b):Promise.resolve();
         return Promise.all([c1,c2,c3]);}).then(function(){b.selfcheck="ok";b.selfcheckProm=!!(pk&&pids.length);if(irae)b.selfcheckIrae=isub.length?"ok":"empty";return b;},
           function(e){throw new Error(e&&e.message==="noirkey"?"備份自我檢查失敗：irAE 金鑰沒有包給您的帳號，這份備份將無法開啟。請先到「帳號管理」處理後再備份":"備份自我檢查失敗，請勿依賴此備份，並通知維護者");});})
-    .then(function(b){secLog("下載加密備份("+(b.irae?"irAE "+b.nSubjects+" 位受試者、"+b.nIraeFacts+" 筆事實、"+b.nIraeConfirms+" 筆確認；":"")+b.n+" 位病歷,"+b.nProm+" 筆 PROM,"+b.nInbox+" 筆未收件)");
+    .then(function(b){secLog("下載加密備份("+(b.irae?"irAE "+b.nSubjects+" 位受試者、"+b.nIraeFacts+" 筆事實、"+b.nIraeConfirms+" 筆確認；":"")+b.n+" 位病歷,"+b.nProm+" 筆 ePRO,"+b.nInbox+" 筆未收件)");
       col("meta").doc("backup").set({at:TS(),by:SESSION.uid,n:b.irae?b.nSubjects:b.n}).then(function(){lastBackup=new Date();backupBar();}).catch(function(){});return JSON.stringify(b);});}
   function iraeCheck(k,ik,dump,b){var w=ik&&ik.keys&&ik.keys[SESSION.uid];if(!w)return Promise.reject(new Error("noirkey"));
     return crypto.subtle.decrypt({name:"RSA-OAEP"},k,ub64(w)).then(function(raw){return aesKey(new Uint8Array(raw));}).then(function(kk){
@@ -1696,7 +1696,7 @@ var SEC=(function(){
           return rsaUnwrap(g.keys[B.pi]).then(aesKey).then(function(k){return aesDec(k,g);}).then(function(u){DB.audSample=JSON.parse(dec.decode(u)).audSample||[];}).catch(function(){});})
         .then(function(){if(typeof PROM!=="undefined"&&B.prom)return PROM.loadFromBackup(B).catch(function(){return 0;});return 0;})
         .then(function(np){var ni=0;if(B.irae&&typeof IRAE!=="undefined"&&typeof IRAE_STORE!=="undefined"){ni=IRAE_STORE.countsOf(B.irae).subjects;IRAE.loadFromBackup(B);}
-          applySession();toast("已開啟備份("+(B.at||"")+"):"+DB.order.length+" 位"+(miss?",另有 "+miss+" 位無法解開":"")+(np?"、PROM "+np+" 筆":"")+(B.irae?"、irAE "+ni+" 位受試者":"")+"。此為唯讀檢視，修改不會儲存。");return {n:DB.order.length,miss:miss,nProm:np||0,nSubjects:ni};});});}
+          applySession();toast("已開啟備份("+(B.at||"")+"):"+DB.order.length+" 位"+(miss?",另有 "+miss+" 位無法解開":"")+(np?"、ePRO "+np+" 筆":"")+(B.irae?"、irAE "+ni+" 位受試者":"")+"。此為唯讀檢視，修改不會儲存。");return {n:DB.order.length,miss:miss,nProm:np||0,nSubjects:ni};});});}
   function showOpenBackup(){pickFile($("#fJson"),function(t){$("#aSub").textContent="開啟加密備份檔（無須網路）";
     form('<form><p class="adesc">請輸入主持人的登入密碼；忘記密碼時，改填復原碼（二擇一）。解密後可匯出 REDCap 匯入檔；此為唯讀檢視，不會寫回雲端。</p>'+
       '<label class="mf"><span>主持人密碼</span><input name="p" type="password" autocomplete="off"></label>'+
@@ -1807,7 +1807,7 @@ var SEC=(function(){
     m.innerHTML='<section class="sheet report"><h3>帳號管理・'+sn+'</h3><p class="desc">新帳號請先於 Firebase 主控台 → Authentication 建立（電子郵件＋初始密碼）。對方首次登入後，帳號將出現於此，請按「核准並加入本研究」。顯示名稱裡的「申請：…」是對方自己勾選的身份，僅供參考；請依實際身份選角色（PI／sub-PI 目前先在顯示名稱標示）。同一帳號可加入多個研究；「移出本研究」僅影響本研究，「停用帳號」則使該人員在所有研究中皆無法讀取任何病人。</p>'+
       '<div class="tw"><table><thead><tr><th>帳號</th><th>帳號狀態</th><th>本研究成員</th><th>分派人數</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
       '<h3>安全紀錄(本研究最近 50 筆)</h3><div class="tw" id="seclog"><p class="desc">讀取中…</p></div></section>';
-    $$("[data-ok]",m).forEach(function(b){b.onclick=function(){var uid=b.dataset.ok,mr=b.dataset.mr||"abstractor";dialog({title:"加入「"+(SESSION.studyName||SESSION.sid)+"」為"+RN[mr]+":"+(USERS[uid].email||""),msg:mr==="abstractor"?"登錄人員僅能檢視分派給自己的病歷摘錄，無法檢視 PROM。":"個管師／醫師可檢視本研究全部 PROM 症狀紀錄，但無法檢視病歷摘錄。",fields:[{k:"n",label:"顯示名稱",value:USERS[uid].name||"",req:1}],ok:"加入"})
+    $$("[data-ok]",m).forEach(function(b){b.onclick=function(){var uid=b.dataset.ok,mr=b.dataset.mr||"abstractor";dialog({title:"加入「"+(SESSION.studyName||SESSION.sid)+"」為"+RN[mr]+":"+(USERS[uid].email||""),msg:mr==="abstractor"?"登錄人員僅能檢視分派給自己的病歷摘錄，無法檢視 PROM。":"個管師／醫師可檢視本研究全部 ePRO 症狀紀錄，但無法檢視病歷摘錄。",fields:[{k:"n",label:"顯示名稱",value:USERS[uid].name||"",req:1}],ok:"加入"})
       .then(function(v){if(!v)return;setRole(uid,mr,v.n).then(function(){toast("已加入本研究（"+RN[mr]+"）");renderUsers();}).catch(function(e){toast(cErr(e));});});};});
     $$("[data-leave]",m).forEach(function(b){b.onclick=function(){var uid=b.dataset.leave;ask("把 "+(USERS[uid].email||"")+" 移出本研究？該人員將立即無法讀取本研究的病人；分派紀錄將保留，且可再加入。").then(function(ok){if(!ok)return;
       leaveStudy(uid).then(function(){toast("已移出本研究");renderUsers();}).catch(function(e){toast(cErr(e));});});};});
@@ -5613,10 +5613,10 @@ var LISTMAP=(function(){
   return {make:make,ROWS:ROWS};
 })();
 
-/* ====== PROM 病人自述症狀模組（pro-symptoms P2，2026-09-30） ======
+/* ====== ePRO 病人自述症狀模組（pro-symptoms P2，2026-09-30） ======
    依 docs/ePRO_pro-symptoms_建置計畫_20260930.md。
    資料：studies/{sid}/prom/{pid}_{visit} —— 明文只有清單需要的欄位(pid/visit/filledAt/source/triage/closed/panelV/ctcaeV)，
-         作答、原話、三層都在 iv/ct 密文內，金鑰是研究層的 PROM 金鑰(meta/promkey，RSA 包給主持人與每位個管師/醫師)。
+         作答、原話、三層都在 iv/ct 密文內，金鑰是研究層的 ePRO 金鑰(meta/promkey，RSA 包給主持人與每位個管師/醫師)。
    三層：layer1 = answers/cc(病人自述，任何路徑都不改寫)；layer2 = 個管師初審(陣列，只 append，每筆帶人與時間)；
          layer3 = 醫師確認(帶人與時間；只有這一層算數)。結案是 closed 標記不是刪除。
    證據信封與紅旗由 grading.js / flags.js 算(與 Python 版有對等測試)，本檔不重新實作分級。
@@ -5774,29 +5774,29 @@ function chartText(b,en,pick,planNow,whoNow){var L=[],l3=b.layer3,g=l3?l3.grades
 
 /* ---------- 金鑰 ---------- */
 function openKey(){return x().col("meta").doc("promkey").get().then(function(d){
-  if(!d.exists){if(!x().isAdmin())throw new Error("主持人尚未建立 PROM 金鑰，請通知主持人");return createKey();}
-  var o=d.data(),w=o.keys&&o.keys[meUid()];if(!w)throw new Error("PROM 金鑰尚未授權給您的帳號，請通知主持人於「帳號管理」重新授權");
+  if(!d.exists){if(!x().isAdmin())throw new Error("主持人尚未建立 ePRO 金鑰，請通知主持人");return createKey();}
+  var o=d.data(),w=o.keys&&o.keys[meUid()];if(!w)throw new Error("ePRO 金鑰尚未授權給您的帳號，請通知主持人於「帳號管理」重新授權");
   return x().rsaUnwrap(w).then(function(raw){return x().aesKey(raw).then(function(k){PK={raw:raw,key:k,ver:o.ver||1,keys:o.keys,kfp:o.kfp||{}};return PK;});});});}
 function createKey(){var raw=x().rnd(32),pub=x().profile().pub;return Promise.all([x().aesKey(raw),x().rsaWrap(pub,raw),x().fpOf(pub)]).then(function(r){var keys={},kfp={};keys[meUid()]=r[1];kfp[meUid()]=r[2];
-  return x().col("meta").doc("promkey").set({keys:keys,kfp:kfp,ver:1,createdAt:x().TS()}).then(function(){PK={raw:raw,key:r[0],ver:1,keys:keys,kfp:kfp};SEC.secLog("建立 PROM 金鑰");return writeRecipients();}).then(function(){return PK;});});}
-/* 收件人名冊 meta/recipients{pubs{uid:pub}}：PROM 金鑰持有者的公開金鑰，工作人員發權杖時讀。只有主持人能寫，跟著 grant/revoke 一起更新。 */
+  return x().col("meta").doc("promkey").set({keys:keys,kfp:kfp,ver:1,createdAt:x().TS()}).then(function(){PK={raw:raw,key:r[0],ver:1,keys:keys,kfp:kfp};SEC.secLog("建立 ePRO 金鑰");return writeRecipients();}).then(function(){return PK;});});}
+/* 收件人名冊 meta/recipients{pubs{uid:pub}}：ePRO 金鑰持有者的公開金鑰，工作人員發權杖時讀。只有主持人能寫，跟著 grant/revoke 一起更新。 */
 function writeRecipients(){if(!x().isAdmin()||!PK)return Promise.resolve();var U=x().users(),pubs={};Object.keys(PK.keys).forEach(function(uid){var pub=uid===meUid()?x().profile().pub:(U[uid]||{}).pub;if(pub)pubs[uid]=pub;});
   return x().col("meta").doc("recipients").set({pubs:pubs,ver:PK.ver,updatedAt:x().TS()});}
-function grant(uid){if(!x().isAdmin())return Promise.reject(new Error("只有主持人可以授權 PROM 金鑰"));
+function grant(uid){if(!x().isAdmin())return Promise.reject(new Error("只有主持人可以授權 ePRO 金鑰"));
   return (PK?Promise.resolve(PK):openKey()).then(function(){var u=x().users()[uid];if(!u||!u.pub)throw new Error("找不到這個帳號的公鑰");
     return Promise.all([x().rsaWrap(u.pub,PK.raw),x().fpOf(u.pub)]).then(function(r){var keys=Object.assign({},PK.keys),kfp=Object.assign({},PK.kfp);keys[uid]=r[0];kfp[uid]=r[1];
-      return x().col("meta").doc("promkey").update({keys:keys,kfp:kfp,ver:(PK.ver||1)+1,updatedAt:x().TS()}).then(function(){PK.keys=keys;PK.kfp=kfp;PK.ver=(PK.ver||1)+1;SEC.secLog("授權 PROM 金鑰給 "+(u.email||uid));return writeRecipients();});});});}
+      return x().col("meta").doc("promkey").update({keys:keys,kfp:kfp,ver:(PK.ver||1)+1,updatedAt:x().TS()}).then(function(){PK.keys=keys;PK.kfp=kfp;PK.ver=(PK.ver||1)+1;SEC.secLog("授權 ePRO 金鑰給 "+(u.email||uid));return writeRecipients();});});});}
 function revoke(uid){if(!x().isAdmin())return Promise.reject(new Error("只有主持人可以收回"));return (PK?Promise.resolve(PK):openKey()).then(function(){
   var keys=Object.assign({},PK.keys),kfp=Object.assign({},PK.kfp);delete keys[uid];delete kfp[uid];
-  return x().col("meta").doc("promkey").update({keys:keys,kfp:kfp,ver:(PK.ver||1)+1,updatedAt:x().TS()}).then(function(){PK.keys=keys;PK.kfp=kfp;PK.ver=(PK.ver||1)+1;SEC.secLog("收回 PROM 金鑰 "+uid);return writeRecipients();});});}
-/* 離開研究／改角色後，收回「已不是個管師/醫師、也不是主持人」的人的 PROM 金鑰與收件人名冊（2026-10-01：先前 PROM.revoke 全站無人呼叫）。
+  return x().col("meta").doc("promkey").update({keys:keys,kfp:kfp,ver:(PK.ver||1)+1,updatedAt:x().TS()}).then(function(){PK.keys=keys;PK.kfp=kfp;PK.ver=(PK.ver||1)+1;SEC.secLog("收回 ePRO 金鑰 "+uid);return writeRecipients();});});}
+/* 離開研究／改角色後，收回「已不是個管師/醫師、也不是主持人」的人的 ePRO 金鑰與收件人名冊（2026-10-01：先前 PROM.revoke 全站無人呼叫）。
    純函式 staleKeyUids 可在 node 測；members/users 沒載入（空）時一律不動，免得誤收回所有人。保留：自己、主持人帳號、(帳號 user 且成員角色 nurse/doctor)。 */
 function staleKeyUids(keys,M,U,me){var ks=Object.keys(keys||{});if(!ks.length||!Object.keys(M||{}).length||!Object.keys(U||{}).length)return [];
   return ks.filter(function(uid){if(uid===me)return false;var u=U[uid],m=M[uid];if(u&&u.role==="admin")return false;return !(u&&u.role==="user"&&m&&(m.role==="nurse"||m.role==="doctor"));});}
 function revokeStale(){if(!x().isAdmin()||!PK)return Promise.resolve(0);
   var gone=staleKeyUids(PK.keys,x().members(),x().users(),meUid());if(!gone.length)return Promise.resolve(0);
   var keys=Object.assign({},PK.keys),kfp=Object.assign({},PK.kfp);gone.forEach(function(uid){delete keys[uid];delete kfp[uid];});
-  return x().col("meta").doc("promkey").update({keys:keys,kfp:kfp,ver:(PK.ver||1)+1,updatedAt:x().TS()}).then(function(){PK.keys=keys;PK.kfp=kfp;PK.ver=(PK.ver||1)+1;SEC.secLog("收回 PROM 金鑰（已非個管師／醫師）"+gone.length+" 人");return writeRecipients();}).then(function(){return gone.length;});}
+  return x().col("meta").doc("promkey").update({keys:keys,kfp:kfp,ver:(PK.ver||1)+1,updatedAt:x().TS()}).then(function(){PK.keys=keys;PK.kfp=kfp;PK.ver=(PK.ver||1)+1;SEC.secLog("收回 ePRO 金鑰（已非個管師／醫師）"+gone.length+" 人");return writeRecipients();}).then(function(){return gone.length;});}
 /* 個管師/醫師重建金鑰後，主持人載入時自動重新授權(對齊病歷摘錄的 staleRegrant) */
 function regrantStale(){if(!x().isAdmin()||!PK)return Promise.resolve(0);var U=x().users(),M=x().members(),jobs=[];
   Object.keys(M).forEach(function(uid){var m=M[uid];if(!(m.role==="nurse"||m.role==="doctor"))return;var u=U[uid];if(!u||!u.pub||u.role!=="user")return;
@@ -5839,14 +5839,14 @@ function review(id,f){var r=RECS[id];if(!r)return Promise.reject(new Error("找�
   var en=enrich(b,prevBody(b.pid,b.filledAt,id));r.body=b;
   /* 草稿在送出當下就切離（confirms 已複製進這一筆）：存檔期間繼續做的修改屬於下一筆，不能被存檔完成的回呼清掉；存失敗就把草稿還回去（2026-10-04 UI 壓力測試抓到的競態） */
   var snap=DRAFT[id],snapForm=FORM[id];delete DRAFT[id];delete FORM[id];
-  return save(r,{triage:en.triage.level}).then(function(){SEC.secLog("PROM 初審 "+id);},function(e){r.body=old;DRAFT[id]=Object.assign({},snap||{},DRAFT[id]||{});if(snapForm&&!FORM[id])FORM[id]=snapForm;throw e;});}
+  return save(r,{triage:en.triage.level}).then(function(){SEC.secLog("ePRO 初審 "+id);},function(e){r.body=old;DRAFT[id]=Object.assign({},snap||{},DRAFT[id]||{});if(snapForm&&!FORM[id])FORM[id]=snapForm;throw e;});}
 function confirm(id,grades,plan){var r=RECS[id];if(!r)return Promise.reject(new Error("找不到紀錄"));if(!canConfirm())return Promise.reject(new Error("只有醫師或主持人可以確認"));
   if(!Object.keys(grades||{}).length)return Promise.reject(new Error("請至少選取一個等級；系統不會代為填寫"));
   var old=r.body,b=JSON.parse(JSON.stringify(old));applyConfirm(b,{by:meUid(),name:meName(),at:Date.now(),grades:grades,plan:plan});r.body=b;
-  return save(r,{closed:true,closedAt:x().TS(),closedBy:meUid()}).then(function(){SEC.secLog("PROM 確認結案 "+id);},function(e){r.body=old;throw e;});}
+  return save(r,{closed:true,closedAt:x().TS(),closedBy:meUid()}).then(function(){SEC.secLog("ePRO 確認結案 "+id);},function(e){r.body=old;throw e;});}
 function reopen(id){var r=RECS[id];if(!r)return Promise.reject(new Error("找不到紀錄"));if(!x().isAdmin())return Promise.reject(new Error("只有主持人可以重開"));
-  return save(r,{closed:false}).then(function(){SEC.secLog("PROM 重開 "+id);});}
-function remove(id){if(!x().isAdmin())return Promise.reject(new Error("只有主持人可以刪除"));return x().col("prom").doc(id).delete().then(function(){delete RECS[id];if(SEL===id)SEL=null;sortOrder();SEC.secLog("刪除 PROM 紀錄 "+id);});}
+  return save(r,{closed:false}).then(function(){SEC.secLog("ePRO 重開 "+id);});}
+function remove(id){if(!x().isAdmin())return Promise.reject(new Error("只有主持人可以刪除"));return x().col("prom").doc(id).delete().then(function(){delete RECS[id];if(SEL===id)SEL=null;sortOrder();SEC.secLog("刪除 ePRO 紀錄 "+id);});}
 
 
 /* ---------- 門診代號（P10，2026-10-03）：病人不一定有研究編號 ----------
@@ -5889,7 +5889,7 @@ function inferTx(rec,now){now=now==null?Date.now():now;var out={tx:[],why:{},not
 /* ---------- 權杖（工作人員發給病人）與收件匣（P3） ---------- */
 function sha256b64(str){return crypto.subtle.digest("SHA-256",enc.encode(str)).then(function(h){var u=new Uint8Array(h),s="";for(var i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);return btoa(s);});}
 function b64rand(n){var u=x().rnd(n),s="";for(var i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);return btoa(s).replace(/[+/=]/g,"").slice(0,n);}
-function recipients(){return x().col("meta").doc("recipients").get().then(function(d){var p=d.exists&&d.data().pubs||{};if(!Object.keys(p).length)throw new Error("收件人名冊為空：請主持人先開啟一次 PROM 頁面（以建立金鑰）");return p;});}
+function recipients(){return x().col("meta").doc("recipients").get().then(function(d){var p=d.exists&&d.data().pubs||{};if(!Object.keys(p).length)throw new Error("收件人名冊為空：請主持人先開啟一次 ePRO 頁面（以建立金鑰）");return p;});}
 /* issueToken({pid, kind:'standing'|'visit', treatments:[...], birth4:'0101', days, label}) → {tid, link} */
 function issueToken(o){var pid=String(o.pid||"").trim();
   if(!pid)return listTokens().then(function(L){var seen={};L.forEach(function(t){seen[t.pid]=1;});ORDER.forEach(function(id){seen[(RECS[id].body||{}).pid]=1;});return issueToken(Object.assign({},o,{pid:genPid(seen)}));});
@@ -5900,8 +5900,8 @@ function issueToken(o){var pid=String(o.pid||"").trim();
   return recipients().then(function(pubs){var salt=b64rand(12);var f2p=o.birth4?sha256b64(salt+"|"+String(o.birth4).replace(/\D/g,"")).then(function(h){return {salt:salt,hash:h};}):Promise.resolve(null);
     return f2p.then(function(f2){var data={pid:pid,kind:kind,treatments:(o.treatments||[]).slice(),expires:firebase.firestore.Timestamp.fromMillis(Date.now()+days*86400e3),revoked:false,uses:0,issuedBy:meUid(),issuedAt:x().TS(),recipients:pubs};
       if(f2)data.f2=f2;if(o.label)data.label=String(o.label).slice(0,60);var bk=parseFloat(o.baselineKg);if(bk>20&&bk<250)data.baselineKg=bk;  /* 治療前體重：Weight loss 與體重紅旗的基準，病人端不問 */
-      return x().col("tokens").doc(tid).set(data).then(function(){SEC.secLog("發 PROM 權杖 "+kind+" "+pid);return {tid:tid,pid:pid,kind:kind,expiresMs:data.expires.toMillis(),link:(o.base||"")+"?s="+encodeURIComponent(S().sid)+"&t="+encodeURIComponent(tid)};});});});}
-function revokeToken(tid){return x().col("tokens").doc(tid).update({revoked:true,revokedBy:meUid(),revokedAt:x().TS()}).then(function(){SEC.secLog("撤銷 PROM 權杖 "+tid);});}
+      return x().col("tokens").doc(tid).set(data).then(function(){SEC.secLog("發 ePRO 權杖 "+kind+" "+pid);return {tid:tid,pid:pid,kind:kind,expiresMs:data.expires.toMillis(),link:(o.base||"")+"?s="+encodeURIComponent(S().sid)+"&t="+encodeURIComponent(tid)};});});});}
+function revokeToken(tid){return x().col("tokens").doc(tid).update({revoked:true,revokedBy:meUid(),revokedAt:x().TS()}).then(function(){SEC.secLog("撤銷 ePRO 權杖 "+tid);});}
 function listTokens(){return x().col("tokens").get().then(function(qs){var out=[];qs.forEach(function(d){var v=d.data();out.push({tid:d.id,pid:v.pid,kind:v.kind,revoked:!!v.revoked,uses:v.uses||0,expiresMs:v.expires&&v.expires.toMillis?v.expires.toMillis():0,issuedMs:v.issuedAt&&v.issuedAt.toMillis?v.issuedAt.toMillis():0,label:v.label||"",issuedBy:v.issuedBy});});return out;});}
 
 
@@ -5917,10 +5917,11 @@ function printCards(rs){var old=$("#pmPrintCards");if(old)old.remove();var d=doc
   window.addEventListener("afterprint",done);document.body.classList.add("pm-printing");setTimeout(function(){try{window.print();}catch(e){done();}},50);}
 function pidListHtml(){var ids=[];try{if(typeof DB!=="undefined"&&DB.rec)ids=Object.keys(DB.rec);}catch(e){}ids.sort();return ids.length?'<datalist id="pmPidList">'+ids.map(function(i){return '<option value="'+E(i)+'">';}).join("")+'</datalist>':"";}
 function openIssueDialog(){
-  var lastTx="chemo,rt",lastKind=0;try{lastTx=localStorage.getItem("promTx")||lastTx;lastKind=parseInt(localStorage.getItem("promKind")||"0",10)||0;}catch(e){}
-  var KOPT=["standing 常駐（療程）","visit 單次（7 天）"];
-  var pr=dialog({title:"發權杖給病人",msg:"有研究編號者請填入（可由清單選取）；門診病人請將編號留白，系統將自動產生代號，且不記錄姓名。",
-    fields:[{k:"p",label:"編號（留白＝自動產生門診代號）"},{k:"n",label:"張數（編號留白時可一次發多張，1–30）",value:"1"},{k:"k",label:"種類（常駐＝整個療程同一條；單次＝7 天）",type:"select",options:lastKind?[KOPT[1],KOPT[0]]:KOPT},{k:"tx",label:"治療（chemo,rt,io,adc,surgery 以逗號分隔）",value:lastTx},{k:"w",label:"治療前體重 kg（空白＝從病歷摘錄帶入；病人端不會問）"},{k:"b",label:"生日四碼（月日，例 0315；第二因子）"},{k:"l",label:"備註（不放個資）"}],ok:"發出"});
+  var lastTx="",lastKind=0;try{lastTx=localStorage.getItem("promTx")||"";lastKind=parseInt(localStorage.getItem("promKind")||"0",10)||0;}catch(e){}   /* 治療別預設空白（必須明確選），不再預設化療＋放療；上次的選擇仍會沿用並提示 */
+  var KOPT=["單次（7 天，建議）：收件一次就失效","常駐（整個療程同一條連結）：只給同一位病人"],clinic=promSpace();
+  var pr=dialog({title:"發權杖給病人",msg:"門診病人：編號留白，系統會自動產生代號，不記錄姓名。最常見的錯誤：①編號欄填了病歷號或姓名 ②治療別沒選對（病人會被問錯的加掛題）③常駐權杖被不同人使用。",
+    fields:[{k:"p",label:"編號（留白＝自動產生門診代號；⚠ 不要填病歷號或姓名）"},{k:"n",label:"張數（編號留白時可一次發 1–30 張；填了編號只能發 1 張）",value:"1"},{k:"k",label:"有效期（建議單次）",type:"select",options:lastKind?[KOPT[1],KOPT[0]]:KOPT},{k:"tx",label:"治療別（必選，可複選）：決定病人會被問哪些加掛題",value:lastTx,req:1},
+      {k:"w",label:clinic?"治療前體重 kg（選填；空白＝不設基準，體重減少兩成的紅旗就無法判斷；一次發多張時不會帶入）":"治療前體重 kg（選填；空白＝從病歷摘錄帶入；病人端不會問）"},{k:"b",label:"生日四碼（選填；月日，例 0315）：填了，病人要輸入相同的四碼才能送出，用來核對是不是本人；一次發多張時不會帶入"},{k:"l",label:"備註（選填；不要放姓名、病歷號）"}],ok:"發出"});
   mcls("pm-wide pm-issue");var box=$("#mBody"),inp=box&&box.querySelector("label.mf input");
   {var ks=box&&box.querySelector('select[data-k="k"]');if(ks&&!ks.value)ks.selectedIndex=1;var ln=box&&box.querySelector('[data-k="l"]');if(ln&&ln.closest)ln.closest("label").classList.add("pm-full");}
   if(inp&&pidListHtml()){inp.setAttribute("list","pmPidList");inp.insertAdjacentHTML("afterend",pidListHtml());}
@@ -5935,7 +5936,7 @@ function openIssueDialog(){
     TXO.forEach(function(o){var b=document.createElement("button");b.type="button";b.dataset.k=o[0];b.textContent=o[1];
       b.onclick=function(e){e.preventDefault();var c=cur(),i=c.indexOf(o[0]);if(i>=0)c.splice(i,1);else c.push(o[0]);tin.value=c.join(",");manual=true;paint();
         why.innerHTML=auto?"已手動調整。原本依病歷預選：<b>"+esc2(auto)+"</b>":"已手動調整。";};chips.appendChild(b);});
-    tin.style.display="none";if(sp)sp.textContent="治療（可複選）";lab.insertBefore(chips,tin);lab.appendChild(why);paint();
+    tin.style.display="none";if(sp)sp.textContent="治療別（必選，可複選）：決定病人會被問哪些加掛題 *";lab.insertBefore(chips,tin);lab.appendChild(why);if(cur().length&&!(inp&&inp.value))why.innerHTML="已沿用上次的選擇，請確認是否適用於這位／這批病人。";paint();
     function fromRec(){if(manual)return;var pid=String((inp&&inp.value)||"").trim();
       if(!pid){auto="";why.innerHTML="";paint();return;}
       var rec=(typeof DB!=="undefined"&&DB&&DB.rec)?DB.rec[pid]:null;
@@ -5950,8 +5951,8 @@ function openIssueDialog(){
       why.innerHTML=h;paint();}
     if(inp){inp.addEventListener("input",fromRec);inp.addEventListener("change",fromRec);}
   })();
-  pr.then(function(v){if(!v)return;var kind=/visit/.test(v.k)?"visit":"standing",tx=String(v.tx||"").split(/[,\s，]+/).filter(Boolean);
-    try{SEC.secLog("PROM 發權杖 治療別="+tx.join(",")+(box&&box.dataset.txsrc==="auto"?"（依病歷自動預選）":box&&box.dataset.txsrc==="manual"?"（手動調整）":"（沿用上次）"));}catch(e){}
+  pr.then(function(v){if(!v)return;var kind=/單次|visit/.test(v.k)?"visit":"standing",tx=String(v.tx||"").split(/[,\s，]+/).filter(Boolean);
+    try{SEC.secLog("ePRO 發權杖 治療別="+tx.join(",")+(box&&box.dataset.txsrc==="auto"?"（依病歷自動預選）":box&&box.dataset.txsrc==="manual"?"（手動調整）":"（沿用上次）"));}catch(e){}
     try{localStorage.setItem("promTx",tx.join(","));localStorage.setItem("promKind",kind==="visit"?"1":"0");}catch(e){}
     issueTokens({pid:v.p,n:v.n,kind:kind,treatments:tx,baselineKg:v.w,birth4:v.b,label:v.l,base:location.origin+location.pathname.replace(/[^/]*$/,"")+"prom_patient.html"}).then(function(rs){
       if(rs.length===1){var r=rs[0],pr2=dialog({title:"權杖已發出",msg:"請病人以手機相機掃描此 QR 碼（或將連結製成小卡）。連結不含姓名或病歷號。"+(r.kind==="visit"?"單次權杖：收件後即失效。":"常駐權杖：整個療程使用同一組；建議請病人將連結加入手機主畫面。")+" 請將代號寫在小卡上，並自行記錄該卡發給哪一位病人（雲端不儲存身分資料）。",fields:[{k:"u",label:"連結（全選複製）",type:"textarea",value:r.link}],ok:"複製"});
@@ -6011,9 +6012,9 @@ function cleanApply(sel){if(!x().isAdmin())return Promise.reject(new Error("只�
   return seq(sel.inbox,function(id){return x().col("prom_inbox").doc(id).delete().then(function(){n.inbox++;});})
     .then(function(){return seq(sel.prom,function(id){return x().col("prom").doc(id).delete().then(function(){n.prom++;delete RECS[id];});});})
     .then(function(){return seq(sel.tokens,function(id){return x().col("tokens").doc(id).delete().then(function(){n.tokens++;});});})
-    .then(function(){sortOrder();SEL=null;SEC.secLog("清除 PROM 測試資料：紀錄 "+n.prom+"、權杖 "+n.tokens+"、收件 "+n.inbox+(err.length?"，失敗 "+err.length:""));return {n:n,errors:err};});}
+    .then(function(){sortOrder();SEL=null;SEC.secLog("清除 ePRO 測試資料：紀錄 "+n.prom+"、權杖 "+n.tokens+"、收件 "+n.inbox+(err.length?"，失敗 "+err.length:""));return {n:n,errors:err};});}
 function openCleanTest(){
-  var pr=dialog({title:"清除測試資料",msg:"僅刪除 PROM 的測試紀錄、測試權杖及這些權杖的收件匣（條件：研究編號為 ESCC9xxx 或 ESCC1234，或來源為示範／測試）。不會變更金鑰、收件人名冊、成員、摘錄病歷及其他研究編號。刪除後無法復原。",fields:[{k:"c",label:"確認：請輸入「清除測試資料」",req:1}],ok:"刪除所選"});mcls("pm-wide");
+  var pr=dialog({title:"清除測試資料",msg:"僅刪除 ePRO 的測試紀錄、測試權杖及這些權杖的收件匣（條件：研究編號為 ESCC9xxx 或 ESCC1234，或來源為示範／測試）。不會變更金鑰、收件人名冊、成員、摘錄病歷及其他研究編號。刪除後無法復原。",fields:[{k:"c",label:"確認：請輸入「清除測試資料」",req:1}],ok:"刪除所選"});mcls("pm-wide");
   var box=$("#mBody"),wrap=document.createElement("div"),SC=null,ON={prom:{},tokens:{},inbox:{}};wrap.className="pmtk";wrap.innerHTML='<p class="mini">掃描中…</p>';box.insertBefore(wrap,box.querySelector("label.mf")||$("#mErr"));
   function sect(key,title,rows,line){if(!rows.length)return "";return '<h4 class="ph4">'+E(title)+'（'+rows.length+'）</h4>'+rows.map(function(r){return '<label class="ck"><input type="checkbox" data-k="'+key+'" data-id="'+E(r.id)+'" checked> <span>'+line(r)+'</span></label>';}).join("");}
   function paint(sc){SC=sc;["prom","tokens","inbox"].forEach(function(k){sc[k].forEach(function(r){ON[k][r.id]=true;});});var tot=sc.prom.length+sc.tokens.length+sc.inbox.length;
@@ -6028,12 +6029,12 @@ function openCleanTest(){
     var sel={};["prom","tokens","inbox"].forEach(function(k){sel[k]=SC[k].filter(function(r){return ON[k][r.id];}).map(function(r){return r.id;});});
     if(!sel.prom.length&&!sel.tokens.length&&!sel.inbox.length){toast("沒有勾選任何項目");return;}
     cleanApply(sel).then(function(r){toast("已清除：紀錄 "+r.n.prom+"、權杖 "+r.n.tokens+"、收件 "+r.n.inbox+(r.errors.length?"；"+r.errors.length+" 筆失敗":""));if(r.errors.length)console.warn(r.errors);return loadAll();}).then(render).catch(function(e){toast(e.message||x().cErr(e));});});}
-/* 收件：解開病人匿名寫入的收件匣 → 建 PROM 紀錄(source token) → 標 consumed。只有持 PROM 金鑰的人(主持人/個管師/醫師)解得開。 */
+/* 收件：解開病人匿名寫入的收件匣 → 建 ePRO 紀錄(source token) → 標 consumed。只有持 ePRO 金鑰的人(主持人/個管師/醫師)解得開。 */
 /* 病人端送來的清單作答摘要：只收已知形狀（列代號＋y/n/u），不信任病人端自己算的 unsure，由 a 重算 */
 function listClean(l){if(!l||typeof l!=="object"||l.v!==1||!l.a||typeof l.a!=="object"||Array.isArray(l.a))return null;var a={},u=[];
   Object.keys(l.a).slice(0,60).forEach(function(k){var v=l.a[k];if(/^[a-z_0-9]{1,24}$/.test(k)&&(v==="y"||v==="n"||v==="u")){a[k]=v;if(v==="u")u.push(k);}});
   return {v:1,a:a,unsure:u,redOk:l.redOk===true,needHits:Math.max(0,Math.min(999,parseInt(l.needHits,10)||0))};}
-function consumeInbox(){if(!PK)return Promise.reject(new Error("PROM 金鑰未載入"));var uid=meUid(),n=0,skipped=0,errs=[];
+function consumeInbox(){if(!PK)return Promise.reject(new Error("ePRO 金鑰未載入"));var uid=meUid(),n=0,skipped=0,errs=[];
   return x().col("prom_inbox").get().then(function(qs){var docs=[];qs.forEach(function(d){if(!d.data().consumed)docs.push(d);});
     return docs.reduce(function(p,d){return p.then(function(){var m=d.data(),w=m.wrapped&&m.wrapped[uid];if(!w){skipped++;return;}
       return x().rsaUnwrap(w).then(function(raw){return x().aesKey(raw);}).then(function(k){return x().aesDec(k,{iv:m.iv,ct:m.ct});}).then(function(u){var body=JSON.parse(dec.decode(u));
@@ -6067,7 +6068,7 @@ var DEMO=[
  ["ESCC9011","d1","io","",mk({swallow:{present:0,tube:0},weight:{baseline_kg:70,now_kg:69},pain:{present:0},dehyd:{dry_mouth:0,low_urine:0}}),"術後追蹤、只有核心題、無症狀 → 無須開啟",["surgery"]]];
 function demoBodies(now){now=now||Date.now();return DEMO.map(function(c,i){return newBody({pid:c[0],visit:c[1],drugClass:c[2],cc:{text:c[3]},answers:c[4],treatments:c[6]||null,filledAt:now-(DEMO.length-i)*3600e3*(c[1]==="d2"?0.5:1)-(c[1]==="d1"&&c[0]==="ESCC9004"?48*3600e3:0),filledBy:i%3===2?"family":"self"});});}
 function loadDemo(){if(!x().isAdmin())return Promise.reject(new Error("只有主持人可以載入示範資料"));var bodies=demoBodies(),n=0;
-  return bodies.reduce(function(p,b){return p.then(function(){if(RECS[b.pid+"_"+b.visit])return;return create(b,"demo").then(function(){n++;});});},Promise.resolve()).then(function(){SEC.secLog("載入 PROM 示範資料 "+n+" 筆");return n;});}
+  return bodies.reduce(function(p,b){return p.then(function(){if(RECS[b.pid+"_"+b.visit])return;return create(b,"demo").then(function(){n++;});});},Promise.resolve()).then(function(){SEC.secLog("載入 ePRO 示範資料 "+n+" 筆");return n;});}
 
 /* ---------- 交接碼（病人手機 QR，桌上條碼機掃進來） ---------- */
 function importPayload(str){var d=PAY.dec(PROM_PANEL,str),pid=null;
@@ -6146,7 +6147,7 @@ function counts(){var c={active:0,open:0,all:ORDER.length};ORDER.forEach(functio
 function ago(ms){if(!ms)return "";var h=(Date.now()-ms)/36e5;return h<1?"剛剛":h<24?Math.floor(h)+" 小時前":h<48?"昨天":Math.floor(h/24)+" 天前";}
 function render(){VIEW=true;document.body.classList.add("prom-view");if(typeof cur!=="undefined")cur=null;var dk=$("#dock");if(dk)dk.hidden=true;EN=ens();
   var m=$("#main"),s=S(),r=role(),rn={manager:"主持人",nurse:"個管師",doctor:"醫師"}[r]||r;
-  m.innerHTML='<section class="sheet report prom"><div class="phead"><h3 title="'+E(rn+'　'+s.name+'　CTCAE '+PROM_PANEL.ctcae_version+'・題庫 v'+PROM_PANEL.version)+'">PROM 症狀清單・'+E(s.studyName||s.sid)+'</h3>'+
+  m.innerHTML='<section class="sheet report prom"><div class="phead"><h3 title="'+E(rn+'　'+s.name+'　CTCAE '+PROM_PANEL.ctcae_version+'・題庫 v'+PROM_PANEL.version)+'">ePRO 症狀清單・'+E(s.studyName||s.sid)+'</h3>'+
     '<span class="sp"></span>'+(s.offline?'<span class="kbd">離線備份檢視・唯讀</span>':'<button class="btn" type="button" id="pmTok">發權杖給病人</button><button class="btn" type="button" id="pmFont" title="切換字級：標準／大／特大">字級 <b>'+FSN[FSI]+'</b></button><details class="pm-more" id="pmMoreBox"><summary class="btn" id="pmMore">更多 ▾</summary><div class="pm-menu"><button class="btn" type="button" id="pmTokMgr">權杖管理</button>'+(canConfirm()||canReview()?'<button class="btn" type="button" id="pmQr">貼上交接碼</button><button class="btn" type="button" id="pmInbox">再收件一次</button>':'')+'<button class="btn" type="button" id="pmRef">重新整理</button>'+(x().isAdmin()?(promSpace()?'':'<button class="btn" type="button" id="pmDemo">載入示範資料（合成）</button>')+'<button class="btn" type="button" id="pmClean">清除測試資料…</button>'+(!promSpace()&&!x().studies().some(function(z){return z.mode==="prom";})?'<button class="btn" type="button" id="pmMkSpace">建立「門診 ePRO」空間…</button>':''):'')+'</div></details>')+'</div>'+
     '<div class="pm-sumline" id="pmKpi"></div>'+'<div class="pm-shell"><div class="pm-rail"><div class="lbar" id="pmBar"></div><div class="pm-list"><table id="pmTbl"></table></div><div class="kbd pm-ccdstat" id="pmCcdStat"></div></div><div class="pm-main" id="pmDet"></div></div></section>';
   var rf=$("#pmRef");if(rf)rf.onclick=function(){$("#pmDet").innerHTML="";SEL=null;loadAll().then(render,function(e){toast(x().cErr(e));});};
@@ -6158,7 +6159,7 @@ function render(){VIEW=true;document.body.classList.add("prom-view");if(typeof c
   var d=$("#pmDemo");if(d)d.onclick=function(){ask("載入 12 筆合成示範紀錄（研究編號 ESCC9001–9011，皆為虛構資料；最後三筆採 v3 食道癌題目）？").then(function(ok){if(!ok)return;loadDemo().then(function(n){toast("已載入 "+n+" 筆");render();}).catch(function(e){toast(e.message||x().cErr(e));});});};
   if(NOTES.length){toast(NOTES.join("；"));NOTES=[];}
   var cln=$("#pmClean");if(cln)cln.onclick=openCleanTest;
-  var mks=$("#pmMkSpace");if(mks)mks.onclick=function(){ask("建立獨立的「門診 ePRO」空間？\n病人無須研究編號；成員、PROM 金鑰、權杖與紀錄皆與 ESCC 研究分開。建立後請由右上角「切換作業」進入，再至「帳號管理」加入個管師／醫師。").then(function(ok){if(!ok)return;x().createPromSpace().then(function(st){toast(st.existed?"「門診 ePRO」空間已存在":"已建立「門診 ePRO」空間；請由右上角「切換作業」進入");render();}).catch(function(e){toast(e.message||x().cErr(e));});});};
+  var mks=$("#pmMkSpace");if(mks)mks.onclick=function(){ask("建立獨立的「門診 ePRO」空間？\n病人無須研究編號；成員、ePRO 金鑰、權杖與紀錄皆與 ESCC 研究分開。建立後請由右上角「切換作業」進入，再至「帳號管理」加入個管師／醫師。").then(function(ok){if(!ok)return;x().createPromSpace().then(function(st){toast(st.existed?"「門診 ePRO」空間已存在":"已建立「門診 ePRO」空間；請由右上角「切換作業」進入");render();}).catch(function(e){toast(e.message||x().cErr(e));});});};
   var fb=$("#pmFont");if(fb)fb.onclick=function(){FSI=(FSI+1)%FSV.length;try{localStorage.setItem("promFs",String(FSI));}catch(e){}applyFs();fb.innerHTML='字級 <b>'+FSN[FSI]+'</b>';};
   $$("#pmMoreBox .pm-menu button").forEach(function(bt){bt.addEventListener("click",function(){var bx=$("#pmMoreBox");if(bx)bx.removeAttribute("open");});});
   var pbt=$("#bProm");if(pbt)pbt.classList.add("on");applyFs();NOAUTO=false;
@@ -6260,7 +6261,7 @@ function wire(r,en){wireTodo(r);rowsEl().forEach(function(row){var term=row.data
   var ok=$("#pmOk");if(ok)ok.onclick=function(){confirm(r.id,PICK,$("#pmPlan").value).then(function(){toast("已確認並結案，判定者 "+meName());PICK={};TERMS=[];EN=ens();drawKpi();drawList();drawDetail(r.id);}).catch(function(e){toast(e.message||x().cErr(e));});};
   var ch=$("#pmChart");if(ch)ch.onclick=function(){openChart(r,en);};
   var ro=$("#pmReopen");if(ro)ro.onclick=function(){ask("重新開啟此筆紀錄？結案標記將取消，紀錄不會刪除。").then(function(y){if(!y)return;reopen(r.id).then(function(){toast("已重開");EN=ens();drawList();drawDetail(r.id);}).catch(function(e){toast(e.message||x().cErr(e));});});};
-  var dl=$("#pmDel");if(dl)dl.onclick=function(){dialog({title:"永久刪除這筆 PROM 紀錄？",msg:"紀錄 "+r.id+" 會被永久刪除，無法復原（留稽核紀錄）。這是給清測試資料用的；真實病人請用「結案」。請輸入研究編號確認。",fields:[{k:"c",label:"輸入研究編號："+r.body.pid,req:1}],ok:"永久刪除"}).then(function(v){if(!v)return;
+  var dl=$("#pmDel");if(dl)dl.onclick=function(){dialog({title:"永久刪除這筆 ePRO 紀錄？",msg:"紀錄 "+r.id+" 會被永久刪除，無法復原（留稽核紀錄）。這是給清測試資料用的；真實病人請用「結案」。請輸入研究編號確認。",fields:[{k:"c",label:"輸入研究編號："+r.body.pid,req:1}],ok:"永久刪除"}).then(function(v){if(!v)return;
     if(String(v.c).trim().toUpperCase()!==String(r.body.pid).toUpperCase()){toast("編號不符，未刪除");return;}
     remove(r.id).then(function(){toast("已刪除 "+r.id);EN=ens();drawKpi();drawList();$("#pmDet").innerHTML='<p class="pm-empty">已刪除。請由左側清單選取下一位病人。</p>';}).catch(function(e){toast(e.message||x().cErr(e));});});};
   updCnt();}
@@ -6275,12 +6276,12 @@ document.addEventListener("keydown",function(ev){if(!VIEW||!S())return;if(/^(INP
   if(ev.key==="Enter"){if(/^(BUTTON|A|SUMMARY)$/.test(ev.target.tagName||""))return;var o=$("#pmOk")||$("#pmRevNext");if(o){ev.preventDefault();o.click();}}});
 document.addEventListener("keydown",function(ev){if(ev.key==="Escape")$$("details.pm-more[open]").forEach(function(d){d.removeAttribute("open");});});
 document.addEventListener("click",function(ev){$$("details.pm-more[open]").forEach(function(d){if(!d.contains(ev.target))d.removeAttribute("open");});});
-function ensureButton(){if($("#bProm"))return;var b=document.createElement("button");b.className="btn";b.type="button";b.id="bProm";b.textContent="PROM 症狀";var u=$("#acctBox")||$("#bUsers");u.parentNode.insertBefore(b,u);
-  b.onclick=function(){if(S()&&S().offline){render();return;}$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取 PROM 中…</p></section>';loadAll().then(function(){return regrantStale();}).then(function(n){return revokeStale().then(function(g){if(g)toast("已收回 "+g+" 位已離開／改角色成員的 PROM 金鑰");return n;});}).then(function(n){if(n)toast("已自動把 PROM 金鑰重新授權給 "+n+" 位更新過金鑰的成員");render();},function(e){toast(e.message||x().cErr(e));});};}
+function ensureButton(){if($("#bProm"))return;var b=document.createElement("button");b.className="btn";b.type="button";b.id="bProm";b.textContent="ePRO 症狀";var u=$("#acctBox")||$("#bUsers");u.parentNode.insertBefore(b,u);
+  b.onclick=function(){if(S()&&S().offline){render();return;}$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取 ePRO 中…</p></section>';loadAll().then(function(){return regrantStale();}).then(function(n){return revokeStale().then(function(g){if(g)toast("已收回 "+g+" 位已離開／改角色成員的 ePRO 金鑰");return n;});}).then(function(n){if(n)toast("已自動把 ePRO 金鑰重新授權給 "+n+" 位更新過金鑰的成員");render();},function(e){toast(e.message||x().cErr(e));});};}
 function tidyHeader(){var lk=$("#bLock");if(!lk||$("#acctBox"))return;var items=["#bUsers","#bRec","#bPw"].map(function(q){return $(q);}).filter(Boolean);if(items.length<2)return;
   var d=document.createElement("details");d.className="pm-more";d.id="acctBox";d.innerHTML='<summary class="btn" id="acctSum">帳號 ▾</summary><div class="pm-menu"></div>';lk.parentNode.insertBefore(d,lk);var m=d.querySelector(".pm-menu");items.forEach(function(b){m.appendChild(b);b.addEventListener("click",function(){d.removeAttribute("open");});});}
-function onSession(){var s=S();if(!s)return;if(s.mode==="irae")return;   /* irAE 登錄空間由 IRAE 模組負責（醫師角色不可落入 PROM 畫面） */
-VIEW=false;var h1=document.querySelector("h1");if(h1){if(!h1.dataset.orig)h1.dataset.orig=h1.textContent;h1.textContent=promSpace()?"門診 ePRO":clin()?"PROM 症狀":h1.dataset.orig;}
+function onSession(){var s=S();if(!s)return;if(s.mode==="irae")return;   /* irAE 登錄空間由 IRAE 模組負責（醫師角色不可落入 ePRO 畫面） */
+VIEW=false;var h1=document.querySelector("h1");if(h1){if(!h1.dataset.orig)h1.dataset.orig=h1.textContent;h1.textContent=promSpace()?"門診 ePRO":clin()?"ePRO 症狀":h1.dataset.orig;}
   document.body.classList.toggle("prom-space",promSpace());
   if(x().isAdmin())tidyHeader();
   if(clin()){document.body.classList.add("prom-only");render();}else{document.body.classList.remove("prom-only");if(x().isAdmin())ensureButton();var b=$("#bProm");if(b)b.hidden=!x().isAdmin()||(!!s.offline&&!LOADED);
