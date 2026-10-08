@@ -242,6 +242,9 @@ h3{font-size:1rem;color:var(--ink);}
 .prom tr.pgrp td{padding:10px 4px 3px;font-size:.76rem;color:var(--soft);letter-spacing:.04em;} .prom tr.prow td{padding:7px 5px;border-top:1px solid var(--rule);vertical-align:top;} .prom tr.prow.on td{background:var(--iodine-soft);} .prom tr.prow:hover td{background:var(--well);}
 .prom tr.prow td:first-child{width:16px;padding-top:12px;} .prom .c3{text-align:right;white-space:nowrap;width:76px;} .prom .why1{font-size:.86rem;color:var(--ink);line-height:1.35;margin-top:2px;} .prom .m{font-size:.78rem;color:var(--soft);} .prom .age{font-size:.78rem;color:var(--soft);}
 .prom .t-dc{background:var(--well);color:var(--soft);font-size:.72rem;}
+/* 手機（≤880px，2026-10-08 user：iPhone 背景可移動、前景擋住）：病人清單不再黏住畫面（原本佔 89% 高、細節在後面捲），改成固定高度的獨立捲動框；上方列在窄螢幕不黏；輸入框 16px 免 iOS 自動放大 */
+@media (max-width:880px){.pm-rail{position:static;max-height:min(42vh,380px);max-height:min(42dvh,380px);overscroll-behavior:contain;-webkit-overflow-scrolling:touch;} .prom input,.prom select,.prom textarea{font-size:16px;}}
+@media (max-width:560px){.bar{position:static;}}
 .pm-main{min-width:0;} .pm-empty{color:var(--soft);padding:48px 12px;text-align:center;line-height:1.8;}
 .pm-sum{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;} @media (max-width:1100px){.pm-sum{grid-template-columns:1fr;}}
 .pm-ev{margin-top:4px;} .pm-hist{margin:8px 0;} .pm-foot{position:sticky;bottom:0;background:var(--sheet);border-top:1px solid var(--rule);margin-top:10px;padding:4px 0 6px;z-index:2;} .pm-foot .actbar{margin-top:6px;}
@@ -6192,7 +6195,7 @@ function drawList(){drawCcdStat();var n={red:0,confirm:0,act:0,read:0,skip:0},sc
   $$("#pmBar .fbtn").forEach(function(b){b.onclick=function(){FILT=b.dataset.f;NOAUTO=false;drawKpi();drawList();};});
   var scp=$("#pmScope");if(scp)scp.onchange=function(){SCOPE=scp.value;SEL=null;NOAUTO=false;$("#pmDet").innerHTML="";drawKpi();drawList();};
   if(AUTODRAW){AUTODRAW=false;if(SEL)drawDetail(SEL);else $("#pmDet").innerHTML='<p class="pm-empty">此範圍內沒有病人。</p>';}
-  $$("#pmTbl tr.prow").forEach(function(tr){tr.onclick=function(){SEL=tr.dataset.id;NOAUTO=false;PICK={};TERMS=[];$$("#pmTbl tr.prow").forEach(function(z){z.classList.toggle("on",z===tr);});drawDetail(SEL);var d=$("#pmDet");if(d)d.scrollTop=0;};});}
+  $$("#pmTbl tr.prow").forEach(function(tr){tr.onclick=function(){SEL=tr.dataset.id;NOAUTO=false;PICK={};TERMS=[];$$("#pmTbl tr.prow").forEach(function(z){z.classList.toggle("on",z===tr);});drawDetail(SEL);var d=$("#pmDet");if(d)d.scrollTop=0;var mn=$(".pm-main");if(mn&&window.matchMedia&&matchMedia("(max-width:880px)").matches)try{mn.scrollIntoView({block:"start",behavior:"smooth"});}catch(e){mn.scrollIntoView();}};});}
 function item(id){return PROM_PANEL.items.filter(function(i){return i.id===id;})[0];}
 function drawDetail(id){var r=RECS[id];if(!r){$("#pmDet").innerHTML="";return;}var b=r.body,en=EN[id]||enrich(b,prevBody(b.pid,b.filledAt,id)),e=en.envelope,cc=b.cc||{},l2=lastReview(b);
   var chg=(en.prev&&en.prev.deltas)?en.prev.deltas.filter(function(d){return d.now>d.was;}):[];
