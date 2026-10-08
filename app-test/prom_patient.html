@@ -147,6 +147,11 @@ button:focus-visible,.opt:focus-visible,.chip:focus-visible{outline-offset:3px}
 @media (max-width:440px){.rr{grid-template-columns:1fr}.rr .lseg{grid-template-columns:repeat(3,1fr)}}
 .lsum{margin:12px 0;padding:14px 16px;border:2px solid var(--line);border-radius:14px}.lsum h3{margin:0 0 6px;font-size:20px}
 .lsum ul{margin:0;padding-left:1.2em}.lsum li{margin:3px 0}.lsum li small{display:block;color:var(--ink2);font-size:16px}.lsum p{margin:0;color:var(--ink2)}
+
+/* ---- P13 ---- */
+.opts.yn{grid-template-columns:1fr 1fr}
+.opts.yn .opt{justify-content:center;min-height:68px}
+.wrap{padding-bottom:190px}
 </style></head><body>
 
 <div id="top" class="hid"><div id="bar"><div id="fill"></div></div>
@@ -395,8 +400,8 @@ function paint(it,q){
   if(q.type==='yesno'){
     var warn=(q.id==='blister')?' warn':'';
     h+='<div class="opts yn">'+
-      '<button class="opt'+(v===0?' on':'')+'" data-v="0"><span class="dot"></span>沒有</button>'+
-      '<button class="opt'+warn+(v===1?' on':'')+'" data-v="1"><span class="dot"></span>有</button></div>';
+      '<button class="opt'+warn+(v===1?' on':'')+'" data-v="1"><span class="dot"></span>有</button>'+
+      '<button class="opt'+(v===0?' on':'')+'" data-v="0"><span class="dot"></span>沒有</button></div>';
   }else if(q.type==='choice'&&q.ui==='sitemap'){
     h+=sitemapHTML(q,v);
   }else if(q.type==='choice'){
@@ -425,8 +430,10 @@ function paint(it,q){
 function wire(it,q,host){
   host.querySelectorAll('.opt[data-v]').forEach(function(b){
     b.onclick=function(){
+      var wasNew=val(it.id,q.id)==null;
       setv(it.id,q.id,parseInt(b.dataset.v,10));
       it.q.forEach(function(qq){paint(it,qq)});
+      if(typeof afterFuAnswer==='function')afterFuAnswer(wasNew);
       if(q.id==='blister'&&parseInt(b.dataset.v,10)===1)
         toast('這一項醫療團隊會優先看');
     };
@@ -528,8 +535,8 @@ function renderADL(st){
     var h='<div class="q"><div class="qt">'+esc(def.text)+'</div>'+
       '<div class="chips">'+def.examples.map(function(e){return '<span class="chip">'+esc(e)+'</span>'}).join('')+'</div>'+
       '<div class="opts yn" style="margin-top:12px" data-adl="'+key+'">'+
-      '<button class="opt'+(v===0?' on':'')+'" data-v="0"><span class="dot"></span>都做得來</button>'+
-      '<button class="opt'+(v===1?' on':'')+'" data-v="1"><span class="dot"></span>有做不來的</button></div>';
+      '<button class="opt'+(v===1?' on':'')+'" data-v="1"><span class="dot"></span>有做不來的</button>'+
+      '<button class="opt'+(v===0?' on':'')+'" data-v="0"><span class="dot"></span>都做得來</button></div>';
     if(v===1){
       h+='<div class="hint" style="margin-top:14px">'+esc(ad.attribution_prompt)+'</div><div class="chips" data-by="'+key+'">'+
         symptomsPresent().map(function(s){
@@ -846,7 +853,7 @@ function listAnswers(){var r=LM.toAnswers({tx:TREAT,a:LA,fu:A,adl_by:{adl_i:A.ad
   ['adl_i','adl_s'].forEach(function(k){if(A[k]===0||A[k]===1){ans[k]=A[k];ans[k+'_by']=A[k]===1?(A[k+'_by']||[]):[];}});
   return ans;}
 function listMeta(){var u=Object.keys(LA).filter(function(k){return LA[k]==='u';});
-  return {v:1,a:JSON.parse(JSON.stringify(LA)),unsure:u,redOk:REDOK,needHits:NEED_HITS};}
+  return {v:1,ui:'P13',autoN:AUTO_N,a:JSON.parse(JSON.stringify(LA)),unsure:u,redOk:REDOK,needHits:NEED_HITS};}
 /* ---- 畫面 ---- */
 function listHeader(s){if(s.kind!=='fu')RET_REV=false;if(s.kind!=='list')$('#stage').onclick=null;var gs=LGROUPS.filter(function(g){return lrowsOf(g[0]).length;}),total=gs.length+2,idx=0,frac=0,right='';
   if(s.kind==='adl')idx=total-1;
@@ -869,7 +876,7 @@ function renderList(st,s){FUROOT=null;var un=listUnanswered(s);
     if(b.id==='allno'){ALLNO=s.grp;return rerender(st,s,'#allno-yes');}
     if(b.id==='allno-cancel'){ALLNO=null;return rerender(st,s,'#allno');}
     if(b.id==='allno-yes'){listUnanswered(s).forEach(function(r){setRow(r.id,'n');});ALLNO=null;return rerender(st,s);}
-    var p=b.dataset.a.split('|');setRow(p[0],p[1]);rerender(st,s,'[data-a="'+p[0]+'|'+p[1]+'"]');};}
+    var p=b.dataset.a.split('|');setRow(p[0],p[1]);rerender(st,s,'[data-a="'+p[0]+'|'+p[1]+'"]');if(STEPS[I]&&STEPS[I].kind==='list')afterListAnswer(st,p[0]);};}
 function rerender(st,s,focus){var y=window.scrollY;if(STEPS[I]!==s)s=STEPS[I];renderList(st,s);listHeader(s);window.scrollTo(0,y);
   if(focus){var f=st.querySelector(focus);if(f)try{f.focus({preventScroll:true});}catch(e){f.focus();}}}
 function stepOk(s){if(s.kind!=='list')return true;var un=listUnanswered(s);if(!un.length)return true;NEED_HITS++;
@@ -918,6 +925,24 @@ function listSubmitGate(){if(REDOK)return true;NEED_HITS++;var bl=$('#redblk');i
 function listDoneNote(){var u=Object.keys(LA).filter(function(k){return LA[k]==='u';});if(!LISTFLOW||!u.length)return '';
   return '<div class="note" style="text-align:left;margin-top:18px;font-size:18px"><b>我們會再向您確認</b><br>'+u.map(function(k){var r=lrowById(k);return esc(r?r.n:k);}).join('、')+'</div>';}
 
+
+/* ---- P13：自動跳頁＋自動捲（2026-10-08） ---- */
+var AUTO_GAP=450, AUTO_T=null, AUTO_N=0;
+function navTop(){var n=document.getElementById('nav');return n?n.getBoundingClientRect().top:window.innerHeight;}
+function offView(el){var r=el.getBoundingClientRect();return r.top<64||r.bottom>navTop()-12;}
+function bringUp(el){if(el&&offView(el))try{el.scrollIntoView({block:'center',behavior:'smooth'});}catch(e){el.scrollIntoView();}}
+function qDone(h){if(h.querySelector('input[type=number]'))return !!h.querySelector('input[type=number]').value;return !!h.querySelector('.opt.on');}
+function fuState(){var st=$('#stage'),qs=[].slice.call(st.querySelectorAll('.q')).filter(function(h){return !h.classList.contains('hid')&&h.innerHTML;});
+  var plain=qs.every(function(h){return !h.querySelector('input,svg,.rg')&&h.querySelector('.opt[data-v]');});
+  return {qs:qs,plain:plain,next:qs.filter(function(h){return !qDone(h);})[0]||null};}
+function afterFuAnswer(wasNew){if(!LISTFLOW)return;var s=STEPS[I];if(!s||s.kind!=='fu')return;
+  if(AUTO_T){clearTimeout(AUTO_T);AUTO_T=null;}
+  var f=fuState();
+  if(f.next){bringUp(f.next);return;}
+  if(!wasNew||!f.plain||f.qs.length!==1||!AUTO_GAP)return;
+  var i0=I;AUTO_T=setTimeout(function(){AUTO_T=null;if(I!==i0||!$('#review').classList.contains('hid'))return;var g=fuState();if(g.next||!g.plain||g.qs.length!==1)return;AUTO_N++;$('#next').click();},AUTO_GAP);}
+function afterListAnswer(st,id){var rows=[].slice.call(st.querySelectorAll('.lrow')),k=rows.findIndex(function(e){return e.dataset.row===id;});
+  var nx=rows.slice(k+1).concat(rows.slice(0,k)).filter(function(e){return !LA[e.dataset.row];})[0];if(nx)bringUp(nx);}
 /* ---------- 導覽 ---------- */
 var NAV_GAP=(location.hash==='#selftest')?0:300, NAV_T=0;
 function navGate(){var n=Date.now(); if(n-NAV_T<NAV_GAP) return false; NAV_T=n; return true}
@@ -1037,6 +1062,6 @@ SAFETY={phone:'', text:'如果現在很不舒服，例如很喘、發燒超過 3
   flush();
 })();
 if(location.hash==='#selftest') window.__pp={A:function(){return A},setv:setv,state:function(){return {I:I,TOKEN:TOKEN,SID:SID,TREAT:TREAT,BIRTH:BIRTH,TOK:TOK,steps:STEPS.length,inForm:!$('#form').classList.contains('hid'),inReview:!$('#review').classList.contains('hid'),done:!$('#done').classList.contains('hid')}},
-  goReview:function(){I=STEPS.length-1;save();render();$('#next').click();},goItem:function(id){var k=STEPS.findIndex(function(s){return s.kind==='item'&&s.item.id===id});if(k>=0){I=k;save();render();}return k;},LA:function(){return LA},devStart:function(tr){TREAT=tr.slice();TOK={pid:'DEV'};SESS={pid:'DEV',name:''};VISIT='vdev';$('#next').disabled=false;buildSteps();$('#login').classList.add('hid');$('#form').classList.remove('hid');$('#back').classList.remove('hid');$('#top').classList.remove('hid');render();},devReset:function(){A={};LA={};REDOK=false;NEED_HITS=0;RET_REV=false;ALLNO=null;FUROOT=null;MEDIA.photo=null;MEDIA.audio=null;I=0;$('#review').classList.add('hid');$('#done').classList.add('hid');},setRow:setRow,listAnswers:listAnswers,listMeta:listMeta,LM:LM,REDOK:function(){return REDOK},LISTFLOW:LISTFLOW,buildBody:buildBody,navGap:function(ms){if(ms!=null)NAV_GAP=ms;return NAV_GAP},MEDIA:MEDIA,STEPS:function(){return STEPS}};
+  goReview:function(){I=STEPS.length-1;save();render();$('#next').click();},goItem:function(id){var k=STEPS.findIndex(function(s){return s.kind==='item'&&s.item.id===id});if(k>=0){I=k;save();render();}return k;},autoGap:function(ms){if(ms!=null)AUTO_GAP=ms;return AUTO_GAP},LA:function(){return LA},devStart:function(tr){TREAT=tr.slice();TOK={pid:'DEV'};SESS={pid:'DEV',name:''};VISIT='vdev';$('#next').disabled=false;buildSteps();$('#login').classList.add('hid');$('#form').classList.remove('hid');$('#back').classList.remove('hid');$('#top').classList.remove('hid');render();},devReset:function(){A={};LA={};REDOK=false;NEED_HITS=0;RET_REV=false;ALLNO=null;FUROOT=null;MEDIA.photo=null;MEDIA.audio=null;I=0;$('#review').classList.add('hid');$('#done').classList.add('hid');},setRow:setRow,listAnswers:listAnswers,listMeta:listMeta,LM:LM,REDOK:function(){return REDOK},LISTFLOW:LISTFLOW,buildBody:buildBody,navGap:function(ms){if(ms!=null)NAV_GAP=ms;return NAV_GAP},MEDIA:MEDIA,STEPS:function(){return STEPS}};
 window.addEventListener('online',flush);
 </script></body></html>

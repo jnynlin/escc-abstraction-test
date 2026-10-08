@@ -6036,7 +6036,10 @@ function openCleanTest(){
 /* 病人端送來的清單作答摘要：只收已知形狀（列代號＋y/n/u），不信任病人端自己算的 unsure，由 a 重算 */
 function listClean(l){if(!l||typeof l!=="object"||l.v!==1||!l.a||typeof l.a!=="object"||Array.isArray(l.a))return null;var a={},u=[];
   Object.keys(l.a).slice(0,60).forEach(function(k){var v=l.a[k];if(/^[a-z_0-9]{1,24}$/.test(k)&&(v==="y"||v==="n"||v==="u")){a[k]=v;if(v==="u")u.push(k);}});
-  return {v:1,a:a,unsure:u,redOk:l.redOk===true,needHits:Math.max(0,Math.min(999,parseInt(l.needHits,10)||0))};}
+  var o={v:1,a:a,unsure:u,redOk:l.redOk===true,needHits:Math.max(0,Math.min(999,parseInt(l.needHits,10)||0))};
+  if(typeof l.ui==="string"&&/^[A-Za-z0-9._-]{1,16}$/.test(l.ui))o.ui=l.ui;  /* 病人端版本（P13 起；分析分得出改版前後） */
+  if(l.autoN!=null)o.autoN=Math.max(0,Math.min(99,parseInt(l.autoN,10)||0));
+  return o;}
 function consumeInbox(){if(!PK)return Promise.reject(new Error("ePRO 金鑰未載入"));var uid=meUid(),n=0,skipped=0,errs=[];
   return x().col("prom_inbox").get().then(function(qs){var docs=[];qs.forEach(function(d){if(!d.data().consumed)docs.push(d);});
     return docs.reduce(function(p,d){return p.then(function(){var m=d.data(),w=m.wrapped&&m.wrapped[uid];if(!w){skipped++;return;}
