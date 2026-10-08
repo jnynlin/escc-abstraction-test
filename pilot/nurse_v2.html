@@ -147,7 +147,7 @@ function evaluate(p) {
   const blockers = [...C.filter(c => c.red).map(c => `待確認「${NAME[c.id]}」`), ...F.filter(f => f.level === "today" && !f.acked).map(f => `今日處理「${f.text.slice(0, 10)}…」未回覆`)];
   return { F, C, level, unfilled, blockers };
 }
-const TOD = id => ({ today: "今日處理", confirm: "待確認", act: "建議處理", read: "閱讀", skip: "無須處理" })[id];
+const TOD = id => ({ today: "今日處理", confirm: "待確認", act: "建議處理", read: "閱讀", skip: "無需處理" })[id];
 const E = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const $ = (q, r = document) => r.querySelector(q), $$ = (q, r = document) => [...r.querySelectorAll(q)];
 const now = () => new Date().toTimeString().slice(0, 5);

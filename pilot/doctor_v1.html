@@ -53,7 +53,7 @@ function render() {
   if (!R.length) { $("#queue").innerHTML = ""; $("#pane").innerHTML = '<p class="mini">等待個管師送來的紀錄…</p>'; return; }
   const order = R.map((r, i) => i).sort((a, b) => rank(R[a]) - rank(R[b]) || a - b); if (CUR >= R.length) CUR = 0;
   $("#queue").innerHTML = order.map(i => { const r = R[i], u = urgent(r).length, k = rank(r);
-    return `<li><button type="button" class="qi" data-i="${i}" aria-current="${i === CUR}"><span class="chip c-${L3[r.code] ? "ok" : u ? "today" : k === 1 ? "act" : "skip"}">${L3[r.code] ? "已確認" : u ? "請先處理" : k === 1 ? "看診時處理" : "無須處理"}</span><span><span class="code">${E(r.code)}</span><small>${E(r.age)}　${txs(r.tx)}</small></span></button></li>`; }).join("");
+    return `<li><button type="button" class="qi" data-i="${i}" aria-current="${i === CUR}"><span class="chip c-${L3[r.code] ? "ok" : u ? "today" : k === 1 ? "act" : "skip"}">${L3[r.code] ? "已確認" : u ? "請先處理" : k === 1 ? "看診時處理" : "無需處理"}</span><span><span class="code">${E(r.code)}</span><small>${E(r.age)}　${txs(r.tx)}</small></span></button></li>`; }).join("");
   const r = R[CUR], U = urgent(r), T = routine(r), O = r.flags.filter(f => f.level !== "today"), un = r.flags.filter(f => /^unconf_/.test(f.id));
   const li = (f, cls = "") => `<li class="fi ${cls}"><b>${E(f.text)}</b><small>依據：${E(f.why)}${f.resp ? `　個管師回覆：${E(f.resp)}` : ""}</small></li>`;
   let h = `<section class="card"><div class="head"><span class="code">${E(r.code)}</span><span>${E(r.age)}</span><span>${txs(r.tx)}</span><span class="chip c-${L3[r.code] ? "ok" : U.length ? "today" : "act"}">${L3[r.code] ? "已確認" : U.length ? "請先處理" : "看診時處理"}</span></div></section>`;
