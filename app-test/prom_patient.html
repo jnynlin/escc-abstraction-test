@@ -943,6 +943,35 @@ function afterFuAnswer(wasNew){if(!LISTFLOW)return;var s=STEPS[I];if(!s||s.kind!
   var i0=I;AUTO_T=setTimeout(function(){AUTO_T=null;if(I!==i0||!$('#review').classList.contains('hid'))return;var g=fuState();if(g.next||!g.plain||g.qs.length!==1)return;AUTO_N++;$('#next').click();},AUTO_GAP);}
 function afterListAnswer(st,id){var rows=[].slice.call(st.querySelectorAll('.lrow')),k=rows.findIndex(function(e){return e.dataset.row===id;});
   var nx=rows.slice(k+1).concat(rows.slice(0,k)).filter(function(e){return !LA[e.dataset.row];})[0];if(nx)bringUp(nx);}
+
+/* ---- P13b：瀏覽器上一頁／下一頁＝上一步／下一步（2026-10-08） ----
+   每筆瀏覽紀錄 state={pp:第幾步(確認頁=步數, 送出後='done'), k:第幾筆}；HE[k]＝那一筆是第幾步。
+   網頁上的「上一步」也走瀏覽紀錄往回（history.go），所以之後按手機返回鍵不會有「按了沒反應」的一下。 */
+var HPOP=false, HSKIP=null, HE=[], HD=0;
+function hpos(){if(!$('#done').classList.contains('hid'))return 'done';if($('#form').classList.contains('hid')&&$('#review').classList.contains('hid'))return null;return !$('#review').classList.contains('hid')?STEPS.length:I;}
+function hput(m,p,k){try{history[m]({pp:p,k:k},'');}catch(e){}}
+function hsync(){if(HPOP||!window.history||!history.replaceState)return;var p=hpos();if(p===null)return;var st=history.state;
+  if(!st||st.k==null){HE=[p];HD=0;hput('replaceState',p,0);return;}
+  if(HE[HD]===undefined)HE[HD]=st.pp;
+  if(p===HE[HD])return;
+  if(p==='done'||(HE[HD]!=='done'&&p>HE[HD])){HE.length=HD+1;HE.push(p);HD++;hput('pushState',p,HD);return;}
+  for(var k=HD-1;k>=0;k--)if(HE[k]===p)break;
+  if(k>=0){var d=k-HD;HD=k;HSKIP=k;try{history.go(d);}catch(e){HSKIP=null;}return;}
+  HE[HD]=p;hput('replaceState',p,HD);}
+window.addEventListener('popstate',function(ev){var st=ev.state||{},p=hpos();
+  if(HSKIP!==null&&st.k===HSKIP){HSKIP=null;return;}HSKIP=null;
+  if(p===null)return;
+  if(st.k!=null)HD=st.k;
+  if(p==='done'){HE.length=HD+1;HE.push('done');HD++;hput('pushState','done',HD);toast('已經送出了，不用再填一次');return;}
+  var t=st.pp;if(t===undefined||t===null||t==='done')return;
+  HPOP=true;try{for(var g=0;g<80;g++){p=hpos();if(p===t||p==='done')break;NAV_T=0;var i0=p;
+      if(t<p)$('#back').onclick();else{if(!$('#review').classList.contains('hid'))break;$('#next').onclick();}
+      if(hpos()===i0)break;}}
+  finally{HPOP=false;}
+  p=hpos();if(p!==null&&p!==t){HE[HD]=p;hput('replaceState',p,HD);}else HE[HD]=t;});
+var _hRender=render;render=function(){var r=_hRender.apply(this,arguments);hsync();return r;};
+var _hReview=renderReview;renderReview=function(){var r=_hReview.apply(this,arguments);hsync();return r;};
+var _hDone=showDone;showDone=function(){var r=_hDone.apply(this,arguments);hsync();return r;};
 /* ---------- 導覽 ---------- */
 var NAV_GAP=(location.hash==='#selftest')?0:300, NAV_T=0;
 function navGate(){var n=Date.now(); if(n-NAV_T<NAV_GAP) return false; NAV_T=n; return true}
