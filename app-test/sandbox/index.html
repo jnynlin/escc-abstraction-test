@@ -246,8 +246,8 @@ body.picking .bstudy:not(.ro){outline:2px dashed var(--c1);outline-offset:2px}
 
 </style></head><body>
 <header class="top">
-<h1>ePRO 模組沙盤 v6.5（PI 版）　<span class="small soft">練習用，資料只存在你的瀏覽器</span></h1>
-<p class="sub">先選「你是誰」，再把項目加進計畫：點一下項目再點要放的位置，或用「＋」、用滑鼠拖進去都可以。要交回請按「下載存檔」或「複製給總 PI」。<span id="saved" class="small"></span></p>
+<h1>ePRO 模組沙盤 v6.5（PI 版）　<span class="small soft">練習用，資料只存在這個瀏覽器</span></h1>
+<p class="sub">先選「你是誰」，再把項目加進計畫：點一下項目再點要放的位置，或用「＋」、用滑鼠拖進去都可以。要交回請按「下載存檔」或「複製給總 PI」。<span id="saved" class="small" title="每次操作都會自動存在這台裝置的瀏覽器"></span></p>
 <div class="who"><label>你是誰<select id="actor" data-act="actor" aria-label="你是誰"></select></label><span id="whoinfo" class="small"></span></div>
 <div class="tools"><button type="button" class="primary" data-act="copy">複製給總 PI</button><button type="button" data-act="save">下載存檔</button>
 <label class="small" style="display:inline-flex;align-items:center;gap:6px">載入存檔 <input id="loadin" type="file" accept="application/json,.json" data-act="load"></label>
@@ -656,9 +656,9 @@ var S=SBX,$=function(q,r){return (r||document).querySelector(q);},$$=function(q,
 var KEY="epro_sandbox_v1",UKEY="epro_sandbox_ui_v1",M=load()||S.defaults(),UI={tab:"blocks",sid:null,actor:S.PROFILE==="pi"?"pi1":"sys",overview:false,persona:{cycleWeeks:3,horizonWeeks:26,endWeek:"",resp:1,enrolled:null},armed:null};
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
 function load(){try{var t=localStorage.getItem(KEY);if(!t)return null;var r=S.sanitize(JSON.parse(t));return r.ok?r.model:null;}catch(e){return null;}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(M));}catch(e){}var n=$("#saved");if(n)n.textContent="已暫存 "+new Date().toLocaleTimeString("zh-TW",{hour12:false});}
-function loadUI(){try{var j=JSON.parse(localStorage.getItem(UKEY)||"null");if(j&&typeof j==="object"){if(S.ACTORS.indexOf(j.actor)>=0)UI.actor=j.actor;if(typeof j.sid==="string")UI.sid=j.sid;UI.overview=!!j.overview;}}catch(e){}}
-function saveUI(){try{localStorage.setItem(UKEY,JSON.stringify({actor:UI.actor,sid:UI.sid,overview:UI.overview}));}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(M));}catch(e){}var n=$("#saved");if(n)n.textContent="關掉不會不見・已暫存 "+new Date().toLocaleTimeString("zh-TW",{hour12:false});}
+function loadUI(){try{var j=JSON.parse(localStorage.getItem(UKEY)||"null");if(j&&typeof j==="object"){if(S.ACTORS.indexOf(j.actor)>=0)UI.actor=j.actor;if(typeof j.tab==="string")UI.tab=j.tab;   /* TABS 這時還沒定義，之後再檢查 */if(typeof j.sid==="string")UI.sid=j.sid;UI.overview=!!j.overview;}}catch(e){}}
+function saveUI(){try{localStorage.setItem(UKEY,JSON.stringify({actor:UI.actor,sid:UI.sid,overview:UI.overview,tab:UI.tab}));}catch(e){}}
 loadUI();
 /* 身份與可見範圍（模擬登入）：系統管理者看全部；其他人只看到自己有角色（PI／sub-PI）的計畫——和測試站「不是成員就看不到」同一條規則 */
 function isPf(){return S.isPlatform(UI.actor);}
@@ -881,7 +881,7 @@ function stewardWhy(scale,v){var cur=(M.stewards||{})[scale];if(cur&&cur!==UI.ac
 
 /* ---------- 事件（委派）---------- */
 document.addEventListener("click",function(ev){var b=ev.target.closest("[data-act]");if(!b)return;var a=b.dataset.act,sid=b.dataset.sid;
-  if(a==="tab"){UI.tab=b.dataset.tab;render();return;}
+  if(a==="tab"){goTab(b.dataset.tab);return;}
   if(a==="pick"){UI.sid=sid;UI.overview=false;UI.armed=null;render();return;}
   if(a==="rm"){var kd=b.dataset.kind;if(S.removeItem(M,sid,kd,b.dataset.id,b.dataset.tid,UI.actor))changed();else{var mg0=kd==="owner"||kd==="subpi";if(!(mg0?S.canManage(M,UI.actor,sid):S.canEdit(M,UI.actor,sid))){toast(denyMsg(sid,mg0),true);render();}}return;}
   if(a==="addtpl"){var rt=S.place(M,{kind:"template",id:b.dataset.id},{studyId:sid,slot:"templates"},UI.actor);toast(rt.msg,!rt.ok);if(rt.ok){UI.flash={sid:sid,key:"template:"+b.dataset.id};changed();}return;}
@@ -954,6 +954,17 @@ document.addEventListener("click",function(ev){
   var st=ev.target.closest&&ev.target.closest(".bstudy");if(!st)return;
   var d2=UI.pick;setPick(null);dropAt(ev.target,d2);},true);
 document.addEventListener("keydown",function(ev){if(ev.key==="Escape"&&UI.pick)setPick(null);});
+/* 分頁進瀏覽紀錄（2026-10-09 user：返回鍵原本直接離開沙盤）：返回＝上一個分頁、前進＝下一個；
+   在第一個分頁再按返回才離開。選起項目還沒放下時，返回先取消選取。 */
+var HPOP=false;
+if(!TABS.some(function(t){return t[0]===UI.tab;}))UI.tab=TABS[0][0];   /* 存檔裡的分頁可能已不存在（例如 PI 版沒有「權限」） */
+function goTab(tab,fromPop){if(!TABS.some(function(t){return t[0]===tab;}))return;var was=UI.tab;UI.tab=tab;render();
+  if(fromPop||was===tab||!window.history||!history.pushState)return;
+  try{history.pushState({sbxTab:tab},"");}catch(e){}}
+if(window.history&&history.replaceState)try{history.replaceState({sbxTab:UI.tab},"");}catch(e){}
+window.addEventListener("popstate",function(ev){
+  if(UI.pick){setPick(null);try{history.pushState({sbxTab:UI.tab},"");}catch(e){}return;}   /* 先取消選取，不離開 */
+  var st=ev.state;if(!st||!st.sbxTab)return;HPOP=true;try{goTab(st.sbxTab,true);}finally{HPOP=false;}});
 /* 鍵盤：Enter 在素材上＝提示用選單 */
 
 if(window.matchMedia&&window.matchMedia("(max-width:900px)").matches){var dt=$("#pal");if(dt)dt.open=false;}
