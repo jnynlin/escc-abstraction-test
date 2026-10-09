@@ -877,7 +877,7 @@ setInterval(function(){if(cur&&!document.hidden)tick();},60000);
 function openPt(id){if(typeof PROM!=="undefined")PROM.onLeave();tick();cur=id;touched={};UNLOCK={};tStart=Date.now();
   if(auditMode()){audOf(id);if(!FORM_BY[tab].audit)tab="core_abstraction";}
   var fm=FORM_BY[tab];if(fm&&!formShown(id,fm))tab="core_abstraction";
-  renderMain();renderRail();window.scrollTo(0,0);if(typeof DOCIMPORT!=="undefined")DOCIMPORT.spineBar();}
+  renderMain();renderRail();window.scrollTo(0,0);if(typeof DOCIMPORT!=="undefined")DOCIMPORT.spineBar();wbHPt(id);}
 function renderMain(){if(typeof PROM!=="undefined")PROM.onLeave();
   var m=$("#main");
   if(!DB.order.length){
@@ -6237,9 +6237,17 @@ function mTop(){if(!narrow())return;var k=document.getElementById("pmBack");wind
 /* 手機返回鍵／瀏覽器上一頁＝回清單、下一頁＝回到剛才那位（2026-10-08 user：back 鍵等前進後退再優化）。只有窄螢幕（清單／細節分開時）才記瀏覽紀錄。 */
 function hDet(id){if(!narrow()||!window.history||!history.pushState)return;try{var st=history.state;if(st&&st.pm==="det")history.replaceState({pm:"det",id:id},"");else history.pushState({pm:"det",id:id},"");}catch(e){}}
 function mDet(on){var b=document.body;if(on){if(!b.classList.contains("pm-m-det"))LISTY=window.scrollY;b.classList.add("pm-m-det");hDet(SEL);mTop();}else if(b.classList.contains("pm-m-det")){b.classList.remove("pm-m-det");if(narrow())window.scrollTo(0,LISTY||0);}}
+/* 這一下 popstate 是不是對話框造成的（見 build_cloud.py 的 MODAL_BACK） */
+function modalNav(){var m=document.getElementById("modal");
+  if(m&&m.classList.contains("open"))return true;
+  return !!(window.__MODALNAV&&Date.now()-window.__MODALNAV<1200);}
 function mBack(){if(history.state&&history.state.pm==="det")history.back();else mDet(false);}
 if(typeof document!=="undefined"&&document.addEventListener)document.addEventListener("click",function(ev){if(ev.target&&ev.target.closest&&ev.target.closest("#pmBack"))mBack();});
 if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("popstate",function(ev){var st=ev.state;if(!document.getElementById("pmTbl"))return;
+  /* 對話框造成的 popstate 不要動細節頁（2026-10-10）：對話框開著時會推一筆紀錄，
+     關掉時會退回來；若照常重畫，還沒存的給級選擇（PICK／TERMS）會被清掉、捲動位置也會跳。
+     兩種情形：返回鍵按下時對話框還開著；或用按鈕關掉、由 MODAL_BACK 退回那一筆（留 __MODALNAV 記號）。 */
+  if(modalNav())return;
   if(st&&st.pm==="det"&&RECS[st.id]){var b=document.body;if(!b.classList.contains("pm-m-det"))LISTY=window.scrollY;SEL=st.id;NOAUTO=false;PICK={};TERMS=[];$$("#pmTbl tr.prow").forEach(function(z){z.classList.toggle("on",z.dataset.id===SEL);});drawDetail(SEL);b.classList.add("pm-m-det");mTop();}
   else mDet(false);});
 function drawDetail(id){var r=RECS[id];if(!r){$("#pmDet").innerHTML="";return;}var b=r.body,en=EN[id]||enrich(b,prevBody(b.pid,b.filledAt,id)),e=en.envelope,cc=b.cc||{},l2=lastReview(b);
@@ -6904,8 +6912,21 @@ function newSubject(){
 
 /* ---------- 受試者頁 ---------- */
 function openSubject(id){var my=++SEQ;CUR=id;loading("讀取 "+id+"…");
-  return store().loadSubject(id).then(function(s){if(my!==SEQ)return;CD=s;var a=IRAE_SCHEMA.assemble({subject:s.doc,facts:s.facts,confirms:s.confirms});CD.asm=a;CD.tl=IRAE_TL.timeline(a.subject,null,today());drawSubject();}).catch(function(e){if(my===SEQ)fail(e);});}
+  return store().loadSubject(id).then(function(s){if(my!==SEQ)return;CD=s;var a=IRAE_SCHEMA.assemble({subject:s.doc,facts:s.facts,confirms:s.confirms});CD.asm=a;CD.tl=IRAE_TL.timeline(a.subject,null,today());drawSubject();hSubj(id);}).catch(function(e){if(my===SEQ)fail(e);});}
 function cur(items,kind){return IRAE_SCHEMA.current(items).filter(function(f){return f.kind===kind;});}
+/* 手機返回鍵／瀏覽器上一頁＝回清單（2026-10-10，user「回上頁，這些邏輯？照順序」第 4 項）。
+   受試者頁是整頁替換（不分寬窄），所以不像個管師頁要先判斷窄螢幕。 */
+function hSubj(id){if(!window.history||!history.pushState)return;
+  try{var st=history.state;if(st&&st.ir)history.replaceState({ir:id},"");else history.pushState({ir:id},"");}catch(e){}}
+function irGoHome(){if(history.state&&history.state.ir)history.back();else home();}
+if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("popstate",function(ev){
+  if(!iraeSpace())return;
+  var m=document.getElementById("modal");   /* 對話框造成的 popstate 不要重讀受試者（見 build_cloud.py 的 MODAL_BACK） */
+  if(m&&m.classList.contains("open"))return;
+  if(window.__MODALNAV&&Date.now()-window.__MODALNAV<1200)return;
+  var st=ev.state;
+  if(st&&st.ir){if(CUR!==st.ir)openSubject(st.ir);}
+  else if(CUR)home();});
 function reopen(){return CUR?openSubject(CUR):home();}
 function drawSubject(){
   var s=CD,id=s.id,d=s.doc,tl=s.tl,facts=cur(s.facts,"ici_dose"),courses=cur(s.facts,"course"),draws=cur(s.facts,"draw").sort(function(a,b){return a.data.date<b.data.date?-1:a.data.date>b.data.date?1:0;}),
@@ -6997,7 +7018,7 @@ function nextStep(tl,cids,doseFacts,w,cf){var d=CD.doc,term=d.status&&d.status.k
   return box("info","所有時點都已處理完畢","沒有待辦的抽血。");}
 function find(arr,id){return arr.filter(function(f){return f.id===id;})[0];}
 function wire(){
-  $("#irBack").onclick=home;$("#irRel").onclick=reopen;var s=CD,id=s.id;
+  $("#irBack").onclick=irGoHome;$("#irRel").onclick=reopen;var s=CD,id=s.id;
   var on=function(sel,fn){$$(sel).forEach(function(b){b.onclick=function(){fn(b);};});};
   var ok=ok2;
   var ed=$("#irEdit");if(ed)ed.onclick=function(){editBasics();};var stb=$("#irStatus");if(stb)stb.onclick=function(){editStatus();};
@@ -7170,6 +7191,51 @@ function grantKeys(){return store().openKey().then(function(){var M=x().members(
   return Promise.all(jobs).then(function(a){return a.reduce(function(n,v){return n+v;},0);});});}
 return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:function(){return LIST.length;},home:home,openSubject:openSubject,grantKeys:grantKeys,grantOne:grantOne,revokeOne:revokeOne,store:store,
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
+})();
+
+
+/* ---- 摘錄工作站：手機返回鍵＝取消選取回清單（2026-10-10，「照順序」第 5 項，A 案）----
+   只在窄螢幕生效。桌機維持原本行為一行不動：工作站是研究人員每天坐在電腦前用的，
+   桌機很少按返回也沒有滑動返回手勢，風險幾乎只存在手機上。
+   手機上清單（側欄）會變成內容上方的區塊，所以「取消選取」就等於回到清單。 */
+function wbNarrow(){return !!(window.matchMedia&&matchMedia("(max-width:880px)").matches);}
+function wbModalNav(){var m=document.getElementById("modal");
+  if(m&&m.classList.contains("open"))return true;                       /* 返回鍵是要關對話框的 */
+  return !!(window.__MODALNAV&&Date.now()-window.__MODALNAV<1200);}     /* 對話框用按鈕關掉時退回的那一下 */
+function wbHPt(id){if(!wbNarrow()||!window.history||!history.pushState)return;
+  try{var st=history.state;
+    if(st&&st.wb)history.replaceState({wb:id},"");                      /* 連續換病人用覆蓋，不要累積成要按十次返回 */
+    else history.pushState({wb:id},"");}catch(e){}}
+function wbUnselect(){tick();cur=null;tStart=null;touched={};UNLOCK={};renderMain();renderRail();window.scrollTo(0,0);}
+window.addEventListener("popstate",function(ev){
+  if(wbModalNav())return;
+  if(!document.getElementById("main")||document.body.classList.contains("prom-space")||document.body.classList.contains("irae-space"))return;
+  var st=ev.state;
+  if(st&&st.wb){if(DB.pre&&DB.pre[st.wb]&&cur!==st.wb)openPt(st.wb);return;}
+  if(cur&&wbNarrow())wbUnselect();});
+
+
+/* ---- 對話框與返回鍵（2026-10-09）---- */
+(function(){var m=document.getElementById("modal");if(!m||!window.history||!history.pushState)return;
+  var pushed=false,closing=false;
+  function dismiss(){var no=document.getElementById("mNo"),yes=document.getElementById("mYes");
+    if(no&&!no.hidden&&no.offsetParent!==null){no.click();return;}            /* 有「取消」就等於按取消 */
+    if(yes&&yes.offsetParent!==null){yes.click();return;}                     /* 只有「關閉」的說明型對話框 */
+    m.classList.remove("open");}
+  new MutationObserver(function(){
+    var open=m.classList.contains("open");
+    if(open&&!pushed){pushed=true;try{history.pushState({modal:1},"");}catch(e){}}
+    else if(!open&&pushed){pushed=false;
+      if(!closing&&history.state&&history.state.modal){window.__MODALNAV=Date.now();try{history.back();}catch(e){}}   /* 用按鈕關的：把那一筆紀錄收回去；留記號讓各頁的 popstate 知道這一下是對話框造成的 */
+    }
+  }).observe(m,{attributes:true,attributeFilter:["class"]});
+  window.addEventListener("popstate",function(){
+    /* 這支處理器排在各頁的 popstate 之後，所以在這裡把記號清掉＝記號只生效一次。
+       不能只靠時間判斷：對話框關掉後 1 秒內如果使用者又按返回，那一下會被誤吃掉（2026-10-10 e2e_irae backHome 就是這樣失敗）。 */
+    window.__MODALNAV=0;
+    if(!m.classList.contains("open"))return;
+    closing=true;pushed=false;dismiss();setTimeout(function(){closing=false;},0);
+  });
 })();
 
 /* ---------- init ---------- */
