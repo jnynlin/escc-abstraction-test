@@ -223,17 +223,31 @@ h2{font-size:1.65rem;margin:.9em 0 .5em;padding-bottom:.25em}
 .namehint{margin:.4em 0 0;color:var(--accent);font-size:.92rem}.bstudy.unnamed .sname{border-bottom-color:var(--accent)}
 .cfmnone{margin:2em 0 0;color:var(--accent)}.cfmother{margin:3.2em 0 0}.cfmother>summary{cursor:pointer;min-height:40px;display:flex;align-items:center;font-weight:700;color:var(--soft);border-bottom:1px solid var(--rule)}
 
+/* 手機／觸控（2026-10-09 點擊模型：×22×26 每點一次沒點到 35%／68%；輸入框 <16px 會讓 iOS 自動放大整頁） */
+@media (max-width:900px),(pointer:coarse){
+  button,select,input[type=text],input[type=number],textarea{font-size:16px}
+  input[type=file]{font-size:16px;min-height:44px}
+  .chip .x,.sblk .x,.blk .x,.tl-l .th .x{min-height:44px;min-width:44px;padding:0 10px}
+  .bstudy select,.tc select,.sblk .sb3 select,.tl-l .th{min-height:44px;font-size:16px}
+  .chip{min-height:44px}
+  .tl-l .th{padding-right:52px}.tl-l .th .x{width:44px}
+}
+
+/* 點兩下加入（2026-10-09）：選起來的素材 */
+.picked{outline:3px solid var(--c1);outline-offset:1px}
+body.picking .bstudy:not(.ro){outline:2px dashed var(--c1);outline-offset:2px}
+
 </style></head><body>
 <header class="top">
 <h1>ePRO 模組沙盤 v6.5（PI 版）　<span class="small soft">練習用，資料只存在你的瀏覽器</span></h1>
-<p class="sub">先選「你是誰」，再從素材庫把項目拖進計畫；要交回請按「下載存檔」或「複製給總 PI」。<span id="saved" class="small"></span></p>
+<p class="sub">先選「你是誰」，再把項目加進計畫：點一下項目再點要放的位置，或用「＋」、用滑鼠拖進去都可以。要交回請按「下載存檔」或「複製給總 PI」。<span id="saved" class="small"></span></p>
 <div class="who"><label>你是誰<select id="actor" data-act="actor" aria-label="你是誰"></select></label><span id="whoinfo" class="small"></span></div>
 <div class="tools"><button type="button" class="primary" data-act="copy">複製給總 PI</button><button type="button" data-act="save">下載存檔</button>
 <label class="small" style="display:inline-flex;align-items:center;gap:6px">載入存檔 <input id="loadin" type="file" accept="application/json,.json" data-act="load"></label>
 <button type="button" class="warnb" data-act="reset">重設為範例</button></div>
 </header>
 <nav class="tabs" id="tabs" role="tablist" aria-label="分頁"></nav>
-<div class="layout"><aside id="palwrap"><details id="pal" open><summary>素材庫</summary><div id="palbody"></div></details></aside><main id="main"></main></div>
+<div class="layout"><aside id="palwrap"><details id="pal" open><summary>可以加入的項目</summary><div id="palbody"></div></details></aside><main id="main"></main></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script>
 var SBX_PROFILE="pi";
@@ -352,14 +366,14 @@ function place(m,drag,target,actor){
       if(s.owner===drag.id)return {ok:false,msg:"這個人已是這個計畫的 PI，不能同時是 sub-PI"};
       if(s.subpis.indexOf(drag.id)>=0)return {ok:false,msg:"這個人已是這個計畫的 sub-PI"};
       s.subpis.push(drag.id);removeFrom();return {ok:true,msg:"已加入 sub-PI"};}
-    if(target.slot!=="owner")return {ok:false,msg:"人員只能放在「PI」或「sub-PI」位置"};
+    if(target.slot!=="owner")return {ok:false,msg:"這是人，只能放在「PI」或「sub-PI」的位置"};
     var wasSub=s.subpis.indexOf(drag.id);if(wasSub>=0)s.subpis.splice(wasSub,1);
     s.owner=drag.id;removeFrom();if(moving&&f===s)s.owner=drag.id;return {ok:true,msg:"已指定計畫 PI"};}
   if(drag.kind==="role"){
-    if(target.slot!=="members")return {ok:false,msg:"成員角色要放在「成員」位置"};
+    if(target.slot!=="members")return {ok:false,msg:"這是團隊角色，要放在「團隊角色」位置"};
     if(!by(ROLES,drag.id))return {ok:false,msg:"找不到這個角色"};
-    if(s.members.indexOf(drag.id)>=0)return {ok:false,msg:"這個角色已在成員裡"};
-    s.members.push(drag.id);removeFrom();return {ok:true,msg:"已加入成員"};}
+    if(s.members.indexOf(drag.id)>=0)return {ok:false,msg:"這個團隊角色已經加過了"};
+    s.members.push(drag.id);removeFrom();return {ok:true,msg:"已加入團隊角色"};}
   if(drag.kind==="disease"){
     if(target.slot!=="diseases")return {ok:false,msg:"疾病要放在「疾病」位置"};
     if(!by(DISEASES,drag.id))return {ok:false,msg:"找不到這個疾病"};
@@ -459,8 +473,8 @@ function lint(m){var out=[];
       var trg=t.scales.filter(function(x){var sc=by(SCALES,x.id);return sc&&sc.kind==="triage"&&sc.id!=="proctcae";});
       if(trg.length>1)add("info",s.id,"core-and-full",nm+tn+"同時放了症狀核心版和完整版：通常二選一，或平常用核心版、每第 3 次回診才用完整版");
       var roles=t.scales.map(function(x){return x.role;});
-      if(roles.indexOf("anchor")>=0&&roles.filter(function(r){return r==="primary";}).length===0)add("amber",s.id,"anchor-alone",nm+tn+"有「對照」量表，卻沒有主要量表可以比");
-      if(roles.indexOf("anchor")>=0&&roles.indexOf("primary")>=0)add("info",s.id,"pk",nm+tn+"有主要量表和對照量表：可以並排比較，各自計分、不改題");
+      if(roles.indexOf("anchor")>=0&&roles.filter(function(r){return r==="primary";}).length===0)add("amber",s.id,"anchor-alone",nm+tn+"有「比較用」量表，卻沒有主要量表可以比");
+      if(roles.indexOf("anchor")>=0&&roles.indexOf("primary")>=0)add("info",s.id,"pk",nm+tn+"有主要量表和比較用量表：可以並排比較，各自計分、不改題");
       t.scales.forEach(function(x){var sc=by(SCALES,x.id);if(!sc)return;
         (scaleUse[sc.id]=scaleUse[sc.id]||[]).push(s.id);
         if(sc.lic&&sc.lic!=="自編"&&sc.lic!=="—")add("amber",s.id,"license",nm+"「"+sc.name+"」授權："+sc.lic);
@@ -565,13 +579,13 @@ function summarize(m,sim){var L=[];L.push("ePRO 模組沙盤・設計摘要（�
     L.push("【計畫】"+s.name);L.push("類型："+ty.name);
     L.push("PI："+(s.owner?ownerName(m,s.owner):"（未指定）"));
     L.push("sub-PI："+((s.subpis||[]).length?s.subpis.map(function(p){return ownerName(m,p);}).join("、"):"（無）"));
-    L.push("成員："+(s.members.length?s.members.map(function(r){return (by(ROLES,r)||{name:r}).name;}).join("、"):"（無）"));
+    L.push("團隊角色："+(s.members.length?s.members.map(function(r){return (by(ROLES,r)||{name:r}).name;}).join("、"):"（無）"));
     L.push("疾病："+(s.diseases.length?s.diseases.map(function(d){return (by(DISEASES,d)||{name:d}).name;}).join("、"):"（不限）"));
     s.templates.forEach(function(t){var d=by(TEMPLATES,t.tpl)||{name:t.tpl},ld=tplLoad(t,m.speed);
       L.push("模板："+d.name+(d.patient?"，頻率："+(CADENCES[t.cadence]||t.cadence)+"，在"+(VENUES[t.venue]||t.venue)+"填，每次 "+ld.items+" 題、約 "+ld.min+" 分鐘":""));
-      t.scales.forEach(function(x){var sc=by(SCALES,x.id);L.push("　量表："+(sc?sc.name:x.id)+"（"+(x.role==="anchor"?"對照":x.role==="exploratory"?"探索":"主要")+"）");});});
+      t.scales.forEach(function(x){var sc=by(SCALES,x.id);L.push("　量表："+(sc?sc.name:x.id)+"（"+(x.role==="anchor"?"比較用":x.role==="exploratory"?"探索性":"主要")+"）");});});
     L.push("");});
-  L.push("【人員與計畫】");var pm=peopleMatrix(m);
+  L.push("【研究團隊】");var pm=peopleMatrix(m);
   pm.people.forEach(function(p){var roles=pm.studies.map(function(s){return pm.cells[p.id][s.id]?"在「"+s.name+"」是 "+pm.cells[p.id][s.id]:"";}).filter(Boolean);L.push(p.name+"："+(roles.length?roles.join("；"):"（沒有計畫）")+(pm.stewards[p.id].length?"；負責量表："+pm.stewards[p.id].map(function(id){return by(SCALES,id).name;}).join("、"):""));});
   L.push("");L.push("【提醒】");var li=lint(m);["red","amber","info"].forEach(function(lv){var xs=li.filter(function(x){return x.level===lv;});if(!xs.length)return;L.push({red:"必須處理",amber:"需留意",info:"提示"}[lv]+"（"+xs.length+"）");xs.forEach(function(x){L.push("・"+x.msg);});});
   L.push("");L.push("【意見】");DECISIONS.forEach(function(d){var v=m.decisions&&m.decisions[d.id];L.push(d.q);L.push("　回答："+(v?v:"還沒選"));});
@@ -639,9 +653,9 @@ var VALTXT={validated:"有繁中驗證版",needs:"繁中版待確認",self:"自�
 function scaleTip(sc){return sc.name+"・"+sc.items+" 題・約 "+sc.min+" 分鐘\n授權："+sc.lic+"\n驗證："+VALTXT[sc.val]+(sc.note?"\n"+sc.note:"");}
 function palGroup(title,n,inner){return '<details class="grp" open><summary class="gt"><span>'+title+'</span><span class="gn">'+n+'</span></summary><div class="gb">'+inner+'</div></details>';}   /* 主要標題：可收合 */
 function palette(){var ppl=people(),ren=S.OWNERS.filter(function(o){return S.ACTORS.indexOf(o.id)>=0&&(o.kind==="pi"||o.kind==="sys2");});
-  var h=palGroup("人",ppl.length,'<div class="chips">'+ppl.map(function(o){return chip("owner",o.id,oname(o.id),"",{kind:"owner",id:o.id});}).join("")+'</div><div class="sgt">稱呼</div>'+
+  var h=palGroup("主持人人選",ppl.length,'<div class="chips">'+ppl.map(function(o){return chip("owner",o.id,oname(o.id),"",{kind:"owner",id:o.id});}).join("")+'</div><div class="sgt">稱呼</div>'+
     ren.map(function(o){return '<input class="namein" type="text" maxlength="30" data-act="oname" data-oid="'+o.id+'" value="'+esc(oname(o.id))+'"'+(S.canRename(UI.actor,o.id)?"":" disabled")+' aria-label="改名：'+esc(o.name)+'">';}).join(""));
-  h+=palGroup("成員",S.ROLES.length,'<div class="chips">'+S.ROLES.map(function(r){return chip("role",r.id,r.name,"",{kind:"role",id:r.id});}).join("")+'</div>');
+  h+=palGroup("團隊角色",S.ROLES.length,'<div class="chips">'+S.ROLES.map(function(r){return chip("role",r.id,r.name,"",{kind:"role",id:r.id});}).join("")+'</div>');
   h+=palGroup("疾病",S.DISEASES.length,'<div class="chips">'+featFirst(S.DISEASES,"diseases").map(function(d){return chip("disease",d.id,d.name,d.mod?"常見搭配："+S.by(S.SCALES,d.mod).name:"",{kind:"disease",id:d.id},"",feat("diseases",d.id));}).join("")+'</div>');
   h+=palGroup("模板",S.TEMPLATES.length,'<div class="chips">'+featFirst(S.TEMPLATES,"templates").map(function(t){return chip("template",t.id,t.name,t.note,{kind:"template",id:t.id},"",feat("templates",t.id));}).join("")+'</div>');
   var groups=[["triage","症狀回報"],["adl","ADL／功能"],["qol","QoL"],["disease","疾病專用模組"],["psych","心理"],["custom","自訂"]];
@@ -658,7 +672,7 @@ function projBar(withOv){var vs=visibleStudies(),h='<div class="projbar" role="g
   h+='<button type="button" class="primary" data-act="addstudy">＋新增計畫</button>';
   if(withOv&&vs.length>1)h+='<label class="opt ovl"><input type="checkbox" data-act="overview"'+(UI.overview?" checked":"")+'><span class="small">全部計畫（唯讀）</span></label>';
   return h+'</div>';}
-var ROLETXT={"PI":"你是這個計畫的 PI：可以編輯設計、調整 PI／sub-PI、刪除計畫。","sub-PI":"你是這個計畫的 sub-PI：可以編輯設計（疾病、模板、量表、成員、時程）；不能調整 PI／sub-PI，也不能刪除計畫（要找 PI 或系統管理者）。","系統管理者":"你是系統管理者：可以編輯所有計畫、調整 PI／sub-PI、刪除計畫。"};
+var ROLETXT={"PI":"你是這個計畫的 PI：可以編輯設計、調整 PI／sub-PI、刪除計畫。","sub-PI":"你是這個計畫的 sub-PI：可以編輯設計（疾病、模板、量表、團隊角色、時程）；不能調整 PI／sub-PI，也不能刪除計畫（要找 PI 或系統管理者）。","系統管理者":"你是系統管理者：可以編輯所有計畫、調整 PI／sub-PI、刪除計畫。"};
 function roleBar(x){var r=S.roleIn(M,UI.actor,x.id);return '<p class="rolebar" data-role="'+esc(r)+'" title="'+esc(ROLETXT[r]||"")+'"><b>'+esc(oname(UI.actor))+'</b>在這個計畫是 <span class="rtag">'+esc(r)+'</span></p>';}   /* 權限說明放在 title，畫面只留身份標籤與名字 */
 function emptyHTML(){return '<div class="emptyproj"><p><b>'+esc(oname(UI.actor))+'</b>目前沒有計畫。按「＋新增計畫」，建議從頭頸癌＋傳統 PROM 開始。</p></div>';}
 
@@ -688,22 +702,22 @@ function tplBlock(s,t,dupMap,H0){var d=S.by(S.TEMPLATES,t.tpl),ld=S.tplLoad(t,M.
       (t.tpl==="pprom"&&!S.HIDE_IRAE?'<label class="opt tc2"><input type="checkbox" data-act="align" data-sid="'+s.id+'" data-tid="'+t.tid+'"'+(t.align?" checked":"")+'><span class="small">與 irAE 抽血日相差 ≤3 天就改到抽血當日填</span></label>':"")+comboSel(s,t)+'</div>';
     var den=Math.max(ld.min,d.budgetMin||ld.min||1);
     h+='<div class="burden'+(over?" over":"")+'" title="每次 '+ld.items+' 題、約 '+ld.min+' 分鐘；預算最多 '+(d.budgetItems||"–")+' 題、'+(d.budgetMin||"–")+' 分鐘（黑線是預算的位置）">'+t.scales.map(function(x,qi){var sc=S.by(S.SCALES,x.id);return '<i style="width:'+Math.round(sc.min*(M.speed||1)/den*1000)/10+'%;background:'+SEGC[qi%SEGC.length]+'"></i>';}).join("")+(d.budgetMin?'<span class="bud" style="right:auto;left:calc('+Math.round(d.budgetMin/den*1000)/10+'% - 2px)"></span>':"")+'</div><div class="burdtxt"><b>'+ld.items+'</b> 題・<b>'+ld.min+'</b> 分<span class="bd">　預算最多 '+(d.budgetItems||"–")+' 題・'+(d.budgetMin||"–")+' 分</span></div>';
-    h+='<div class="slot" data-accepts="scale" data-slot="scales" data-tid="'+t.tid+'" style="margin-top:8px;display:block">'+(t.scales.length?"":'<span class="hint">拖量表進來</span>')+t.scales.map(function(x,qi){var sc=S.by(S.SCALES,x.id),warn=(sc.lic&&sc.lic!=="自編"&&sc.lic!=="—")||sc.val==="needs";
-      return '<div class="sblk r-'+x.role+(dupMap[x.id]?" dup":"")+(feat("scales",x.id)?" rc":"")+'" style="--sc:'+SEGC[qi%SEGC.length]+'" draggable="true" data-d="'+dpl({kind:"scale",id:x.id,from:{studyId:s.id,tid:t.tid}})+'" data-b="scale:'+x.id+'" data-scale="'+x.id+'" title="'+esc(scaleTip(sc))+'"><div class="sb1"><b>'+esc(sc.name.replace(/（.*$/,""))+'</b>'+(warn?'<span class="warn" title="授權／驗證需確認">⚠</span>':"")+'<span class="m">'+sc.items+' 題・'+sc.min+' 分</span></div><div class="sb2"><span class="stw" title="量表負責人（把人拖到這個量表上就能指定）">'+(M.stewards&&M.stewards[x.id]?'負責人：'+esc(oname(M.stewards[x.id])):'負責人：—')+'</span>'+dupNote(dupMap[x.id],s.id)+'</div><div class="sb3"><select data-act="role" data-sid="'+s.id+'" data-tid="'+t.tid+'" data-id="'+x.id+'" aria-label="角色">'+[["primary","主要"],["anchor","對照"],["exploratory","探索"]].map(function(r){return '<option value="'+r[0]+'"'+(r[0]===x.role?" selected":"")+'>'+r[1]+'</option>';}).join("")+'</select><button class="x" type="button" data-act="rm" data-kind="scale" data-sid="'+s.id+'" data-tid="'+t.tid+'" data-id="'+x.id+'" aria-label="移除">×</button></div></div>';}).join("")+addSel("scales",s.id,t.tid,scaleOptGroups(),"＋量表")+'</div>';
+    h+='<div class="slot" data-accepts="scale" data-slot="scales" data-tid="'+t.tid+'" style="margin-top:8px;display:block">'+(t.scales.length?"":'<span class="hint">點＋加入；或點左邊的項目再點這裡</span>')+t.scales.map(function(x,qi){var sc=S.by(S.SCALES,x.id),warn=(sc.lic&&sc.lic!=="自編"&&sc.lic!=="—")||sc.val==="needs";
+      return '<div class="sblk r-'+x.role+(dupMap[x.id]?" dup":"")+(feat("scales",x.id)?" rc":"")+'" style="--sc:'+SEGC[qi%SEGC.length]+'" draggable="true" data-d="'+dpl({kind:"scale",id:x.id,from:{studyId:s.id,tid:t.tid}})+'" data-b="scale:'+x.id+'" data-scale="'+x.id+'" title="'+esc(scaleTip(sc))+'"><div class="sb1"><b>'+esc(sc.name.replace(/（.*$/,""))+'</b>'+(warn?'<span class="warn" title="授權／驗證需確認">⚠</span>':"")+'<span class="m">'+sc.items+' 題・'+sc.min+' 分</span></div><div class="sb2"><span class="stw" title="量表負責人（把人拖到這個量表上就能指定）">'+(M.stewards&&M.stewards[x.id]?'負責人：'+esc(oname(M.stewards[x.id])):'負責人：—')+'</span>'+dupNote(dupMap[x.id],s.id)+'</div><div class="sb3"><select data-act="role" data-sid="'+s.id+'" data-tid="'+t.tid+'" data-id="'+x.id+'" aria-label="角色">'+[["primary","主要"],["anchor","比較用"],["exploratory","探索性"]].map(function(r){return '<option value="'+r[0]+'"'+(r[0]===x.role?" selected":"")+'>'+r[1]+'</option>';}).join("")+'</select><button class="x" type="button" data-act="rm" data-kind="scale" data-sid="'+s.id+'" data-tid="'+t.tid+'" data-id="'+x.id+'" aria-label="移除">×</button></div></div>';}).join("")+addSel("scales",s.id,t.tid,scaleOptGroups(),"＋量表")+'</div>';
   }
   return h+'</div><div class="tl-r">'+strip(s.id,t,H0)+'</div></div>';}
 function bstudyHTML(s,li,dupMap){
   var ty=S.by(S.STYPES,s.type),mine=li.filter(function(x){return x.study===s.id;}),red=mine.filter(function(x){return x.level==="red";}),amb=mine.filter(function(x){return x.level==="amber";}),H0=s.templates.length?(S.templateTicks(M,s.id,s.templates[0].tid,{}).H||182):182;
   var unnamed=(s.name==="新計畫"||s.name==="未命名計畫");
   var h='<section class="bstudy t-'+s.type+(unnamed?" unnamed":"")+'" data-sid="'+s.id+'"><div class="bhead"><input class="sname" type="text" maxlength="60" data-act="sname" data-sid="'+s.id+'" value="'+esc(s.name)+'" placeholder="計畫名稱，例如：頭頸癌 PROM 追蹤" aria-label="計畫名稱"><div class="bmeta"><select data-act="stype" data-sid="'+s.id+'" aria-label="研究型態" title="'+esc(ty.note)+'">'+opts(S.STYPES,s.type)+'</select><span class="badge red" title="必須處理">'+red.length+'</span><span class="badge amber" title="需留意">'+amb.length+'</span><button type="button" data-act="delstudy" data-sid="'+s.id+'">'+(UI.armed===s.id?"確認刪除？":"刪除計畫")+'</button></div></div>'+(unnamed?'<p class="namehint">先幫這個計畫取個名字，例如「頭頸癌 PROM 追蹤」。</p>':"");
-  h+='<h3 class="bh">人員與疾病</h3><div class="brow">';
-  h+='<div class="bsec"><div class="bl">PI</div><div class="slot" data-accepts="owner" data-slot="owner">'+(s.owner?blk("pblk",oname(s.owner),{kind:"owner",id:s.owner,from:{studyId:s.id}},'data-kind="owner" data-sid="'+s.id+'"'):'<span class="hint">拖人進來</span>')+addSel("owner",s.id,"",opts(people(),null,function(o){return oname(o.id);}),"＋")+'</div></div>';
+  h+='<h3 class="bh">團隊與疾病</h3><div class="brow">';
+  h+='<div class="bsec"><div class="bl">PI</div><div class="slot" data-accepts="owner" data-slot="owner">'+(s.owner?blk("pblk",oname(s.owner),{kind:"owner",id:s.owner,from:{studyId:s.id}},'data-kind="owner" data-sid="'+s.id+'"'):'<span class="hint">點＋加入；或點左邊的項目再點這裡</span>')+addSel("owner",s.id,"",opts(people(),null,function(o){return oname(o.id);}),"＋")+'</div></div>';
   h+='<div class="bsec"><div class="bl">sub-PI</div><div class="slot" data-accepts="owner" data-slot="subpis">'+(s.subpis||[]).map(function(p){return blk("pblk sub",oname(p),{kind:"owner",id:p,from:{studyId:s.id,slot:"subpis"}},'data-kind="subpi" data-sid="'+s.id+'" data-id="'+p+'"');}).join("")+addSel("subpis",s.id,"",opts(people().filter(function(o){return o.id!==s.owner&&(s.subpis||[]).indexOf(o.id)<0;}),null,function(o){return oname(o.id);}),"＋")+'</div></div>';
-  h+='<div class="bsec"><div class="bl">成員</div><div class="slot" data-accepts="role" data-slot="members">'+s.members.map(function(r){return blk("rblk",(S.by(S.ROLES,r)||{name:r}).name,{kind:"role",id:r,from:{studyId:s.id}},'data-kind="role" data-sid="'+s.id+'" data-id="'+r+'"');}).join("")+addSel("members",s.id,"",opts(S.ROLES.filter(function(r){return s.members.indexOf(r.id)<0;})),"＋")+'</div></div>';
+  h+='<div class="bsec"><div class="bl">團隊角色</div><div class="slot" data-accepts="role" data-slot="members">'+s.members.map(function(r){return blk("rblk",(S.by(S.ROLES,r)||{name:r}).name,{kind:"role",id:r,from:{studyId:s.id}},'data-kind="role" data-sid="'+s.id+'" data-id="'+r+'"');}).join("")+addSel("members",s.id,"",opts(S.ROLES.filter(function(r){return s.members.indexOf(r.id)<0;})),"＋")+'</div></div>';
   h+='<div class="bsec"><div class="bl">疾病</div><div class="slot" data-accepts="disease" data-slot="diseases">'+s.diseases.map(function(d){return blk("dblk"+(feat("diseases",d)?" rc":""),(S.by(S.DISEASES,d)||{name:d}).name,{kind:"disease",id:d,from:{studyId:s.id}},'data-kind="disease" data-sid="'+s.id+'" data-id="'+d+'"');}).join("")+addSel("diseases",s.id,"",opts(featFirst(S.DISEASES.filter(function(d){return s.diseases.indexOf(d.id)<0;}),"diseases")),"＋")+'</div></div></div>';
   h+='<h3 class="bh">問卷與時間</h3>'+(s.templates.length?'<div class="tlaxis" aria-hidden="true"><div class="tl-l"></div><div class="tl-r">'+axisSvg(H0)+'</div></div>':"")+'<div class="btpls">'+s.templates.map(function(t){return tplBlock(s,t,dupMap,H0);}).join("")+'</div>';
   var usedT=s.templates.map(function(t){return t.tpl;});
-  h+='<div class="bsec bsec-add"><div class="bl">模板</div><div class="slot" data-accepts="template" data-slot="templates"><span class="hint">拖模板進來</span>'+addSel("templates",s.id,"",opts(featFirst(S.TEMPLATES.filter(function(t){return usedT.indexOf(t.id)<0;}),"templates")),"＋")+'</div></div>';
+  h+='<div class="bsec bsec-add"><div class="bl">模板</div><div class="slot" data-accepts="template" data-slot="templates"><span class="hint">點＋加入；或點左邊的項目再點這裡</span>'+addSel("templates",s.id,"",opts(featFirst(S.TEMPLATES.filter(function(t){return usedT.indexOf(t.id)<0;}),"templates")),"＋")+'</div></div>';
   if(red.length||amb.length)h+='<ul class="issues">'+red.concat(amb).map(function(x){return '<li class="'+x.level+'">'+esc(x.msg)+'</li>';}).join("")+'</ul>';
   return h+'</section>';}
 function blocksHTML(){var vs=visibleStudies(),dm={},x=S.study(M,UI.sid),ov=UI.overview&&vs.length>1;S.sharedScales(M).forEach(function(q){dm[q.scale]=q.studies;});var li=lintView();
@@ -715,16 +729,16 @@ function blocksHTML(){var vs=visibleStudies(),dm={},x=S.study(M,UI.sid),ov=UI.ov
 function confirmHTML(){var vs=visibleStudies(),li=lintView(),r=li.filter(function(x){return x.level==="red";}).length,a=li.filter(function(x){return x.level==="amber";}).length;
   /* 以自己建的計畫（自己是 PI）為主：排前面、展開；其他參與的計畫（例如 sub-PI）收在下面 */
   var own=vs.filter(function(s){return S.roleIn(M,UI.actor,s.id)==="PI";}),oth=vs.filter(function(s){return own.indexOf(s)<0;});
-  var h='<h2>定板確認</h2><p class="cfmhead">你建的計畫 '+own.length+' 個'+(oth.length?'（另外參與 '+oth.length+' 個）':'')+'；目前共 '+vs.length+' 個計畫，必須處理 <b>'+r+'</b>、需留意 <b>'+a+'</b>。</p>';
+  var h='<h2>最後確認</h2><p class="cfmhead">你建的計畫 '+own.length+' 個'+(oth.length?'（另外參與 '+oth.length+' 個）':'')+'；目前共 '+vs.length+' 個計畫，必須處理 <b>'+r+'</b>、需留意 <b>'+a+'</b>。</p>';
   if(!vs.length)return h+emptyHTML();
   return h+(own.length?own.map(cfmSection).join(""):'<p class="cfmnone">你還沒有自己建的計畫。到「研究架構」按「＋新增計畫」開始。</p>')+(oth.length?'<details class="cfmother"><summary>其他你參與的計畫（'+oth.length+'）</summary>'+oth.map(cfmSection).join("")+'</details>':"");
   function cfmSection(s){var ty=S.by(S.STYPES,s.type),role=S.roleIn(M,UI.actor,s.id),mine=li.filter(function(x){return x.study===s.id;});
     var hh='<section class="cfm" data-sid="'+s.id+'"><h3>'+esc(s.name)+' <span class="stag">'+esc(ty.name)+'</span> <span class="rtag">'+esc(role)+'</span></h3>';
-    hh+='<dl class="cfmdl"><dt>計畫 PI</dt><dd>'+(s.owner?esc(oname(s.owner)):'<span class="soft">（未指定）</span>')+'</dd><dt>sub-PI</dt><dd>'+((s.subpis||[]).length?esc(s.subpis.map(oname).join("、")):'<span class="soft">（無）</span>')+'</dd><dt>成員</dt><dd>'+(s.members.length?esc(s.members.map(function(m){return (S.by(S.ROLES,m)||{name:m}).name;}).join("、")):'<span class="soft">（無）</span>')+'</dd><dt>疾病</dt><dd>'+(s.diseases.length?esc(s.diseases.map(function(d){return (S.by(S.DISEASES,d)||{name:d}).name;}).join("、")):'<span class="soft">（不限）</span>')+'</dd></dl>';
+    hh+='<dl class="cfmdl"><dt>計畫 PI</dt><dd>'+(s.owner?esc(oname(s.owner)):'<span class="soft">（未指定）</span>')+'</dd><dt>sub-PI</dt><dd>'+((s.subpis||[]).length?esc(s.subpis.map(oname).join("、")):'<span class="soft">（無）</span>')+'</dd><dt>團隊角色</dt><dd>'+(s.members.length?esc(s.members.map(function(m){return (S.by(S.ROLES,m)||{name:m}).name;}).join("、")):'<span class="soft">（無）</span>')+'</dd><dt>疾病</dt><dd>'+(s.diseases.length?esc(s.diseases.map(function(d){return (S.by(S.DISEASES,d)||{name:d}).name;}).join("、")):'<span class="soft">（不限）</span>')+'</dd></dl>';
     hh+=s.templates.map(function(t){var d=S.by(S.TEMPLATES,t.tpl),ld=S.tplLoad(t,M.speed),over=d.patient&&((d.budgetItems&&ld.items>d.budgetItems)||(d.budgetMin&&ld.min>d.budgetMin));
       var x='<div class="cfmt"><h4>'+esc(d.name)+(d.patient?'　<span class="small soft">頻率：'+esc(S.CADENCES[t.cadence].replace(/（.*$/,""))+'；在'+esc(S.VENUES[t.venue])+'填；'+(Number(t.offset)===0?"當天":Number(t.offset)<0?"提前 "+(-t.offset)+" 天":"延後 "+t.offset+" 天")+'</span>':'')+'</h4>';
       if(d.patient){x+='<p class="small'+(over?" bad":"")+'">每次 <b>'+ld.items+'</b> 題・約 <b>'+ld.min+'</b> 分（預算最多 '+(d.budgetItems||"–")+' 題、'+(d.budgetMin||"–")+' 分）'+(over?'　⚠ 超過預算':'')+'</p>';
-        x+=t.scales.length?'<div class="scroll"><table><thead><tr><th>量表</th><th>題數</th><th>約幾分鐘</th><th>角色</th><th>授權與驗證</th><th>負責人</th></tr></thead><tbody>'+t.scales.map(function(q){var sc=S.by(S.SCALES,q.id);return '<tr><td>'+esc(sc.name.replace(/（.*$/,""))+'</td><td>'+sc.items+'</td><td>'+sc.min+'</td><td>'+({primary:"主要",anchor:"對照",exploratory:"探索"}[q.role])+'</td><td>'+esc(sc.lic)+'；'+VALTXT[sc.val]+'</td><td>'+(M.stewards&&M.stewards[q.id]?esc(oname(M.stewards[q.id])):'<span class="soft">—</span>')+'</td></tr>';}).join("")+'</tbody></table></div>':'<p class="small soft">（還沒有量表）</p>';}
+        x+=t.scales.length?'<div class="scroll"><table><thead><tr><th>量表</th><th>題數</th><th>約幾分鐘</th><th>角色</th><th>授權與驗證</th><th>負責人</th></tr></thead><tbody>'+t.scales.map(function(q){var sc=S.by(S.SCALES,q.id);return '<tr><td>'+esc(sc.name.replace(/（.*$/,""))+'</td><td>'+sc.items+'</td><td>'+sc.min+'</td><td>'+({primary:"主要",anchor:"比較用",exploratory:"探索性"}[q.role])+'</td><td>'+esc(sc.lic)+'；'+VALTXT[sc.val]+'</td><td>'+(M.stewards&&M.stewards[q.id]?esc(oname(M.stewards[q.id])):'<span class="soft">—</span>')+'</td></tr>';}).join("")+'</tbody></table></div>':'<p class="small soft">（還沒有量表）</p>';}
       return x+strip(s.id,t)+'</div>';}).join("");
     if(!s.templates.length)hh+='<p class="small soft">（還沒有模板）</p>';
     hh+=mine.length?'<ul class="issues">'+mine.map(function(x){return '<li class="'+(x.level==="info"?"":x.level)+'">'+esc(x.msg)+'</li>';}).join("")+'</ul>':'<p class="small soft">沒有提醒。</p>';
@@ -736,7 +750,7 @@ function drawLinks(){var cv=$("#bcanvas");if(!cv)return;var svg=$("#links",cv);i
   svg.innerHTML=h;}
 /* ---------- 人：人×計畫（PI／sub-PI）與模組維護者 ---------- */
 function stewPersons(cur,persons){if(isPf()||cur===UI.actor)return persons;return persons.filter(function(o){return o.id===cur||(!cur&&o.id===UI.actor);});}   /* 維護者規則：沒人維護→只能認領給自己；自己維護→可交給任何人；別人維護→不能動 */
-function peopleHTML(){var pm=S.peopleMatrix(V()),h='<h2>人</h2>';
+function peopleHTML(){var pm=S.peopleMatrix(V()),h='<h2>研究團隊</h2>';
   h+='<div class="scroll"><table><thead><tr><th>人</th>'+pm.studies.map(function(s){return '<th>'+esc(s.name)+'</th>';}).join("")+'<th title="負責某份量表的原文、計分、版本、授權與驗證">負責的量表</th></tr></thead><tbody>'+pm.people.map(function(p){return '<tr><td><b>'+esc(p.name)+'</b></td>'+pm.studies.map(function(s){var c=pm.cells[p.id][s.id];return '<td>'+(c?'<span class="role-'+(c==="PI"?"pi":"sub")+'">'+c+'</span>':'<span class="soft">—</span>')+'</td>';}).join("")+'<td>'+(pm.stewards[p.id].length?esc(pm.stewards[p.id].map(function(id){return S.by(S.SCALES,id).name.replace(/（.*$/,"");}).join("、")):'<span class="soft">—</span>')+'</td></tr>';}).join("")+'</tbody></table></div>';
   var used={};V().studies.forEach(function(s){s.templates.forEach(function(t){t.scales.forEach(function(x){used[x.id]=1;});});});
   var persons=S.OWNERS.filter(function(o){return o.kind!=="sys2";});
@@ -801,7 +815,7 @@ function decHTML(){var h='<h2>'+(S.HIDE_IRAE?"請給意見":"待決事項與決�
   return h;}
 
 /* ---------- 版面 ---------- */
-var TABS=[["blocks","研究架構"],["people","人"],["check","檢查"]].concat(S.HIDE_IRAE?[]:[["perm","權限"]]).concat([["sim","模擬"],["dec",S.HIDE_IRAE?"意見":"決議"],["confirm","定板確認"]]);   /* 計畫板移到最後改成「定板確認」；PI 版沒有「權限」（平台治理討論） */
+var TABS=[["blocks","研究架構"],["people","研究團隊"],["check","設計檢查"]].concat(S.HIDE_IRAE?[]:[["perm","權限"]]).concat([["sim","模擬"],["dec",S.HIDE_IRAE?"意見":"決議"],["confirm","最後確認"]]);   /* 計畫板移到最後改成「定板確認」；PI 版沒有「權限」（平台治理討論） */
 function lockSections(){
   $$("#main section.bstudy").forEach(function(sec){var sid=sec.dataset.sid,ro=(UI.tab==="blocks"&&UI.overview)||!S.canEdit(M,UI.actor,sid),noMg=!S.canManage(M,UI.actor,sid);
     function nodrag(root){$$("[data-d],[draggable]",root).forEach(function(e){e.removeAttribute("data-d");e.removeAttribute("draggable");});}
@@ -810,7 +824,7 @@ function lockSections(){
 function render(){resolveSid();saveUI();var li=lintView(),r=li.filter(function(x){return x.level==="red";}).length,a=li.filter(function(x){return x.level==="amber";}).length;
   $("#actor").innerHTML=S.OWNERS.filter(function(o){return S.ACTORS.indexOf(o.id)>=0;}).map(function(o){return '<option value="'+o.id+'"'+(o.id===UI.actor?" selected":"")+'>'+esc(oname(o.id))+'</option>';}).join("");
   var nv=visibleStudies().length;$("#whoinfo").textContent=isPf()?"系統管理者・全部 "+M.studies.length+" 個計畫":"你的計畫 "+nv+" 個";
-  $("#tabs").innerHTML=TABS.map(function(t){return '<button type="button" role="tab" data-act="tab" data-tab="'+t[0]+'" aria-selected="'+(UI.tab===t[0])+'">'+t[1]+(t[0]==="check"?'<span class="badge red">'+r+'</span><span class="badge amber">'+a+'</span>':"")+'</button>';}).join("");
+  $("#tabs").innerHTML=TABS.map(function(t){return '<button type="button" role="tab" data-act="tab" data-tab="'+t[0]+'" aria-selected="'+(UI.tab===t[0])+'">'+t[1]+(t[0]==="check"?'<span class="badge red" title="必須處理的項目數">'+r+'</span><span class="badge amber" title="需留意的項目數">'+a+'</span>':"")+'</button>';}).join("");
   $("#palbody").innerHTML=palette();
   var c=UI.tab==="blocks"?blocksHTML():UI.tab==="people"?peopleHTML():UI.tab==="check"?checkHTML():UI.tab==="perm"?permHTML():UI.tab==="sim"?simHTML():UI.tab==="confirm"?confirmHTML():decHTML();
   document.body.classList.add("bm");$("#main").innerHTML=c;lockSections();
@@ -862,14 +876,33 @@ document.addEventListener("dragstart",function(ev){var c=ev.target.closest&&ev.t
 document.addEventListener("dragover",function(ev){var st=ev.target.closest&&ev.target.closest(".bstudy");if(!st||st.classList.contains("ro"))return;ev.preventDefault();$$(".bstudy.over").forEach(function(x){if(x!==st)x.classList.remove("over");});st.classList.add("over");});
 document.addEventListener("dragleave",function(ev){var st=ev.target.closest&&ev.target.closest(".bstudy");if(st&&!st.contains(ev.relatedTarget))st.classList.remove("over");});
 document.addEventListener("dragend",function(){delete document.body.dataset.drag;$$(".bstudy.over").forEach(function(x){x.classList.remove("over");});});
-document.addEventListener("drop",function(ev){delete document.body.dataset.drag;var st=ev.target.closest&&ev.target.closest(".bstudy");if(!st)return;ev.preventDefault();if(st.classList.contains("ro")){toast("全部計畫是唯讀的，取消勾選後才能編輯",true);return;}st.classList.remove("over");
+/* 落點處理：拖放與「點兩下」共用。target＝手指／滑鼠放開的那個元素 */
+function dropAt(target,d){var st=target.closest&&target.closest(".bstudy");if(!st)return false;
+  if(st.classList.contains("ro")){toast("全部計畫是唯讀的，取消勾選後才能編輯",true);return true;}
+  st.classList.remove("over");
+  var slot={owner:"owner",role:"members",disease:"diseases",template:"templates",scale:"scales"}[d.kind];if(!slot)return false;
+  if(d.kind==="owner"){var sb=target.closest(".sblk");if(sb&&sb.dataset.scale){var okS=S.setSteward(M,sb.dataset.scale,d.id,UI.actor);toast(okS?"已指定量表負責人："+oname(d.id):stewardWhy(sb.dataset.scale,d.id),!okS);if(okS){UI.flash={sid:st.dataset.sid,key:"scale:"+sb.dataset.scale};changed();}return true;}
+    if(target.closest('[data-slot="subpis"]'))slot="subpis";}
+  var blkEl=target.closest(".btpl"),r=S.place(M,d,{studyId:st.dataset.sid,slot:slot,tid:blkEl?blkEl.dataset.tid:undefined},UI.actor);toast(r.msg,!r.ok);if(r.ok){UI.flash={sid:st.dataset.sid,key:d.kind+":"+d.id};changed();}return true;}
+document.addEventListener("drop",function(ev){delete document.body.dataset.drag;if(!(ev.target.closest&&ev.target.closest(".bstudy")))return;ev.preventDefault();
   var d;try{d=JSON.parse(ev.dataTransfer.getData("text/plain"));}catch(e){return;}
-  var slot={owner:"owner",role:"members",disease:"diseases",template:"templates",scale:"scales"}[d.kind];if(!slot)return;
-  if(d.kind==="owner"){var sb=ev.target.closest(".sblk");if(sb&&sb.dataset.scale){var okS=S.setSteward(M,sb.dataset.scale,d.id,UI.actor);toast(okS?"已指定量表負責人："+oname(d.id):stewardWhy(sb.dataset.scale,d.id),!okS);if(okS){UI.flash={sid:st.dataset.sid,key:"scale:"+sb.dataset.scale};changed();}return;}
-    if(ev.target.closest('[data-slot="subpis"]'))slot="subpis";}
-  var blkEl=ev.target.closest(".btpl"),r=S.place(M,d,{studyId:st.dataset.sid,slot:slot,tid:blkEl?blkEl.dataset.tid:undefined},UI.actor);toast(r.msg,!r.ok);if(r.ok){UI.flash={sid:st.dataset.sid,key:d.kind+":"+d.id};changed();}});
+  dropAt(ev.target,d);});
+/* 點兩下加入（手機拖不動；鍵盤也能用）：點素材選起來 → 點計畫裡要放的位置。再點一次同一個素材或按 Esc 取消 */
+function setPick(el,d){var old=$(".picked");if(old)old.classList.remove("picked");
+  if(!el){UI.pick=null;document.body.classList.remove("picking");return;}
+  UI.pick=d;el.classList.add("picked");document.body.classList.add("picking");
+  toast("已選起「"+(el.textContent||"").trim().replace(/×$/,"")+"」，請點計畫裡要放的位置（再點一次取消）");}
+document.addEventListener("click",function(ev){
+  var src=ev.target.closest&&ev.target.closest("[data-d]");
+  if(src&&!ev.target.closest("[data-act]")){var d;try{d=JSON.parse(src.dataset.d);}catch(e){return;}
+    if(UI.pick&&src.classList.contains("picked")){setPick(null);return;}
+    setPick(src,d);return;}
+  if(!UI.pick)return;
+  var st=ev.target.closest&&ev.target.closest(".bstudy");if(!st)return;
+  var d2=UI.pick;setPick(null);dropAt(ev.target,d2);},true);
+document.addEventListener("keydown",function(ev){if(ev.key==="Escape"&&UI.pick)setPick(null);});
 /* 鍵盤：Enter 在素材上＝提示用選單 */
-document.addEventListener("keydown",function(ev){if(ev.key==="Enter"&&ev.target.classList&&ev.target.classList.contains("chip")&&ev.target.closest("#pal"))toast("鍵盤操作請用各計畫位置旁的「＋」選單");});
+
 if(window.matchMedia&&window.matchMedia("(max-width:900px)").matches){var dt=$("#pal");if(dt)dt.open=false;}
 window.addEventListener("resize",function(){if(UI.tab==="blocks")drawLinks();});
 render();
