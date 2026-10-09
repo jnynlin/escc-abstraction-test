@@ -245,7 +245,8 @@ h3{font-size:1rem;color:var(--ink);}
 /* 手機（≤880px，2026-10-08 user：iPhone 背景可移動、前景擋住）：病人清單不再黏住畫面（原本佔 89% 高、細節在後面捲），改成固定高度的獨立捲動框；上方列在窄螢幕不黏；輸入框 16px 免 iOS 自動放大 */
 /* 手機第二版（2026-10-08 user：Android 也卡——上下框、內外框捲軸）：整頁只有一個捲軸；清單與細節一次只顯示一個（點病人進細節、「← 回清單」回去）；下方按鈕列不黏；分組框改扁平 */
 .pm-mwrap{min-width:0;} .pm-mback{display:none;}
-@media (max-width:880px),(pointer:coarse){.pm-keys{display:none!important;}}  /* 手機／觸控不顯示鍵盤快捷鍵（2026-10-08） */
+@media (max-width:880px),(pointer:coarse){.pm-keys{display:none!important;}}
+@media (max-width:560px){.prom #pmBar .seg{display:grid;grid-template-columns:1fr 1fr;width:100%;} .prom #pmBar .seg .fbtn{border-right:1px solid #9AA8A3;border-bottom:1px solid #9AA8A3;white-space:nowrap;} .prom #pmBar .seg .fbtn:nth-child(2n){border-right:0;}}  /* 篩選鈕手機 2×2，字不斷行（2026-10-09） */  /* 手機／觸控不顯示鍵盤快捷鍵（2026-10-08） */
 @media (max-width:880px){.pm-rail{position:static;max-height:none;overflow:visible;border:none;padding:0;background:none;} body.pm-m-det .pm-rail{display:none;} body:not(.pm-m-det) .pm-mwrap{display:none;}
  .pm-mback{display:block;width:100%;min-height:48px;margin:0 0 12px;text-align:left;font-size:1rem;}
  .prom .pm-foot{position:static;} .prom input,.prom select,.prom textarea{font-size:16px;}
@@ -324,7 +325,9 @@ h3{font-size:1rem;color:var(--ink);}
 .prom tr.pgrp td{letter-spacing:.02em;font-weight:600;}
 /* 點擊目標 ≥ 32px，主按鈕 44px */
 .prom .gb{width:40px;height:38px;} .prom .info{width:34px;height:34px;} .prom .chip{min-height:32px;padding:4px 12px;} .prom .fbtn{min-height:36px;} .prom .pm-scope{min-height:36px;} .prom .btn,.prom summary.btn{min-height:38px;}
-#pmRevNext,#pmOk{min-height:44px;font-size:1.05rem;padding:0 20px;}
+#pmRevNext,#pmOk,#pmOkNext{min-height:44px;font-size:1.05rem;padding:0 20px;}
+/* 操作列：標籤放最前面自成一行、已選等級放按鈕下面（2026-10-08 醫師頁第 7 條） */
+.prom .pm-foot .actbar>.kbd{order:-5;flex-basis:100%;font-weight:700;} .prom .pm-foot .actbar>.cnt{order:8;flex-basis:100%;}
 .pm-shell{grid-template-columns:minmax(300px,26rem) minmax(0,1fr);} @media (max-width:880px){.pm-shell{grid-template-columns:1fr;}}
 /* 工具列：一個常用鈕＋字級＋「更多」選單；帳號相關收進「帳號」選單 */
 .pm-more{position:relative;display:inline-block;} .pm-more>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;} .pm-more>summary::-webkit-details-marker{display:none;}
@@ -371,7 +374,7 @@ h3{font-size:1rem;color:var(--ink);}
 .pmcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin:8px 0;} .pmcard{border:1px dashed var(--rule);border-radius:8px;padding:8px;text-align:center;background:var(--sheet);} .pmcard .pmcode{font-size:1.1rem;} .pmcard svg{width:130px;height:auto;background:#fff;padding:4px;border-radius:4px;} .pmcard .mini{margin:4px 0 0;}
 @media print{body.pm-printing>*:not(#pmPrintCards){display:none!important;} body.pm-printing{background:#fff!important;} #pmPrintCards{display:grid!important;grid-template-columns:repeat(3,1fr);gap:8mm;padding:8mm;} #pmPrintCards .pmcard{border:1px dashed #666;color:#000;background:#fff;break-inside:avoid;} #pmPrintCards .pmcode{color:#000;font-size:15pt;} #pmPrintCards .mini{color:#000;}}
 /* 主按鈕放在黏底列最左（離清單最近，指標少移動）；DOM 順序不變，只用 order */
-.prom .pm-foot .actbar #pmRevNext,.prom .pm-foot .actbar #pmOk{order:-2;} .prom .pm-foot .actbar #pmRev,.prom .pm-foot .actbar #pmChart{order:-1;}
+.prom .pm-foot .actbar #pmRevNext,.prom .pm-foot .actbar #pmOkNext{order:-3;} .prom .pm-foot .actbar #pmOk{order:-2;} .prom .pm-foot .actbar #pmRev,.prom .pm-foot .actbar #pmChart{order:-1;}
 label.mf>span,label.mf span{font-size:.95rem;}
 /* 摘錄側欄與共用按鈕的字級地板（CSS 層，不動 ESCC 摘錄流程）；佇列徽章的數字繼承按鈕文字色（原本 on 狀態下 1.28:1） */
 .btn,button.btn,summary.btn{font-size:.95rem;} #queues button,.qb{font-size:.95rem;min-height:34px;} #queues button span,.qb span{font-size:inherit;color:inherit;opacity:.9;}
@@ -5647,6 +5650,7 @@ function clin(){return role()==="nurse"||role()==="doctor";}
 function promSpace(){var s=S();return !!s&&s.mode==="prom";}
 function canReview(){return role()==="nurse"||role()==="manager";}
 function canConfirm(){return role()==="doctor"||role()==="manager";}
+function docOnly(){return role()==="doctor";}  /* 醫師專用畫面差異（2026-10-08 user「Ok」：醫師頁 9 條，第 6 條「照個管師建議一鍵帶入」保守不做） */
 function meUid(){var s=S();return s?s.uid:"";}
 function meName(){var s=S();return s?s.name:"";}
 var MODALWATCH=false;
@@ -5865,7 +5869,7 @@ function review(id,f){var r=RECS[id];if(!r)return Promise.reject(new Error("找�
   var snap=DRAFT[id],snapForm=FORM[id];delete DRAFT[id];delete FORM[id];
   return save(r,{triage:en.triage.level}).then(function(){SEC.secLog("ePRO 初審 "+id);},function(e){r.body=old;DRAFT[id]=Object.assign({},snap||{},DRAFT[id]||{});if(snapForm&&!FORM[id])FORM[id]=snapForm;throw e;});}
 function confirm(id,grades,plan){var r=RECS[id];if(!r)return Promise.reject(new Error("找不到紀錄"));if(!canConfirm())return Promise.reject(new Error("只有醫師或主持人可以確認"));
-  if(!Object.keys(grades||{}).length)return Promise.reject(new Error("請至少選取一個等級；系統不會代為填寫"));
+  if(!Object.keys(grades||{}).length)return Promise.reject(new Error("請至少選一個等級（系統不會自動帶入）"));
   var old=r.body,b=JSON.parse(JSON.stringify(old));applyConfirm(b,{by:meUid(),name:meName(),at:Date.now(),grades:grades,plan:plan});r.body=b;
   return save(r,{closed:true,closedAt:x().TS(),closedBy:meUid()}).then(function(){SEC.secLog("ePRO 確認結案 "+id);},function(e){r.body=old;throw e;});}
 function reopen(id){var r=RECS[id];if(!r)return Promise.reject(new Error("找不到紀錄"));if(!x().isAdmin())return Promise.reject(new Error("只有主持人可以重開"));
@@ -6168,14 +6172,17 @@ function flagConfirmed(f,en){var def=PROM_PANEL.hard_red_flags.filter(function(z
 function lv(en){return (en.triage||{}).level||"skip";}
 function ens(){var out={};ORDER.forEach(function(id){var r=RECS[id];out[id]=enrich(r.body,prevBody(r.body.pid,r.body.filledAt,id),DRAFT[id]);});return out;}
 var EN={};
+/* 待醫師確認＝這個範圍內、個管師判斷過、還沒結案 */
+function waitDocIds(){return ORDER.filter(function(id){var r=RECS[id];return inScope(r)&&!r.meta.closed&&(r.body.layer2||[]).length>0;});}
+function waitDoc(){return waitDocIds().length;}
 function listIds(){var ids=ORDER.filter(function(id){return inScope(RECS[id]);});ids.sort(function(a,b){return LVORD[lv(EN[a])]-LVORD[lv(EN[b])]||(RECS[b].body.filledAt-RECS[a].body.filledAt);});
-  if(FILT==="todo")ids=ids.filter(function(id){var l=lv(EN[id]);return l==="red"||l==="confirm"||l==="act";});else if(FILT==="read")ids=ids.filter(function(id){return lv(EN[id])==="read";});return ids;}
+  if(FILT==="todo")ids=ids.filter(function(id){var l=lv(EN[id]);return l==="red"||l==="confirm"||l==="act";});else if(FILT==="read")ids=ids.filter(function(id){return lv(EN[id])==="read";});else if(FILT==="doc"){var w=waitDocIds();ids=ids.filter(function(id){return w.indexOf(id)>=0;});}return ids;}
 function counts(){var c={active:0,open:0,all:ORDER.length};ORDER.forEach(function(id){var r=RECS[id];if(inScope(r,"open"))c.open++;if(inScope(r,"active"))c.active++;});return c;}
 function ago(ms){if(!ms)return "";var h=(Date.now()-ms)/36e5;return h<1?"剛剛":h<24?Math.floor(h)+" 小時前":h<48?"昨天":Math.floor(h/24)+" 天前";}
 function render(){VIEW=true;document.body.classList.add("prom-view");if(typeof cur!=="undefined")cur=null;var dk=$("#dock");if(dk)dk.hidden=true;EN=ens();
   var m=$("#main"),s=S(),r=role(),rn={manager:"主持人",nurse:"個管師",doctor:"醫師"}[r]||r;
   m.innerHTML='<section class="sheet report prom"><div class="phead"><h3 title="'+E(rn+'　'+s.name+'　CTCAE '+PROM_PANEL.ctcae_version+'・題庫 v'+PROM_PANEL.version)+'">ePRO 症狀清單・'+E(s.studyName||s.sid)+'</h3>'+
-    '<span class="sp"></span>'+(s.offline?'<span class="kbd">離線備份檢視・唯讀</span>':'<button class="btn" type="button" id="pmTok">發連結給病人</button><button class="btn" type="button" id="pmFont" title="切換字級：標準／大／特大">字級 <b>'+FSN[FSI]+'</b></button><details class="pm-more" id="pmMoreBox"><summary class="btn" id="pmMore">更多 ▾</summary><div class="pm-menu"><button class="btn" type="button" id="pmTokMgr">連結管理</button>'+(canConfirm()||canReview()?'<button class="btn" type="button" id="pmInbox">重新讀取</button>':'')+'<button class="btn" type="button" id="pmRef">重新整理</button>'+(x().isAdmin()?(promSpace()?'':'<button class="btn" type="button" id="pmDemo">載入示範資料（合成）</button>')+'<button class="btn" type="button" id="pmClean">清除測試資料…</button>'+(!promSpace()&&!x().studies().some(function(z){return z.mode==="prom";})?'<button class="btn" type="button" id="pmMkSpace">建立「門診 ePRO」空間…</button>':''):'')+'</div></details>')+'</div>'+
+    '<span class="sp"></span>'+(s.offline?'<span class="kbd">離線備份檢視・唯讀</span>':(docOnly()?'':'<button class="btn" type="button" id="pmTok">發連結給病人</button>')+'<button class="btn" type="button" id="pmFont" title="切換字級：標準／大／特大">字級 <b>'+FSN[FSI]+'</b></button><details class="pm-more" id="pmMoreBox"><summary class="btn" id="pmMore">更多 ▾</summary><div class="pm-menu">'+(docOnly()?'<button class="btn" type="button" id="pmTok">發連結給病人</button>':'')+'<button class="btn" type="button" id="pmTokMgr">連結管理</button>'+(canConfirm()||canReview()?'<button class="btn" type="button" id="pmInbox">重新讀取</button>':'')+'<button class="btn" type="button" id="pmRef">重新整理</button>'+(x().isAdmin()?(promSpace()?'':'<button class="btn" type="button" id="pmDemo">載入示範資料（合成）</button>')+'<button class="btn" type="button" id="pmClean">清除測試資料…</button>'+(!promSpace()&&!x().studies().some(function(z){return z.mode==="prom";})?'<button class="btn" type="button" id="pmMkSpace">建立「門診 ePRO」空間…</button>':''):'')+'</div></details>')+'</div>'+
     '<div class="pm-sumline" id="pmKpi"></div>'+'<div class="pm-shell"><div class="pm-rail"><div class="lbar" id="pmBar"></div><div class="pm-list"><table id="pmTbl"></table></div><div class="kbd pm-ccdstat" id="pmCcdStat"></div></div><div class="pm-mwrap"><button class="btn pm-mback" type="button" id="pmBack">← 回清單</button><div class="pm-main" id="pmDet"></div></div></div></section>';
   var rf=$("#pmRef");if(rf)rf.onclick=function(){$("#pmDet").innerHTML="";SEL=null;loadAll().then(render,function(e){toast(x().cErr(e));});};
   var q=$("#pmQr");if(q)q.onclick=function(){dialog({title:"貼上交接碼",msg:"請以桌上條碼掃描器掃描病人手機顯示的 QR 碼，內容將輸入此欄位（掃描器的作用等同鍵盤輸入）。",fields:[{k:"s",label:"交接碼",type:"textarea",req:1}],ok:"登錄"}).then(function(v){if(!v)return;
@@ -6193,15 +6200,15 @@ function render(){VIEW=true;document.body.classList.add("prom-view");if(typeof c
   drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);else $("#pmDet").innerHTML='<p class="pm-empty">請由左側清單選取一位病人；有紅點者請優先處理。<br><span class="kbd pm-keys"><b>j</b>/<b>k</b> 換病人</span></p>';}
 function drawKpi(){var h=$("#pmKpi");if(!h)return;var ids=ORDER.filter(function(id){return inScope(RECS[id]);});
   var red=0,open=0,cc=0,un=0;ids.forEach(function(id){var e=EN[id];if(e.flags.today.length)red++;if(!e.reviewed)open++;if(e.hasText)cc++;if(e.unfilled.length)un++;});
-  h.innerHTML='<span class="sl-main"><b class="'+(red?"red":"")+'">'+red+'</b> 位看診時優先處理</span><span>待個管師看 <b>'+open+'</b></span><span>病人有話要說 <b>'+cc+'</b></span><span>有題目沒填 <b>'+un+'</b></span>';}
+  h.innerHTML='<span class="sl-main"><b class="'+(red?"red":"")+'">'+red+'</b> 位看診時優先處理</span>'+(docOnly()?'<span>待醫師確認 <b>'+waitDoc()+'</b></span>':'<span>待個管師看 <b>'+open+'</b></span>')+'<span>病人有話要說 <b>'+cc+'</b></span><span>有題目沒填 <b>'+un+'</b></span>';}
 function drawList(){drawCcdStat();var n={red:0,confirm:0,act:0,read:0,skip:0},sc=ORDER.filter(function(id){return inScope(RECS[id]);});sc.forEach(function(id){n[lv(EN[id])]++;});var c=counts();
   $("#pmBar").innerHTML='<span class="seg"><button class="fbtn'+(FILT==="todo"?" on":"")+'" data-f="todo">需要處理 <b>'+(n.red+n.confirm+n.act)+'</b></button><button class="fbtn'+(FILT==="read"?" on":"")+'" data-f="read">看一眼就好 <b>'+n.read+'</b></button>'+
-    '<button class="fbtn'+(FILT==="all"?" on":"")+'" data-f="all">全部 <b>'+sc.length+'</b></button></span>'+
+    (canConfirm()?'<button class="fbtn'+(FILT==="doc"?" on":"")+'" data-f="doc">待醫師確認 <b>'+waitDoc()+'</b></button>':'')+'<button class="fbtn'+(FILT==="all"?" on":"")+'" data-f="all">全部 <b>'+sc.length+'</b></button></span>'+
     '<select class="pm-scope" id="pmScope"><option value="active"'+(SCOPE==="active"?" selected":"")+'>這一診（'+WINDOW_H+' 小時內未結案）'+c.active+'</option><option value="open"'+(SCOPE==="open"?" selected":"")+'>所有未結案 '+c.open+'</option><option value="all"'+(SCOPE==="all"?" selected":"")+'>含已結案 '+c.all+'</option></select>'+
     '<span class="kbd pm-skip">'+n.skip+' 位不用點開（'+Math.round(n.skip/Math.max(1,sc.length)*100)+'%）</span>';
   var ids=listIds(),h="",GN={red:"看診時優先處理",confirm:"待確認（先打電話或量測）",act:"建議安排檢查",read:"看一眼就好",skip:"不用點開"},grp=null;
   if(!NOAUTO&&(!SEL||ids.indexOf(SEL)<0)){SEL=ids[0]||null;PICK={};TERMS=[];AUTODRAW=true;}
-  if(!ids.length)h+='<tr><td class="desc" style="padding:18px 8px">'+(FILT==="todo"?"這一診目前沒有需要處理的病人。":"沒有符合的項目。")+'</td></tr>';
+  if(!ids.length)h+='<tr><td class="desc" style="padding:18px 8px">'+(FILT==="todo"?"這一診目前沒有需要處理的病人。":FILT==="doc"?"目前沒有等醫師確認的病人。":"沒有符合的項目。")+'</td></tr>';
   ids.forEach(function(id){var r=RECS[id],e=EN[id],L=lv(e),t=e.triage||{},why="";
     if(L!==grp){grp=L;h+='<tr class="pgrp"><td colspan="3">'+GN[L]+' · '+ids.filter(function(z){return lv(EN[z])===L;}).length+'</td></tr>';}
     if(L==="red")why='<b>'+E((t.why||[]).slice(0,2).join("；"))+'</b>'+((t.why||[]).length>2?" 等 "+t.why.length+" 項":"");else if(L==="act"||L==="confirm")why=E((t.why||[]).join("；"));else if(L==="read")why="—";else why='<span class="desc">無需處理</span>';
@@ -6248,7 +6255,7 @@ function drawDetail(id){var r=RECS[id];if(!r){$("#pmDet").innerHTML="";return;}v
   if(b.layer3)L3+='<div class="box b-ok"><h3>醫師確認</h3><div class="kv"><dt>確認</dt><dd>'+E(b.layer3.name)+'　'+E(tsText(b.layer3.at))+'</dd><dt>等級</dt><dd>'+E(Object.keys(b.layer3.grades).sort().map(function(k){return k+" G"+b.layer3.grades[k];}).join("、")||"—")+'</dd>'+(b.layer3.plan?'<dt>處置</dt><dd>'+E(b.layer3.plan)+'</dd>':"")+'</div></div>';
   L3+='<details class="more"><summary>病人原始回答（不能修改）</summary>'+rawAnswers(b)+'</details>';
   var all=e.determinable.concat(e.floor_only,e.cannot_grade),act=all.filter(function(z){return z.actionable;}),rest=all.filter(function(z){return !z.actionable;});
-  var R='<p class="mini">淺色＝系統推估的範圍，點一級可看定義；你選的會再由醫師確認。</p>'+byOrgan(act,b)+(rest.length?'<details class="more"><summary>另外 '+rest.length+' 項病人沒提到</summary>'+byOrgan(rest,b)+'</details>':"");
+  var R=(docOnly()?'<p class="mini">淺色＝系統推估的範圍，有色框＝個管師建議；點一級可看定義，你選的就是最後的等級。</p>':'<p class="mini">淺色＝系統推估的範圍，點一級可看定義；你選的會再由醫師確認。</p>')+byOrgan(act,b)+(rest.length?'<details class="more"><summary>另外 '+rest.length+' 項病人沒提到</summary>'+byOrgan(rest,b)+'</details>':"");
   if(canReview()&&!r.meta.closed)R+='<details class="more pm-terms"><summary>CTCAE 項目（選填）'+(TERMS.length?'・已選 '+TERMS.length:"")+'</summary><input id="pmTf" class="q" placeholder="可打中文或英文，例如：肝、hepat"><div class="chips" id="pmChips"></div></details>';
   var ovD=confMap(b,DRAFT[id]),escD=cfEscRows(ovD),pendD=pendingOf(b,DRAFT[id]),nredD=pendD.filter(function(p){return p.red;}).length,todo=todoHtml(r),
     escBox=escD.length?'<div class="box b-red"><h3>聯絡不到，請醫師處理</h3><ul>'+escD.map(function(n){return "<li>"+E(n)+"</li>";}).join("")+'</ul></div>':"";
@@ -6262,7 +6269,7 @@ function drawDetail(id){var r=RECS[id];if(!r){$("#pmDet").innerHTML="";return;}v
   if(canReview()&&!r.meta.closed)bar+='<div class="actbar"><span class="kbd">個管師判斷</span><select id="pmUrg" aria-label="怎麼處理">'+["routine","priority","urgent"].map(function(v){return '<option value="'+v+'"'+((FORM[id]&&FORM[id].urg?FORM[id].urg===v:(l2||{}).urgency===v)?" selected":"")+'>'+URG[v]+'</option>';}).join("")+'</select>'+
     '<details class="pm-more" id="pmOptBox"><summary class="btn">電話結果</summary><div class="pm-menu up"><label>電話確認結果　<select id="pmSig">'+["","real","false_alarm"].map(function(v){return '<option value="'+v+'"'+((FORM[id]&&FORM[id].sig!==undefined?FORM[id].sig===v:(l2||{}).signal===v)?" selected":"")+'>'+SIG[v]+'</option>';}).join("")+'</select></label><label><input type="checkbox" id="pmCt"'+((FORM[id]&&FORM[id].ct!==undefined?FORM[id].ct:(l2||{}).contacted)?" checked":"")+'> 已電聯</label></div></details>'+
     '<input id="pmNote" placeholder="備註（例如電話問到的內容）" value="'+E((FORM[id]||{}).note||"")+'">'+(nredD?'<span class="g g-red cf-hint">還有 '+nredD+' 項紅旗相關待確認</span>':"")+'<button class="btn" type="button" id="pmRev"'+(nredD?' disabled title="紅旗相關的待確認還沒處理完"':"")+'>送出</button><button class="btn go" type="button" id="pmRevNext" title="快捷鍵：Enter"'+(nredD?' disabled':"")+'>送出，下一位</button></div>';
-  if(canConfirm()&&!r.meta.closed)bar+='<div class="actbar"><span class="kbd">醫師確認</span><span class="cnt" id="pmCnt">尚未點選任何等級</span><input id="pmPlan" placeholder="處置（選填）"><button class="btn go" type="button" id="pmOk">確認並結案</button><button class="btn" type="button" id="pmChart">複製到病歷</button></div>';
+  if(canConfirm()&&!r.meta.closed)bar+='<div class="actbar"><span class="kbd">醫師確認</span><span class="cnt" id="pmCnt">還沒選等級</span><input id="pmPlan" placeholder="處置（選填）"><button class="btn go" type="button" id="pmOkNext">確認並結案，下一位</button><button class="btn" type="button" id="pmOk">確認並結案</button><button class="btn" type="button" id="pmChart">複製到病歷</button></div>';
   if(r.meta.closed)bar+='<div class="actbar"><span class="kbd">已結案</span><button class="btn" type="button" id="pmChart">複製到病歷</button>'+(x().isAdmin()?'<button class="btn warn" type="button" id="pmReopen">重開（主持人）</button>':"")+'</div>';
   var tail='<div class="actbar pm-tail"><button class="btn" type="button" id="pmClose">關閉</button>'+(x().isAdmin()?'<button class="btn warn" type="button" id="pmDel">刪除紀錄（主持人）</button>':"")+'<span class="kbd pm-keys"><b>j</b>/<b>k</b> 換病人　<b>↑</b>/<b>↓</b> 換項目　<b>0</b>–<b>4</b> 給級　<b>i</b> 原文　<b>Enter</b> '+(canConfirm()?"確認並結案":"送出，下一位")+'</span></div>';
   $("#pmDet").innerHTML=gist+'<div class="pm-sum"><div>'+escBox+(L||'<div class="box b-ok"><h3>無需今日處理</h3><p class="mini">沒有紅旗、沒有病人留言、沒有惡化。</p></div>')+todo+'</div><div>'+L2+'</div></div><div class="pm-ev">'+R+'</div>'+scr+(L3?'<details class="more pm-hist"><summary>紀錄：個管師判斷／醫師確認／病人填答全文</summary>'+L3+'</details>':"")+tail+'<div class="pm-foot">'+bar+'</div>';FOCUS=0;drawChips();wire(r,en);paintFocus();}
@@ -6296,7 +6303,7 @@ function drawChips(){var host=$("#pmChips");if(!host)return;var sm=$(".pm-terms 
   $$(".chip",host).forEach(function(c){c.onclick=function(){var t=c.dataset.t,i=TERMS.indexOf(t);if(i<0)TERMS.push(t);else TERMS.splice(i,1);drawChips();};});}
 function rowsEl(){return $$("#pmDet .trow");}
 function paintFocus(){var rs=rowsEl();rs.forEach(function(el,i){el.classList.toggle("foc",i===FOCUS);});if(rs[FOCUS])rs[FOCUS].scrollIntoView({block:"nearest"});}
-function updCnt(){var n=Object.keys(PICK).length,el=$("#pmCnt");if(el)el.textContent=n?("已點選 "+n+" 項等級"):"尚未點選任何等級";}
+function updCnt(){var n=Object.keys(PICK).length,el=$("#pmCnt");if(el)el.textContent=n?("已選："+Object.keys(PICK).map(function(t){return (ZH[t]||t)+" "+PICK[t];}).join("、")):"還沒選等級";}
 function wire(r,en){wireTodo(r);SELB=r.body;rowsEl().forEach(function(row){var term=row.dataset.term,ref=row.nextElementSibling&&row.nextElementSibling.nextElementSibling;
     function show(g){if(ref&&ref.classList.contains("gref")){ref.innerHTML=gradeRef(term,g);ref.classList.remove("hid");}}
     function back(){var on=$(".gb.on",row);if(on)show(on.dataset.g);else if(ref)ref.classList.add("hid");}
@@ -6307,6 +6314,8 @@ function wire(r,en){wireTodo(r);SELB=r.body;rowsEl().forEach(function(row){var t
   var rv=$("#pmRev");if(rv)rv.onclick=function(){review(r.id,{note:$("#pmNote").value,contacted:$("#pmCt").checked,urgency:$("#pmUrg").value,signal:$("#pmSig").value,terms:TERMS,suggest:PICK,confirms:DRAFT[r.id]}).then(function(){toast("已送出（"+meName()+"）");EN=ens();drawKpi();drawList();if(SEL===r.id){PICK={};TERMS=[];drawDetail(r.id);}}).catch(function(e){toast(e.message||x().cErr(e));});};
   var rn=$("#pmRevNext");if(rn)rn.onclick=function(){var ids=listIds(),i=ids.indexOf(r.id),nx=ids[i+1]||ids[i-1]||null;
     review(r.id,{note:$("#pmNote").value,contacted:$("#pmCt").checked,urgency:$("#pmUrg").value,signal:$("#pmSig").value,terms:TERMS,suggest:PICK,confirms:DRAFT[r.id]}).then(function(){toast("已送出，下一位 "+(nx?RECS[nx].body.pid:"（沒有了）"));PICK={};TERMS=[];EN=ens();SEL=nx;drawKpi();drawList();if(nx)drawDetail(nx);else $("#pmDet").innerHTML='<p class="pm-empty">本診病人已全部檢視完畢。</p>';if(nx)hDet(nx);mTop();}).catch(function(e){toast(e.message||x().cErr(e));});};
+  var okn=$("#pmOkNext");if(okn)okn.onclick=function(){var ids=listIds(),i=ids.indexOf(r.id),nx=ids[i+1]||ids[i-1]||null;if(nx===r.id)nx=null;
+    confirm(r.id,PICK,$("#pmPlan").value).then(function(){toast("已確認並結案（"+meName()+"），下一位 "+(nx&&RECS[nx]?RECS[nx].body.pid:"（沒有了）"));PICK={};TERMS=[];EN=ens();SEL=nx;drawKpi();drawList();if(nx)drawDetail(nx);else $("#pmDet").innerHTML='<p class="pm-empty">本診病人已全部確認完畢。</p>';if(nx)hDet(nx);mTop();}).catch(function(e){toast(e.message||x().cErr(e));});};
   var ok=$("#pmOk");if(ok)ok.onclick=function(){confirm(r.id,PICK,$("#pmPlan").value).then(function(){toast("已確認並結案（"+meName()+"）");PICK={};TERMS=[];EN=ens();drawKpi();drawList();drawDetail(r.id);}).catch(function(e){toast(e.message||x().cErr(e));});};
   var ch=$("#pmChart");if(ch)ch.onclick=function(){openChart(r,en);};
   var ro=$("#pmReopen");if(ro)ro.onclick=function(){ask("重新開啟此筆紀錄？結案標記將取消，紀錄不會刪除。").then(function(y){if(!y)return;reopen(r.id).then(function(){toast("已重開");EN=ens();drawList();drawDetail(r.id);}).catch(function(e){toast(e.message||x().cErr(e));});});};
@@ -6315,7 +6324,7 @@ function wire(r,en){wireTodo(r);SELB=r.body;rowsEl().forEach(function(row){var t
     remove(r.id).then(function(){toast("已刪除 "+r.id);EN=ens();drawKpi();drawList();$("#pmDet").innerHTML='<p class="pm-empty">已刪除。請由左側清單選取下一位病人。</p>';}).catch(function(e){toast(e.message||x().cErr(e));});});};
   updCnt();}
 function openChart(r,en){var txt=chartText(r.body,en,PICK,($("#pmPlan")||{}).value||"",meName());
-  dialog({title:"複製到病歷",msg:"僅包含醫師已確認的等級；系統預設值與個管師建議不會列入。",fields:[{k:"t",label:"內容（全選複製）",type:"textarea",value:txt}],ok:"複製"}).then(function(v){if(!v)return;
+  dialog({title:"複製到病歷",msg:"只帶入你確認的等級；系統推估和個管師建議不會帶入。",fields:[{k:"t",label:"內容（全選複製）",type:"textarea",value:txt}],ok:"複製"}).then(function(v){if(!v)return;
     if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(function(){toast("已複製");},function(){toast("請手動全選複製");});else toast("請手動全選複製");});}
 document.addEventListener("keydown",function(ev){if(!VIEW||!S())return;if(/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName||""))return;var ids=listIds(),idx=ids.indexOf(SEL);
   if(ev.key==="j"||ev.key==="k"){ev.preventDefault();if(!ids.length)return;idx=idx<0?0:(idx+(ev.key==="j"?1:-1)+ids.length)%ids.length;SEL=ids[idx];PICK={};TERMS=[];$$("#pmTbl tr.prow").forEach(function(z){z.classList.toggle("on",z.dataset.id===SEL);});var on=$("#pmTbl tr.prow.on");if(on)on.scrollIntoView({block:"nearest"});drawDetail(SEL);$("#pmDet").scrollTop=0;return;}
