@@ -246,6 +246,7 @@ h3{font-size:1rem;color:var(--ink);}
 /* 手機第二版（2026-10-08 user：Android 也卡——上下框、內外框捲軸）：整頁只有一個捲軸；清單與細節一次只顯示一個（點病人進細節、「← 回清單」回去）；下方按鈕列不黏；分組框改扁平 */
 .pm-mwrap{min-width:0;} .pm-mback{display:none;}
 @media (max-width:880px),(pointer:coarse){.pm-keys{display:none!important;}}
+@media (max-width:880px),(pointer:coarse){body .prom .grades{gap:8px;} body .prom .gb{width:50px;height:48px;font-size:1.05rem;}}  /* 給級按鈕手機放大（2026-10-09 點擊模型：40×38 間隔 4 → 50×48 間隔 8，σ2.5 每點一次點到隔壁級 7.3%→2.1%；360 寬一列含 ⓘ 326 px 放得下） */
 @media (max-width:560px){.prom #pmBar .seg{display:grid;grid-template-columns:1fr 1fr;width:100%;} .prom #pmBar .seg .fbtn{border-right:1px solid #9AA8A3;border-bottom:1px solid #9AA8A3;white-space:nowrap;} .prom #pmBar .seg .fbtn:nth-child(2n){border-right:0;}}  /* 篩選鈕手機 2×2，字不斷行（2026-10-09） */  /* 手機／觸控不顯示鍵盤快捷鍵（2026-10-08） */
 @media (max-width:880px){.pm-rail{position:static;max-height:none;overflow:visible;border:none;padding:0;background:none;} body.pm-m-det .pm-rail{display:none;} body:not(.pm-m-det) .pm-mwrap{display:none;}
  .pm-mback{display:block;width:100%;min-height:48px;margin:0 0 12px;text-align:left;font-size:1rem;}

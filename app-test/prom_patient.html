@@ -335,8 +335,8 @@ function render(){
   $('#next').textContent=(I===STEPS.length-1)?'看一下再送出':'下一步';
   st.innerHTML='';
   if(LISTFLOW){listHeader(s);FUROOT=null;if(s.kind==='list'){renderList(st,s);window.scrollTo(0,0);return;}if(s.kind==='fu'){renderFU(st,s);window.scrollTo(0,0);return;}}
-  if(s.kind==='cc') return renderCC(st);
-  if(s.kind==='adl') return renderADL(st);
+  if(s.kind==='cc'){renderCC(st);window.scrollTo(0,0);return;}
+  if(s.kind==='adl'){renderADL(st);window.scrollTo(0,0);return;}
   renderItem(st,s.item);
   window.scrollTo(0,0);
 }
