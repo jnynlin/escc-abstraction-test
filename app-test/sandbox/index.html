@@ -237,6 +237,13 @@ h2{font-size:1.65rem;margin:.9em 0 .5em;padding-bottom:.25em}
 .picked{outline:3px solid var(--c1);outline-offset:1px}
 body.picking .bstudy:not(.ro){outline:2px dashed var(--c1);outline-offset:2px}
 
+/* 空狀態的模板起手式與建議量表按鈕（2026-10-09） */
+.emptytpl{margin:6px 0 10px}.emptytpl .chips{gap:8px}
+.btn-tpl{min-height:44px;border:1px solid var(--c1);background:var(--c1-soft,var(--well));color:var(--ink);border-radius:10px;padding:0 14px;cursor:pointer}
+.sugbtn{min-height:32px;border:1px dashed var(--c1);background:transparent;color:var(--c1);border-radius:999px;padding:0 10px;font-size:.86rem;cursor:pointer;margin-left:6px}
+@media (max-width:900px),(pointer:coarse){.sugbtn{min-height:44px;font-size:16px}}
+.tc.tcc.first{order:-1}
+
 </style></head><body>
 <header class="top">
 <h1>ePRO 模組沙盤 v6.5（PI 版）　<span class="small soft">練習用，資料只存在你的瀏覽器</span></h1>
@@ -347,6 +354,8 @@ function setScaleRole(m,sid,tid,scaleId,role,actor){if(!canEdit(m,actor,sid))ret
 /* ---------- 放入／搬移（拖放與下拉共用）----------
    drag：{kind:"owner"|"role"|"disease"|"template"|"scale", id, from?:{studyId, tid?}}（from 有值＝搬移，會先從來源移除）
    target：{studyId, slot:"owner"|"members"|"diseases"|"templates"|"scales", tid?}  回傳 {ok,msg,tid?} */
+/* 量表種類 → 預設模板：症狀類進「症狀回報」，其餘病人自填的進「生活品質追蹤」 */
+function autoTplFor(sc){return sc&&sc.kind==="triage"?"triage":"pprom";}
 function place(m,drag,target,actor){
   var s=study(m,target.studyId);if(!s)return {ok:false,msg:"找不到計畫"};
   if(actor!=null){var mgSlot=target.slot==="owner"||target.slot==="subpis";if(mgSlot?!canManage(m,actor,target.studyId):!canEdit(m,actor,target.studyId))return {ok:false,msg:mgSlot?DENY_MANAGE:DENY_EDIT};
@@ -391,7 +400,13 @@ function place(m,drag,target,actor){
     var sc=by(SCALES,drag.id);if(!sc)return {ok:false,msg:"找不到這個量表"};
     var t=target.tid?tplOf(s,target.tid):null;
     if(!t){var pt=s.templates.filter(function(x){var d=by(TEMPLATES,x.tpl);return d&&d.patient;});
-      if(pt.length===1)t=pt[0];else return {ok:false,msg:pt.length?"這個計畫有好幾個要病人填的模板，請把量表放到要用的那一個":"這個計畫還沒有要病人填的模板，請先加入模板"};}
+      if(pt.length===1)t=pt[0];
+      else if(pt.length)return {ok:false,msg:"這個計畫有好幾個要病人填的模板，請把量表放到要用的那一個"};
+      else{   /* 還沒有模板：依量表種類自動補一個（2026-10-09 壓力測試：這是最常見的誤序）。回溯性研究不接觸病人，不自動補 */
+        if(s.type==="retro")return {ok:false,msg:"這是回溯性病歷研究，不接觸病人，所以不放病人填的量表"};
+        var want=by(TEMPLATES,autoTplFor(sc));if(!want)return {ok:false,msg:"這個計畫還沒有要病人填的模板，請先加入模板"};
+        t={tid:uid(m,"t"),tpl:want.id,cadence:want.cadence,offset:want.offset,venue:want.venue,align:want.id==="pprom"&&!HIDE_IRAE,scales:[]};s.templates.push(t);
+        t.scales.push({id:drag.id,role:"primary"});removeFrom();return {ok:true,msg:"已自動加入模板「"+want.name+"」並放進量表（可以換）",tid:t.tid,autoTpl:want.id};}}
     var td=by(TEMPLATES,t.tpl);if(!td||!td.patient)return {ok:false,msg:"這個模板不需要病人填問卷，不能放量表"};
     for(var i2=0;i2<t.scales.length;i2++)if(t.scales[i2].id===drag.id)return {ok:false,msg:"這個量表已在該模板裡"};
     t.scales.push({id:drag.id,role:"primary"});removeFrom();return {ok:true,msg:"已加入量表",tid:t.tid};}
@@ -463,25 +478,25 @@ function lint(m){var out=[];
     if(ty.id==="clinic")add("info",s.id,"clinic",nm+"：屬於臨床照護；之後若要做研究，需另外申請 IRB");
     if(ty.id==="retro")add("info",s.id,"retro",nm+"：是否需要病人同意，要看 IRB 審查結果");
     if(pt.length){add("info",s.id,"identity",nm+"：病人填答前要先核對身分（姓氏、生日末四碼等），核對後才能往下");
-      if(!s.members.some(function(r){return r==="nurse"||r==="doctor";}))add("amber",s.id,"no-reviewer",nm+"病人會填答，但還沒有醫護人員負責看答案");}
+      if(!s.members.some(function(r){return r==="nurse"||r==="doctor";}))add("amber",s.id,"no-reviewer",nm+"有病人填答，團隊角色裡沒有醫師或個管師／護理師");}
     s.templates.forEach(function(t){var d=by(TEMPLATES,t.tpl);if(!d||!d.patient)return;var L=tplLoad(t,m.speed),tn="「"+d.name+"」";
       if(!t.scales.length)add("amber",s.id,"no-scale",nm+tn+"還沒有量表");
       var oi=d.budgetItems&&L.items>d.budgetItems,om=d.budgetMin&&L.min>d.budgetMin;
-      if(oi&&om)add("red",s.id,"over-both",nm+tn+"每次 "+L.items+" 題、約 "+L.min+" 分鐘，超過預算（最多 "+d.budgetItems+" 題、"+d.budgetMin+" 分鐘）");
-      else if(oi)add("red",s.id,"over-items",nm+tn+"每次 "+L.items+" 題，超過預算 "+d.budgetItems+" 題");
-      else if(om)add("red",s.id,"over-min",nm+tn+"每次約 "+L.min+" 分鐘，超過預算 "+d.budgetMin+" 分鐘");
+      if(oi&&om)add("red",s.id,"over-both",nm+tn+"每次 "+L.items+" 題、約 "+L.min+" 分鐘，超過上限（最多 "+d.budgetItems+" 題、"+d.budgetMin+" 分鐘）");
+      else if(oi)add("red",s.id,"over-items",nm+tn+"每次 "+L.items+" 題，超過上限 "+d.budgetItems+" 題");
+      else if(om)add("red",s.id,"over-min",nm+tn+"每次約 "+L.min+" 分鐘，超過上限 "+d.budgetMin+" 分鐘");
       var trg=t.scales.filter(function(x){var sc=by(SCALES,x.id);return sc&&sc.kind==="triage"&&sc.id!=="proctcae";});
       if(trg.length>1)add("info",s.id,"core-and-full",nm+tn+"同時放了症狀核心版和完整版：通常二選一，或平常用核心版、每第 3 次回診才用完整版");
       var roles=t.scales.map(function(x){return x.role;});
-      if(roles.indexOf("anchor")>=0&&roles.filter(function(r){return r==="primary";}).length===0)add("amber",s.id,"anchor-alone",nm+tn+"有「比較用」量表，卻沒有主要量表可以比");
+      if(roles.indexOf("anchor")>=0&&roles.filter(function(r){return r==="primary";}).length===0)add("amber",s.id,"anchor-alone",nm+tn+"有比較用量表，沒有主要量表");
       if(roles.indexOf("anchor")>=0&&roles.indexOf("primary")>=0)add("info",s.id,"pk",nm+tn+"有主要量表和比較用量表：可以並排比較，各自計分、不改題");
       t.scales.forEach(function(x){var sc=by(SCALES,x.id);if(!sc)return;
         (scaleUse[sc.id]=scaleUse[sc.id]||[]).push(s.id);
-        if(sc.lic&&sc.lic!=="自編"&&sc.lic!=="—")add("amber",s.id,"license",nm+"「"+sc.name+"」授權："+sc.lic);
-        if(sc.val==="self"&&s.type!=="retro"&&sc.kind!=="custom")add("info",s.id,"unvalidated",nm+"「"+sc.name+"」是自編量表，尚未驗證");
-        if(sc.val==="needs")add("amber",s.id,"val-needed",nm+"「"+sc.name+"」：繁中版是否等價，還需確認");
-        if(sc.only&&s.diseases.indexOf(sc.only)<0)add("amber",s.id,"disease-mismatch",nm+"「"+sc.name+"」是 "+(by(DISEASES,sc.only)||{}).name+" 專用，但計畫沒有這個疾病");});
-      if(t.tpl==="pprom"&&!t.scales.some(function(x){var sc=by(SCALES,x.id);return sc&&sc.val==="validated";}))add("amber",s.id,"no-validated",nm+tn+"用的量表都還沒有繁中驗證版");});
+        if(sc.lic&&sc.lic!=="自編"&&sc.lic!=="—")add("amber",s.id,"license",nm+"「"+sc.name+"」："+sc.lic);
+        if(sc.val==="self"&&s.type!=="retro"&&sc.kind!=="custom")add("info",s.id,"unvalidated",nm+"「"+sc.name+"」：自編，無驗證資料");
+        if(sc.val==="needs")add("amber",s.id,"val-needed",nm+"「"+sc.name+"」：繁中版等價性未確認");
+        if(sc.only&&s.diseases.indexOf(sc.only)<0)add("amber",s.id,"disease-mismatch",nm+"「"+sc.name+"」為 "+(by(DISEASES,sc.only)||{}).name+" 專用；計畫未含此疾病");});
+      if(t.tpl==="pprom"&&!t.scales.some(function(x){var sc=by(SCALES,x.id);return sc&&sc.val==="validated";}))add("amber",s.id,"no-validated",nm+tn+"：所有量表皆無繁中驗證版");});
     s.diseases.forEach(function(did){var dz=by(DISEASES,did);if(!dz||!dz.mod)return;var has=s.templates.some(function(t){return t.scales.some(function(x){return x.id===dz.mod;});});
       if(!has&&pt.length)add("info",s.id,"disease-hint",nm+"：「"+dz.name+"」常搭配 "+by(SCALES,dz.mod).name);});
   });
@@ -493,7 +508,7 @@ function lint(m){var out=[];
     if(u.length>1&&by(SCALES,id).kind!=="custom")add("amber",null,"dup-scale","「"+by(SCALES,id).name+"」有 "+u.length+" 個計畫在用，同一位病人可能被問好幾次");});
   if(!hasSys&&!HIDE_IRAE)add("red",null,"no-sys","沒有任何計畫由總 PI 負責");
   var piCount={};m.studies.forEach(function(s){if(s.owner)piCount[s.owner]=(piCount[s.owner]||0)+1;});
-  Object.keys(piCount).forEach(function(id){if(piCount[id]>3)add("info",null,"overload",ownerName(m,id)+"同時負責 "+piCount[id]+" 個計畫，工作量可能太大");});
+  Object.keys(piCount).forEach(function(id){if(piCount[id]>3)add("info",null,"overload",ownerName(m,id)+" 目前是 "+piCount[id]+" 個計畫的 PI");});
   if(!HIDE_IRAE)add("info",null,"bk","還沒有指定備援系統管理者");   /* 平台層提醒：PI 版沒有 */
   return out;}
 
@@ -617,7 +632,7 @@ function sanitize(o){var d=defaults(),dropped=0;
   return {ok:true,model:m,dropped:dropped};}
 
 return {recommendCombos:recommendCombos,applyCombo:applyCombo,PROFILE:PROFILE,HIDE_IRAE:HIDE_IRAE,ACTORS:ACTORS,HIGHLIGHT:HIGHLIGHT,canRename:canRename,OWNERS:OWNERS,ROLES:ROLES,DISEASES:DISEASES,STYPES:STYPES,TEMPLATES:TEMPLATES,SCALES:SCALES,VENUES:VENUES,CADENCES:CADENCES,DECISIONS:DECISIONS,PERM_COLS:PERM_COLS,CAP_DEFAULT:CAP_DEFAULT,
-  defaults:defaults,blankStudy:blankStudy,createStudy:createStudy,deleteStudy:deleteStudy,updateStudy:updateStudy,updateTemplate:updateTemplate,setScaleRole:setScaleRole,canEdit:canEdit,canManage:canManage,roleIn:roleIn,isPlatform:isPlatform,DENY_EDIT:DENY_EDIT,DENY_MANAGE:DENY_MANAGE,place:place,removeItem:removeItem,setSteward:setSteward,peopleMatrix:peopleMatrix,tplLoad:tplLoad,lint:lint,simulate:simulate,templateTicks:templateTicks,sharedScales:sharedScales,perms:perms,summarize:summarize,sanitize:sanitize,by:by,clone:clone,ownerName:ownerName,study:study,tplOf:tplOf};
+  defaults:defaults,blankStudy:blankStudy,createStudy:createStudy,deleteStudy:deleteStudy,updateStudy:updateStudy,updateTemplate:updateTemplate,setScaleRole:setScaleRole,canEdit:canEdit,canManage:canManage,roleIn:roleIn,isPlatform:isPlatform,DENY_EDIT:DENY_EDIT,DENY_MANAGE:DENY_MANAGE,place:place,autoTplFor:autoTplFor,removeItem:removeItem,setSteward:setSteward,peopleMatrix:peopleMatrix,tplLoad:tplLoad,lint:lint,simulate:simulate,templateTicks:templateTicks,sharedScales:sharedScales,perms:perms,summarize:summarize,sanitize:sanitize,by:by,clone:clone,ownerName:ownerName,study:study,tplOf:tplOf};
 })();
 if(typeof module!=="undefined")module.exports=SBX;
 
@@ -637,7 +652,8 @@ loadUI();
 function isPf(){return S.isPlatform(UI.actor);}
 function visibleStudies(){return M.studies.filter(function(x){return S.roleIn(M,UI.actor,x.id)!=="";});}
 function V(){return isPf()?M:Object.assign({},M,{studies:visibleStudies()});}   /* 只讀用的「我看得到的資料」；要改資料一律改 M（並帶 UI.actor 走邏輯層） */
-var TO=S.HIDE_IRAE?"總 PI":"我";   /* 「貼回給誰」：PI 版貼回給總 PI */
+var TO=S.HIDE_IRAE?"總 PI":"我";
+function TO2(){return S.HIDE_IRAE?"複製給總 PI":"複製摘要";}   /* 「貼回給誰」：PI 版貼回給總 PI */
 function lintView(){var li=S.lint(V());return isPf()?li:li.filter(function(x){return x.code!=="no-sys"&&x.code!=="bk";});}   /* 平台層的提醒（備援管理者、總PI）只給系統管理者看 */
 function resolveSid(){var ids=visibleStudies().map(function(x){return x.id;});if(ids.indexOf(UI.sid)>=0)return;UI.sid=ids.length?ids[0]:null;}
 var tt=null;function toast(msg,bad){var t=$("#toast");t.textContent=msg;t.className="on"+(bad?" bad":"");clearTimeout(tt);tt=setTimeout(function(){t.className="";},bad?4200:2200);}
@@ -693,7 +709,7 @@ var SEGC=["var(--c5)","var(--c2)","var(--c3)","var(--c1)","var(--c4)","var(--c0)
 function cadOpts(t){return Object.keys(S.CADENCES).filter(function(c){return t.tpl==="triage"?(c==="visit"||c==="perCycle"):t.tpl==="pprom"?(c==="appB"||c==="perCycle"||c==="everyOther"||c==="weekly"):t.tpl==="irae"?c==="irae":c==="none";});}
 function comboSel(s,t){var rc=S.recommendCombos(M,s.id,t.tid);if(!rc.within.length&&!rc.common.length)return "";
   function opt(e){return '<option value="'+e.ids.join(",")+'">'+esc(e.label)+'</option>';}
-  return '<label class="tc tcc"><span>推薦組合</span><select data-act="combo" data-sid="'+s.id+'" data-tid="'+t.tid+'" aria-label="推薦組合"><option value="">選一組…</option>'+(rc.within.length?'<optgroup label="預算內（共 '+rc.n+' 組，先列 '+rc.within.length+' 組）">'+rc.within.map(opt).join("")+'</optgroup>':"")+(rc.common.length?'<optgroup label="常見搭配，但超過預算">'+rc.common.map(opt).join("")+'</optgroup>':"")+'</select></label>';}
+  return '<label class="tc tcc'+(t.scales.length?"":" first")+'"><span>'+(t.scales.length?"推薦組合":"推薦組合（一次加一組）")+'</span><select data-act="combo" data-sid="'+s.id+'" data-tid="'+t.tid+'" aria-label="推薦組合"><option value="">'+(t.scales.length?"選一組（會取代目前的量表）…":"選一組…")+'</option>'+(rc.within.length?'<optgroup label="不超過上限（共 '+rc.n+' 組，先列 '+rc.within.length+' 組）">'+rc.within.map(opt).join("")+'</optgroup>':"")+(rc.common.length?'<optgroup label="常見搭配，但超過上限">'+rc.common.map(opt).join("")+'</optgroup>':"")+'</select></label>';}
 function tplBlock(s,t,dupMap,H0){var d=S.by(S.TEMPLATES,t.tpl),ld=S.tplLoad(t,M.speed),over=d.patient&&((d.budgetItems&&ld.items>d.budgetItems)||(d.budgetMin&&ld.min>d.budgetMin)),cads=cadOpts(t);
   var h='<div class="btpl'+(over?" red":"")+(feat("templates",t.tpl)?" rc":"")+'" data-tid="'+t.tid+'" data-b="template:'+t.tpl+'"><div class="tl-l"><div class="th" draggable="true" data-d="'+dpl({kind:"template",id:t.tpl,tid:t.tid,from:{studyId:s.id}})+'" title="'+esc(d.note)+'"><span class="tn">'+esc(d.name)+'</span>'+(feat("templates",t.tpl)?'<span class="rec">推薦</span>':"")+'<button class="x" type="button" data-act="rm" data-kind="template" data-sid="'+s.id+'" data-tid="'+t.tid+'" aria-label="移除模板">×</button></div>';
   if(d.patient){h+='<div class="tctl"><label class="tc"><span>頻率</span><select data-act="cad" data-sid="'+s.id+'" data-tid="'+t.tid+'" aria-label="頻率">'+cads.map(function(c){return '<option value="'+c+'"'+(c===t.cadence?" selected":"")+'>'+esc(S.CADENCES[c].replace(/（.*$/,""))+'</option>';}).join("")+'</select></label>'+
@@ -701,7 +717,7 @@ function tplBlock(s,t,dupMap,H0){var d=S.by(S.TEMPLATES,t.tpl),ld=S.tplLoad(t,M.
       '<label class="tc"><span>提前／延後</span><select data-act="off" data-sid="'+s.id+'" data-tid="'+t.tid+'" aria-label="提前或延後幾天">'+[-3,-2,-1,0,1,2,3].map(function(o){return '<option value="'+o+'"'+(o===Number(t.offset)?" selected":"")+'>'+(o===0?"當天":o<0?"提前 "+(-o)+" 天":"延後 "+o+" 天")+'</option>';}).join("")+'</select></label>'+
       (t.tpl==="pprom"&&!S.HIDE_IRAE?'<label class="opt tc2"><input type="checkbox" data-act="align" data-sid="'+s.id+'" data-tid="'+t.tid+'"'+(t.align?" checked":"")+'><span class="small">與 irAE 抽血日相差 ≤3 天就改到抽血當日填</span></label>':"")+comboSel(s,t)+'</div>';
     var den=Math.max(ld.min,d.budgetMin||ld.min||1);
-    h+='<div class="burden'+(over?" over":"")+'" title="每次 '+ld.items+' 題、約 '+ld.min+' 分鐘；預算最多 '+(d.budgetItems||"–")+' 題、'+(d.budgetMin||"–")+' 分鐘（黑線是預算的位置）">'+t.scales.map(function(x,qi){var sc=S.by(S.SCALES,x.id);return '<i style="width:'+Math.round(sc.min*(M.speed||1)/den*1000)/10+'%;background:'+SEGC[qi%SEGC.length]+'"></i>';}).join("")+(d.budgetMin?'<span class="bud" style="right:auto;left:calc('+Math.round(d.budgetMin/den*1000)/10+'% - 2px)"></span>':"")+'</div><div class="burdtxt"><b>'+ld.items+'</b> 題・<b>'+ld.min+'</b> 分<span class="bd">　預算最多 '+(d.budgetItems||"–")+' 題・'+(d.budgetMin||"–")+' 分</span></div>';
+    h+='<div class="burden'+(over?" over":"")+'" title="每次 '+ld.items+' 題、約 '+ld.min+' 分鐘；上限 '+(d.budgetItems||"–")+' 題、'+(d.budgetMin||"–")+' 分鐘（黑線是上限的位置）">'+t.scales.map(function(x,qi){var sc=S.by(S.SCALES,x.id);return '<i style="width:'+Math.round(sc.min*(M.speed||1)/den*1000)/10+'%;background:'+SEGC[qi%SEGC.length]+'"></i>';}).join("")+(d.budgetMin?'<span class="bud" style="right:auto;left:calc('+Math.round(d.budgetMin/den*1000)/10+'% - 2px)"></span>':"")+'</div><div class="burdtxt"><b>'+ld.items+'</b> 題・<b>'+ld.min+'</b> 分<span class="bd">　上限 '+(d.budgetItems||"–")+' 題・'+(d.budgetMin||"–")+' 分</span></div>';
     h+='<div class="slot" data-accepts="scale" data-slot="scales" data-tid="'+t.tid+'" style="margin-top:8px;display:block">'+(t.scales.length?"":'<span class="hint">點＋加入；或點左邊的項目再點這裡</span>')+t.scales.map(function(x,qi){var sc=S.by(S.SCALES,x.id),warn=(sc.lic&&sc.lic!=="自編"&&sc.lic!=="—")||sc.val==="needs";
       return '<div class="sblk r-'+x.role+(dupMap[x.id]?" dup":"")+(feat("scales",x.id)?" rc":"")+'" style="--sc:'+SEGC[qi%SEGC.length]+'" draggable="true" data-d="'+dpl({kind:"scale",id:x.id,from:{studyId:s.id,tid:t.tid}})+'" data-b="scale:'+x.id+'" data-scale="'+x.id+'" title="'+esc(scaleTip(sc))+'"><div class="sb1"><b>'+esc(sc.name.replace(/（.*$/,""))+'</b>'+(warn?'<span class="warn" title="授權／驗證需確認">⚠</span>':"")+'<span class="m">'+sc.items+' 題・'+sc.min+' 分</span></div><div class="sb2"><span class="stw" title="量表負責人（把人拖到這個量表上就能指定）">'+(M.stewards&&M.stewards[x.id]?'負責人：'+esc(oname(M.stewards[x.id])):'負責人：—')+'</span>'+dupNote(dupMap[x.id],s.id)+'</div><div class="sb3"><select data-act="role" data-sid="'+s.id+'" data-tid="'+t.tid+'" data-id="'+x.id+'" aria-label="角色">'+[["primary","主要"],["anchor","比較用"],["exploratory","探索性"]].map(function(r){return '<option value="'+r[0]+'"'+(r[0]===x.role?" selected":"")+'>'+r[1]+'</option>';}).join("")+'</select><button class="x" type="button" data-act="rm" data-kind="scale" data-sid="'+s.id+'" data-tid="'+t.tid+'" data-id="'+x.id+'" aria-label="移除">×</button></div></div>';}).join("")+addSel("scales",s.id,t.tid,scaleOptGroups(),"＋量表")+'</div>';
   }
@@ -714,12 +730,21 @@ function bstudyHTML(s,li,dupMap){
   h+='<div class="bsec"><div class="bl">PI</div><div class="slot" data-accepts="owner" data-slot="owner">'+(s.owner?blk("pblk",oname(s.owner),{kind:"owner",id:s.owner,from:{studyId:s.id}},'data-kind="owner" data-sid="'+s.id+'"'):'<span class="hint">點＋加入；或點左邊的項目再點這裡</span>')+addSel("owner",s.id,"",opts(people(),null,function(o){return oname(o.id);}),"＋")+'</div></div>';
   h+='<div class="bsec"><div class="bl">sub-PI</div><div class="slot" data-accepts="owner" data-slot="subpis">'+(s.subpis||[]).map(function(p){return blk("pblk sub",oname(p),{kind:"owner",id:p,from:{studyId:s.id,slot:"subpis"}},'data-kind="subpi" data-sid="'+s.id+'" data-id="'+p+'"');}).join("")+addSel("subpis",s.id,"",opts(people().filter(function(o){return o.id!==s.owner&&(s.subpis||[]).indexOf(o.id)<0;}),null,function(o){return oname(o.id);}),"＋")+'</div></div>';
   h+='<div class="bsec"><div class="bl">團隊角色</div><div class="slot" data-accepts="role" data-slot="members">'+s.members.map(function(r){return blk("rblk",(S.by(S.ROLES,r)||{name:r}).name,{kind:"role",id:r,from:{studyId:s.id}},'data-kind="role" data-sid="'+s.id+'" data-id="'+r+'"');}).join("")+addSel("members",s.id,"",opts(S.ROLES.filter(function(r){return s.members.indexOf(r.id)<0;})),"＋")+'</div></div>';
-  h+='<div class="bsec"><div class="bl">疾病</div><div class="slot" data-accepts="disease" data-slot="diseases">'+s.diseases.map(function(d){return blk("dblk"+(feat("diseases",d)?" rc":""),(S.by(S.DISEASES,d)||{name:d}).name,{kind:"disease",id:d,from:{studyId:s.id}},'data-kind="disease" data-sid="'+s.id+'" data-id="'+d+'"');}).join("")+addSel("diseases",s.id,"",opts(featFirst(S.DISEASES.filter(function(d){return s.diseases.indexOf(d.id)<0;}),"diseases")),"＋")+'</div></div></div>';
-  h+='<h3 class="bh">問卷與時間</h3>'+(s.templates.length?'<div class="tlaxis" aria-hidden="true"><div class="tl-l"></div><div class="tl-r">'+axisSvg(H0)+'</div></div>':"")+'<div class="btpls">'+s.templates.map(function(t){return tplBlock(s,t,dupMap,H0);}).join("")+'</div>';
+  h+='<div class="bsec"><div class="bl">疾病</div><div class="slot" data-accepts="disease" data-slot="diseases">'+s.diseases.map(function(d){return blk("dblk"+(feat("diseases",d)?" rc":""),(S.by(S.DISEASES,d)||{name:d}).name,{kind:"disease",id:d,from:{studyId:s.id}},'data-kind="disease" data-sid="'+s.id+'" data-id="'+d+'"');}).join("")+addSel("diseases",s.id,"",opts(featFirst(S.DISEASES.filter(function(d){return s.diseases.indexOf(d.id)<0;}),"diseases")),"＋")+sugScales(s)+'</div></div></div>';
+  h+='<h3 class="bh">問卷與時間</h3>'+(!s.templates.length?emptyTpl(s):"")+(s.templates.length?'<div class="tlaxis" aria-hidden="true"><div class="tl-l"></div><div class="tl-r">'+axisSvg(H0)+'</div></div>':"")+'<div class="btpls">'+s.templates.map(function(t){return tplBlock(s,t,dupMap,H0);}).join("")+'</div>';
   var usedT=s.templates.map(function(t){return t.tpl;});
   h+='<div class="bsec bsec-add"><div class="bl">模板</div><div class="slot" data-accepts="template" data-slot="templates"><span class="hint">點＋加入；或點左邊的項目再點這裡</span>'+addSel("templates",s.id,"",opts(featFirst(S.TEMPLATES.filter(function(t){return usedT.indexOf(t.id)<0;}),"templates")),"＋")+'</div></div>';
   if(red.length||amb.length)h+='<ul class="issues">'+red.concat(amb).map(function(x){return '<li class="'+x.level+'">'+esc(x.msg)+'</li>';}).join("")+'</ul>';
   return h+'</section>';}
+/* 計畫還沒有模板時的起手式：直接列可用的模板（2026-10-09 壓力測試顯示「先放量表後放模板」最常見） */
+/* 疾病常搭配的量表，計畫還沒放的就給一顆按鈕（原本只寫在灰色提示裡） */
+function sugScales(s){if(s.type==="retro")return "";var have={};s.templates.forEach(function(t){t.scales.forEach(function(x){have[x.id]=1;});});
+  var out=s.diseases.map(function(id){var dz=S.by(S.DISEASES,id);if(!dz||!dz.mod||have[dz.mod])return "";var sc=S.by(S.SCALES,dz.mod);if(!sc)return "";
+    return '<button type="button" class="sugbtn" data-act="addsug" data-sid="'+s.id+'" data-id="'+sc.id+'" title="'+esc(dz.name+" 常搭配 "+sc.name)+'">＋'+esc(sc.name.replace(/（.*$/,""))+'</button>';}).join("");
+  return out;}
+function emptyTpl(s){var ok=S.TEMPLATES.filter(function(t){return s.type!=="retro"||!t.patient;});
+  return '<div class="emptytpl"><p class="soft small">先選一種問卷安排：</p><div class="chips">'+ok.map(function(t){
+    return '<button type="button" class="btn-tpl" data-act="addtpl" data-sid="'+s.id+'" data-id="'+t.id+'">'+esc(t.name)+'</button>';}).join("")+'</div></div>';}
 function blocksHTML(){var vs=visibleStudies(),dm={},x=S.study(M,UI.sid),ov=UI.overview&&vs.length>1;S.sharedScales(M).forEach(function(q){dm[q.scale]=q.studies;});var li=lintView();
   var h='<h2>研究架構</h2>'+projBar(true);
   if(!vs.length||!x)return h+emptyHTML();
@@ -729,15 +754,17 @@ function blocksHTML(){var vs=visibleStudies(),dm={},x=S.study(M,UI.sid),ov=UI.ov
 function confirmHTML(){var vs=visibleStudies(),li=lintView(),r=li.filter(function(x){return x.level==="red";}).length,a=li.filter(function(x){return x.level==="amber";}).length;
   /* 以自己建的計畫（自己是 PI）為主：排前面、展開；其他參與的計畫（例如 sub-PI）收在下面 */
   var own=vs.filter(function(s){return S.roleIn(M,UI.actor,s.id)==="PI";}),oth=vs.filter(function(s){return own.indexOf(s)<0;});
-  var h='<h2>最後確認</h2><p class="cfmhead">你建的計畫 '+own.length+' 個'+(oth.length?'（另外參與 '+oth.length+' 個）':'')+'；目前共 '+vs.length+' 個計畫，必須處理 <b>'+r+'</b>、需留意 <b>'+a+'</b>。</p>';
+  var h='<h2>最後確認</h2><p class="soft small">唯讀；核對後用下面的「'+TO2()+'」或「下載存檔」交回。</p><p class="cfmhead">你建的計畫 '+own.length+' 個'+(oth.length?'（另外參與 '+oth.length+' 個）':'')+'；目前共 '+vs.length+' 個計畫，必須處理 <b>'+r+'</b>、需留意 <b>'+a+'</b>。</p>';
   if(!vs.length)return h+emptyHTML();
-  return h+(own.length?own.map(cfmSection).join(""):'<p class="cfmnone">你還沒有自己建的計畫。到「研究架構」按「＋新增計畫」開始。</p>')+(oth.length?'<details class="cfmother"><summary>其他你參與的計畫（'+oth.length+'）</summary>'+oth.map(cfmSection).join("")+'</details>':"");
+  var foot='<h3 style="margin-top:22px">摘要預覽</h3><pre class="small" style="white-space:pre-wrap;background:var(--well);padding:10px;border-radius:8px">'+esc(S.summarize(V(),UI.lastSim||S.simulate(V(),{cycleWeeks:3,horizonWeeks:26,enrolled:enrolledList()})))+'</pre>'+
+    '<div class="tools" style="margin-top:10px"><button type="button" class="primary" data-act="copy">'+TO2()+'</button><button type="button" data-act="save">下載存檔</button></div>';   /* 交回的動作放在最後一頁最下面，和分頁順序一致（2026-10-09） */
+  return h+(own.length?own.map(cfmSection).join(""):'<p class="cfmnone">你還沒有自己建的計畫。到「研究架構」按「＋新增計畫」開始。</p>')+(oth.length?'<details class="cfmother"><summary>其他你參與的計畫（'+oth.length+'）</summary>'+oth.map(cfmSection).join("")+'</details>':"")+foot;
   function cfmSection(s){var ty=S.by(S.STYPES,s.type),role=S.roleIn(M,UI.actor,s.id),mine=li.filter(function(x){return x.study===s.id;});
     var hh='<section class="cfm" data-sid="'+s.id+'"><h3>'+esc(s.name)+' <span class="stag">'+esc(ty.name)+'</span> <span class="rtag">'+esc(role)+'</span></h3>';
     hh+='<dl class="cfmdl"><dt>計畫 PI</dt><dd>'+(s.owner?esc(oname(s.owner)):'<span class="soft">（未指定）</span>')+'</dd><dt>sub-PI</dt><dd>'+((s.subpis||[]).length?esc(s.subpis.map(oname).join("、")):'<span class="soft">（無）</span>')+'</dd><dt>團隊角色</dt><dd>'+(s.members.length?esc(s.members.map(function(m){return (S.by(S.ROLES,m)||{name:m}).name;}).join("、")):'<span class="soft">（無）</span>')+'</dd><dt>疾病</dt><dd>'+(s.diseases.length?esc(s.diseases.map(function(d){return (S.by(S.DISEASES,d)||{name:d}).name;}).join("、")):'<span class="soft">（不限）</span>')+'</dd></dl>';
     hh+=s.templates.map(function(t){var d=S.by(S.TEMPLATES,t.tpl),ld=S.tplLoad(t,M.speed),over=d.patient&&((d.budgetItems&&ld.items>d.budgetItems)||(d.budgetMin&&ld.min>d.budgetMin));
       var x='<div class="cfmt"><h4>'+esc(d.name)+(d.patient?'　<span class="small soft">頻率：'+esc(S.CADENCES[t.cadence].replace(/（.*$/,""))+'；在'+esc(S.VENUES[t.venue])+'填；'+(Number(t.offset)===0?"當天":Number(t.offset)<0?"提前 "+(-t.offset)+" 天":"延後 "+t.offset+" 天")+'</span>':'')+'</h4>';
-      if(d.patient){x+='<p class="small'+(over?" bad":"")+'">每次 <b>'+ld.items+'</b> 題・約 <b>'+ld.min+'</b> 分（預算最多 '+(d.budgetItems||"–")+' 題、'+(d.budgetMin||"–")+' 分）'+(over?'　⚠ 超過預算':'')+'</p>';
+      if(d.patient){x+='<p class="small'+(over?" bad":"")+'">每次 <b>'+ld.items+'</b> 題・約 <b>'+ld.min+'</b> 分（上限 '+(d.budgetItems||"–")+' 題、'+(d.budgetMin||"–")+' 分）'+(over?'　超過上限':'')+'</p>';
         x+=t.scales.length?'<div class="scroll"><table><thead><tr><th>量表</th><th>題數</th><th>約幾分鐘</th><th>角色</th><th>授權與驗證</th><th>負責人</th></tr></thead><tbody>'+t.scales.map(function(q){var sc=S.by(S.SCALES,q.id);return '<tr><td>'+esc(sc.name.replace(/（.*$/,""))+'</td><td>'+sc.items+'</td><td>'+sc.min+'</td><td>'+({primary:"主要",anchor:"比較用",exploratory:"探索性"}[q.role])+'</td><td>'+esc(sc.lic)+'；'+VALTXT[sc.val]+'</td><td>'+(M.stewards&&M.stewards[q.id]?esc(oname(M.stewards[q.id])):'<span class="soft">—</span>')+'</td></tr>';}).join("")+'</tbody></table></div>':'<p class="small soft">（還沒有量表）</p>';}
       return x+strip(s.id,t)+'</div>';}).join("");
     if(!s.templates.length)hh+='<p class="small soft">（還沒有模板）</p>';
@@ -750,7 +777,7 @@ function drawLinks(){var cv=$("#bcanvas");if(!cv)return;var svg=$("#links",cv);i
   svg.innerHTML=h;}
 /* ---------- 人：人×計畫（PI／sub-PI）與模組維護者 ---------- */
 function stewPersons(cur,persons){if(isPf()||cur===UI.actor)return persons;return persons.filter(function(o){return o.id===cur||(!cur&&o.id===UI.actor);});}   /* 維護者規則：沒人維護→只能認領給自己；自己維護→可交給任何人；別人維護→不能動 */
-function peopleHTML(){var pm=S.peopleMatrix(V()),h='<h2>研究團隊</h2>';
+function peopleHTML(){var pm=S.peopleMatrix(V()),h='<h2>團隊一覽</h2><p class="soft small">唯讀；加人或換人在「研究架構」。</p>';
   h+='<div class="scroll"><table><thead><tr><th>人</th>'+pm.studies.map(function(s){return '<th>'+esc(s.name)+'</th>';}).join("")+'<th title="負責某份量表的原文、計分、版本、授權與驗證">負責的量表</th></tr></thead><tbody>'+pm.people.map(function(p){return '<tr><td><b>'+esc(p.name)+'</b></td>'+pm.studies.map(function(s){var c=pm.cells[p.id][s.id];return '<td>'+(c?'<span class="role-'+(c==="PI"?"pi":"sub")+'">'+c+'</span>':'<span class="soft">—</span>')+'</td>';}).join("")+'<td>'+(pm.stewards[p.id].length?esc(pm.stewards[p.id].map(function(id){return S.by(S.SCALES,id).name.replace(/（.*$/,"");}).join("、")):'<span class="soft">—</span>')+'</td></tr>';}).join("")+'</tbody></table></div>';
   var used={};V().studies.forEach(function(s){s.templates.forEach(function(t){t.scales.forEach(function(x){used[x.id]=1;});});});
   var persons=S.OWNERS.filter(function(o){return o.kind!=="sys2";});
@@ -760,8 +787,11 @@ function peopleHTML(){var pm=S.peopleMatrix(V()),h='<h2>研究團隊</h2>';
   h+='<details><summary class="small soft" style="min-height:44px;display:flex;align-items:center;cursor:pointer">其他量表（'+other.length+'）</summary><div class="scroll"><table><tbody>'+other.map(row).join("")+'</tbody></table></div></details>';
   return h;}
 /* ---------- 檢查 ---------- */
-function checkHTML(){var li=lintView(),h='<h2>規則檢查 <span class="soft">'+li.length+'</span></h2>';
-  [["red","必須處理"],["amber","需留意"],["info","提示"]].forEach(function(l){var xs=li.filter(function(x){return x.level===l[0];});if(!xs.length)return;h+='<div class="lvl '+l[0]+'">'+l[1]+'（'+xs.length+'）</div><ul class="issues">'+xs.map(function(x){return '<li class="'+(l[0]==="info"?"":l[0])+'">'+esc(x.msg)+'</li>';}).join("")+'</ul>';});
+function checkHTML(){var li=lintView(),h='<h2>設計檢查</h2>';
+  [["red","必須處理"],["amber","需留意"]].forEach(function(l){var xs=li.filter(function(x){return x.level===l[0];});if(!xs.length)return;h+='<div class="lvl '+l[0]+'">'+l[1]+'（'+xs.length+'）</div><ul class="issues">'+xs.map(function(x){return '<li class="'+l[0]+'">'+esc(x.msg)+'</li>';}).join("")+'</ul>';});
+  var info=li.filter(function(x){return x.level==="info";});   /* 說明類預設收起：對熟悉的人是雜訊，也會稀釋紅字（2026-10-09） */
+  if(info.length)h+='<details class="more"><summary>另有 '+info.length+' 則說明</summary><ul class="issues">'+info.map(function(x){return '<li>'+esc(x.msg)+'</li>';}).join("")+'</ul></details>';
+  if(!li.length)h+='<p class="soft small">沒有要處理的項目。</p>';
   return h;}
 
 /* ---------- 權限 ---------- */
@@ -815,7 +845,7 @@ function decHTML(){var h='<h2>'+(S.HIDE_IRAE?"請給意見":"待決事項與決�
   return h;}
 
 /* ---------- 版面 ---------- */
-var TABS=[["blocks","研究架構"],["people","研究團隊"],["check","設計檢查"]].concat(S.HIDE_IRAE?[]:[["perm","權限"]]).concat([["sim","模擬"],["dec",S.HIDE_IRAE?"意見":"決議"],["confirm","最後確認"]]);   /* 計畫板移到最後改成「定板確認」；PI 版沒有「權限」（平台治理討論） */
+var TABS=[["blocks","研究架構"],["people","團隊一覽"],["check","設計檢查"]].concat(S.HIDE_IRAE?[]:[["perm","權限"]]).concat([["sim","模擬"],["dec",S.HIDE_IRAE?"意見":"決議"],["confirm","最後確認"]]);   /* 計畫板移到最後改成「定板確認」；PI 版沒有「權限」（平台治理討論） */
 function lockSections(){
   $$("#main section.bstudy").forEach(function(sec){var sid=sec.dataset.sid,ro=(UI.tab==="blocks"&&UI.overview)||!S.canEdit(M,UI.actor,sid),noMg=!S.canManage(M,UI.actor,sid);
     function nodrag(root){$$("[data-d],[draggable]",root).forEach(function(e){e.removeAttribute("data-d");e.removeAttribute("draggable");});}
@@ -823,15 +853,16 @@ function lockSections(){
     if(noMg){sec.classList.add("nomg");    $$("[data-slot=owner],[data-slot=subpis]",sec).forEach(function(z){$$("select[data-act=addsel],[data-act=rm]",z).forEach(function(e){e.remove();});nodrag(z);});$$("[data-act=delstudy]",sec).forEach(function(e){e.remove();});}});}
 function render(){resolveSid();saveUI();var li=lintView(),r=li.filter(function(x){return x.level==="red";}).length,a=li.filter(function(x){return x.level==="amber";}).length;
   $("#actor").innerHTML=S.OWNERS.filter(function(o){return S.ACTORS.indexOf(o.id)>=0;}).map(function(o){return '<option value="'+o.id+'"'+(o.id===UI.actor?" selected":"")+'>'+esc(oname(o.id))+'</option>';}).join("");
-  var nv=visibleStudies().length;$("#whoinfo").textContent=isPf()?"系統管理者・全部 "+M.studies.length+" 個計畫":"你的計畫 "+nv+" 個";
-  $("#tabs").innerHTML=TABS.map(function(t){return '<button type="button" role="tab" data-act="tab" data-tab="'+t[0]+'" aria-selected="'+(UI.tab===t[0])+'">'+t[1]+(t[0]==="check"?'<span class="badge red" title="必須處理的項目數">'+r+'</span><span class="badge amber" title="需留意的項目數">'+a+'</span>':"")+'</button>';}).join("");
+  var vsx=visibleStudies(),own=vsx.filter(function(x){return S.roleIn(M,UI.actor,x.id)==="PI";}).length;   /* 與「最後確認」同一套算法：自己建的＝自己是 PI（2026-10-09） */
+  $("#whoinfo").textContent=isPf()?"系統管理者・全部 "+M.studies.length+" 個計畫":("你建 "+own+" 個"+(vsx.length-own?"・參與 "+(vsx.length-own)+" 個":""));
+  $("#tabs").innerHTML=TABS.map(function(t){return '<button type="button" role="tab" data-act="tab" data-tab="'+t[0]+'" aria-selected="'+(UI.tab===t[0])+'">'+t[1]+(t[0]==="check"?'<span class="badge red" title="必須處理的項目數">必 '+r+'</span><span class="badge amber" title="需留意的項目數">留 '+a+'</span>':"")+'</button>';}).join("");
   $("#palbody").innerHTML=palette();
   var c=UI.tab==="blocks"?blocksHTML():UI.tab==="people"?peopleHTML():UI.tab==="check"?checkHTML():UI.tab==="perm"?permHTML():UI.tab==="sim"?simHTML():UI.tab==="confirm"?confirmHTML():decHTML();
   document.body.classList.add("bm");$("#main").innerHTML=c;lockSections();
   if(UI.focusName){UI.focusName=false;var ni=$(".bstudy .sname");if(ni&&!ni.disabled){ni.focus();ni.select();}}   /* 剛新增的計畫：游標直接停在名稱欄、整段選取，打字就會取代 */
   if(UI.flash){var fl=UI.flash;UI.flash=null;var host=$('.bstudy[data-sid="'+fl.sid+'"]');if(host){var el=host.querySelector('[data-b="'+fl.key+'"]');if(el)el.classList.add("flash");}}
   if(UI.tab==="blocks")requestAnimationFrame(drawLinks);}
-function changed(){var had=UI.sid;save();resolveSid();if(had&&UI.sid!==had&&!S.study(M,had))toast("計畫已刪除，已切換到其他計畫");else if(had&&UI.sid!==had)toast("你已不是原本那個計畫的成員，已切換到其他計畫",true);render();}
+function changed(){var had=UI.sid;save();resolveSid();if(had&&UI.sid!==had&&!S.study(M,had))toast("計畫已刪除，已切換到其他計畫");else if(had&&UI.sid!==had)toast("你在原本那個計畫沒有角色，已切換到其他計畫",true);render();}
 function denyMsg(sid,mg){return mg?S.DENY_MANAGE:S.DENY_EDIT;}
 function afterRes(r,sid){toast(r.msg,!r.ok);if(r.ok)changed();else render();}   /* updateXxx 的結果：失敗要說原因並把畫面還原 */
 function stewardWhy(scale,v){var cur=(M.stewards||{})[scale];if(cur&&cur!==UI.actor&&!isPf())return "這份量表已有負責人「"+oname(cur)+"」，只有他本人或系統管理者能更換";if(!cur&&v!==UI.actor&&!isPf())return "還沒有負責人時，只能由你自己擔任（或請系統管理者指派）";return "不能指定這個人當負責人";}
@@ -841,7 +872,9 @@ document.addEventListener("click",function(ev){var b=ev.target.closest("[data-ac
   if(a==="tab"){UI.tab=b.dataset.tab;render();return;}
   if(a==="pick"){UI.sid=sid;UI.overview=false;UI.armed=null;render();return;}
   if(a==="rm"){var kd=b.dataset.kind;if(S.removeItem(M,sid,kd,b.dataset.id,b.dataset.tid,UI.actor))changed();else{var mg0=kd==="owner"||kd==="subpi";if(!(mg0?S.canManage(M,UI.actor,sid):S.canEdit(M,UI.actor,sid))){toast(denyMsg(sid,mg0),true);render();}}return;}
-  if(a==="addstudy"){var ns=S.createStudy(M,UI.actor);UI.sid=ns.id;UI.overview=false;UI.focusName=true;changed();toast(ns.owner?"已新增計畫，"+oname(ns.owner)+"是這個計畫的 PI":"已新增計畫（尚未指定 PI）");return;}
+  if(a==="addtpl"){var rt=S.place(M,{kind:"template",id:b.dataset.id},{studyId:sid,slot:"templates"},UI.actor);toast(rt.msg,!rt.ok);if(rt.ok){UI.flash={sid:sid,key:"template:"+b.dataset.id};changed();}return;}
+  if(a==="addsug"){var rg=S.place(M,{kind:"scale",id:b.dataset.id},{studyId:sid,slot:"scales"},UI.actor);toast(rg.msg,!rg.ok);if(rg.ok){UI.flash={sid:sid,key:"scale:"+b.dataset.id};changed();}return;}
+  if(a==="addstudy"){var ns=S.createStudy(M,UI.actor);UI.sid=ns.id;UI.overview=false;UI.focusName=true;changed();toast(ns.owner?"已新增計畫，PI 是 "+oname(ns.owner):"已新增計畫（尚未指定 PI）");return;}
   if(a==="delstudy"){if(UI.armed===sid){UI.armed=null;var dr=S.deleteStudy(M,sid,UI.actor);if(dr.ok)changed();else render();toast(dr.msg,!dr.ok);}else{UI.armed=sid;render();setTimeout(function(){if(UI.armed===sid){UI.armed=null;render();}},3500);}return;}
   if(a==="save"){var blob=new Blob([JSON.stringify(M,null,1)],{type:"application/json"}),u=URL.createObjectURL(blob),l=document.createElement("a");l.href=u;l.download="ePRO_沙盤存檔_"+new Date().toISOString().slice(0,10)+".json";document.body.appendChild(l);l.click();setTimeout(function(){URL.revokeObjectURL(u);l.remove();},500);toast("已下載存檔");return;}
   if(a==="copy"){var txt=S.summarize(V(),UI.lastSim||S.simulate(V(),{cycleWeeks:3,horizonWeeks:26,enrolled:enrolledList()}));
@@ -891,7 +924,15 @@ document.addEventListener("drop",function(ev){delete document.body.dataset.drag;
 function setPick(el,d){var old=$(".picked");if(old)old.classList.remove("picked");
   if(!el){UI.pick=null;document.body.classList.remove("picking");return;}
   UI.pick=d;el.classList.add("picked");document.body.classList.add("picking");
-  toast("已選起「"+(el.textContent||"").trim().replace(/×$/,"")+"」，請點計畫裡要放的位置（再點一次取消）");}
+  var KN={owner:"",role:"團隊角色",disease:"疾病",template:"模板",scale:"量表"},nmx=pickName(d);
+  toast("已選起"+(KN[d.kind]||"")+"「"+nmx+"」，請點計畫裡要放的位置（再點一次取消）");}
+function pickName(d){var o;   /* 用資料裡的名稱，避免把畫面上的「推薦」標籤、題數一起帶進訊息 */
+  if(d.kind==="owner")return oname(d.id);
+  if(d.kind==="role")return (S.by(S.ROLES,d.id)||{name:d.id}).name;
+  if(d.kind==="disease")return (S.by(S.DISEASES,d.id)||{name:d.id}).name;
+  if(d.kind==="template")return (S.by(S.TEMPLATES,d.id)||{name:d.id}).name;
+  if(d.kind==="scale")return (S.by(S.SCALES,d.id)||{name:d.id}).name;
+  return String(d.id);}
 document.addEventListener("click",function(ev){
   var src=ev.target.closest&&ev.target.closest("[data-d]");
   if(src&&!ev.target.closest("[data-act]")){var d;try{d=JSON.parse(src.dataset.d);}catch(e){return;}
