@@ -293,21 +293,21 @@ if(HIDE_IRAE)delete CADENCES.irae;
 var LIC_REQ="待確認（以官網為準）";
 /* 量表：min＝估計填答分鐘（每題約 14 秒；症狀核心版取目標 ≤3 分鐘）→ 待實際量測 */
 var SCALES=[
- {id:"core8",name:"症狀核心版",items:8,min:3,kind:"triage",lic:"自編",val:"self",note:"診前症狀回報的基本題目"},
- {id:"full19",name:"症狀完整版",items:19,min:6,kind:"triage",lic:"自編",val:"self",note:"較完整的症狀題目"},
- {id:"adl2o",name:"ADL／工具性 ADL 簡短版",items:2,min:0.5,kind:"adl",lic:"自編",val:"self",note:"兩題日常生活功能，當作結果指標"},
- {id:"barthel",name:"Barthel 日常生活功能指數",items:10,min:2.3,kind:"adl",lic:LIC_REQ,val:"needs",note:"原本由醫護評估；改成病人自填需要先驗證"},
- {id:"lawton",name:"Lawton 工具性 ADL",items:8,min:1.9,kind:"adl",lic:LIC_REQ,val:"needs",note:"可由病人或家屬填寫；繁中版待確認"},
- {id:"c30",name:"EORTC QLQ-C30 生活品質",items:30,min:7,kind:"qol",lic:"需向 EORTC 登記授權",val:"validated",note:"有台灣繁中驗證版"},
- {id:"oes18",name:"EORTC QLQ-OES18 食道癌",items:18,min:4.2,kind:"disease",only:"escc",lic:"需向 EORTC 登記授權",val:"validated",note:"只適用食道癌；和 C30 一起填時，要錯開或分日"},
- {id:"lc13",name:"EORTC QLQ-LC13 肺癌",items:13,min:3,kind:"disease",only:"lung",lic:"需向 EORTC 登記授權",val:"needs",note:"繁中版與授權待確認"},
- {id:"hn35",name:"EORTC QLQ-H&N35 頭頸癌",items:35,min:8.2,kind:"disease",only:"hnscc",lic:"需向 EORTC 登記授權",val:"needs",note:"題數多，要注意填答負擔"},
- {id:"br23",name:"EORTC QLQ-BR23 乳癌",items:23,min:5.4,kind:"disease",only:"breast",lic:"需向 EORTC 登記授權",val:"needs",note:"繁中版與授權待確認"},
- {id:"eq5d",name:"EQ-5D-5L",items:6,min:2,kind:"qol",lic:"需向 EuroQol 註冊授權（部分用途收費）",val:"needs",note:"可算健康效用值；可選用"},
- {id:"factg",name:"FACT-G 生活品質",items:27,min:6.3,kind:"qol",lic:"需向 FACIT 註冊授權",val:"needs",note:"另一種常用的生活品質量表；繁中版待確認"},
- {id:"proctcae",name:"PRO-CTCAE 症狀",items:20,min:4.7,kind:"triage",lic:"NCI 授權（繁中版另需授權與驗證）",val:"needs",note:"美國 NCI 的病人自填版 CTCAE"},
- {id:"hads",name:"HADS 焦慮憂鬱",items:14,min:3.3,kind:"psych",lic:LIC_REQ,val:"needs",note:"評估焦慮與憂鬱"},
- {id:"custom",name:"自訂量表",items:10,min:3,kind:"custom",lic:"—",val:"self",note:"預留位置；題數與時間另外指定"}];
+ {id:"core8",name:"症狀核心版",brief:"症狀核心",items:8,min:3,kind:"triage",lic:"自編",val:"self",note:"診前症狀回報的基本題目"},
+ {id:"full19",name:"症狀完整版",brief:"症狀完整",items:19,min:6,kind:"triage",lic:"自編",val:"self",note:"較完整的症狀題目"},
+ {id:"adl2o",name:"ADL／工具性 ADL 簡短版",brief:"ADL 簡短",items:2,min:0.5,kind:"adl",lic:"自編",val:"self",note:"兩題日常生活功能，當作結果指標"},
+ {id:"barthel",name:"Barthel 日常生活功能指數",brief:"Barthel",items:10,min:2.3,kind:"adl",lic:LIC_REQ,val:"needs",note:"原本由醫護評估；改成病人自填需要先驗證"},
+ {id:"lawton",name:"Lawton 工具性 ADL",brief:"Lawton",items:8,min:1.9,kind:"adl",lic:LIC_REQ,val:"needs",note:"可由病人或家屬填寫；繁中版待確認"},
+ {id:"c30",name:"EORTC QLQ-C30 生活品質",brief:"QLQ-C30",items:30,min:7,kind:"qol",lic:"需向 EORTC 登記授權",val:"validated",note:"有台灣繁中驗證版"},
+ {id:"oes18",name:"EORTC QLQ-OES18 食道癌",brief:"QLQ-OES18",items:18,min:4.2,kind:"disease",only:"escc",lic:"需向 EORTC 登記授權",val:"validated",note:"只適用食道癌；和 C30 一起填時，要錯開或分日"},
+ {id:"lc13",name:"EORTC QLQ-LC13 肺癌",brief:"QLQ-LC13",items:13,min:3,kind:"disease",only:"lung",lic:"需向 EORTC 登記授權",val:"needs",note:"繁中版與授權待確認"},
+ {id:"hn35",name:"EORTC QLQ-H&N35 頭頸癌",brief:"QLQ-H&N35",items:35,min:8.2,kind:"disease",only:"hnscc",lic:"需向 EORTC 登記授權",val:"needs",note:"題數多，要注意填答負擔"},
+ {id:"br23",name:"EORTC QLQ-BR23 乳癌",brief:"QLQ-BR23",items:23,min:5.4,kind:"disease",only:"breast",lic:"需向 EORTC 登記授權",val:"needs",note:"繁中版與授權待確認"},
+ {id:"eq5d",name:"EQ-5D-5L",brief:"EQ-5D-5L",items:6,min:2,kind:"qol",lic:"需向 EuroQol 註冊授權（部分用途收費）",val:"needs",note:"可算健康效用值；可選用"},
+ {id:"factg",name:"FACT-G 生活品質",brief:"FACT-G",items:27,min:6.3,kind:"qol",lic:"需向 FACIT 註冊授權",val:"needs",note:"另一種常用的生活品質量表；繁中版待確認"},
+ {id:"proctcae",name:"PRO-CTCAE 症狀",brief:"PRO-CTCAE",items:20,min:4.7,kind:"triage",lic:"NCI 授權（繁中版另需授權與驗證）",val:"needs",note:"美國 NCI 的病人自填版 CTCAE"},
+ {id:"hads",name:"HADS 焦慮憂鬱",brief:"HADS",items:14,min:3.3,kind:"psych",lic:LIC_REQ,val:"needs",note:"評估焦慮與憂鬱"},
+ {id:"custom",name:"自訂量表",brief:"自訂",items:10,min:3,kind:"custom",lic:"—",val:"self",note:"預留位置；題數與時間另外指定"}];
 var CAP_DEFAULT=15;
 function by(a,id){for(var i=0;i<a.length;i++)if(a[i].id===id)return a[i];return null;}
 function uid(m,p){var n=1;while(true){var id=p+n;var ok=true;for(var i=0;i<m.studies.length;i++){if(m.studies[i].id===id)ok=false;for(var j=0;j<m.studies[i].templates.length;j++)if(m.studies[i].templates[j].tid===id)ok=false;}if(ok)return id;n++;}}
@@ -442,8 +442,8 @@ function recommendCombos(m,sid,tid){var s=study(m,sid),t=s&&tplOf(s,tid),d=t&&by
   function load(ids){var items=0,min=0;ids.forEach(function(id){var sc=by(SCALES,id);items+=sc.items;min+=sc.min;});return {items:items,min:Math.round(min*speed*10)/10};}
   function fits(L){return (!d.budgetItems||L.items<=d.budgetItems)&&(!d.budgetMin||L.min<=d.budgetMin);}
   function ofKind(k){return SCALES.filter(function(x){return x.kind===k;}).map(function(x){return x.id;});}
-  function shortName(id){return by(SCALES,id).name.replace(/^EORTC /,"");}
-  function entry(ids,extra){var L=load(ids),o={ids:ids,items:L.items,min:L.min,label:ids.map(shortName).join("＋")+"（"+L.items+" 題・"+L.min+" 分）"};for(var k in extra)o[k]=extra[k];return o;}
+  function shortName(id){var x=by(SCALES,id);return x.brief||x.name.replace(/^EORTC /,"");}   /* 手機上組合選項會折行，用簡稱（2026-10-09 user 實機回報） */
+  function entry(ids,extra){var L=load(ids),o={ids:ids,items:L.items,min:L.min,label:ids.map(shortName).join("＋")+"　"+L.items+" 題／"+L.min+" 分"};for(var k in extra)o[k]=extra[k];return o;}
   var mods=[];(s.diseases||[]).forEach(function(did){var dz=by(DISEASES,did);if(dz&&dz.mod&&mods.indexOf(dz.mod)<0)mods.push(dz.mod);});
   var groups=t.tpl==="triage"?[ofKind("triage")]:[ofKind("qol"),ofKind("adl"),ofKind("psych")];
   var combos=[[]];
@@ -452,9 +452,21 @@ function recommendCombos(m,sid,tid){var s=study(m,sid),t=s&&tplOf(s,tid),d=t&&by
   var within=combos.filter(function(c){return c.length&&fits(load(c));}).map(function(c){var covered=c.filter(function(id){return mods.indexOf(id)>=0;}).length;return entry(c,{score:[covered,c.indexOf("c30")>=0?1:0,-Math.abs(c.length-2.5),-load(c).min]});});
   within.sort(function(a,b){for(var i=0;i<a.score.length;i++){if(a.score[i]!==b.score[i])return b.score[i]-a.score[i];}return 0;});
   var common=[];if(t.tpl!=="triage")mods.forEach(function(mid){var ids=["c30",mid],e=entry(ids,{over:!fits(load(ids))});if(e.over)common.push(e);});
-  var out=[];if(mods.length>1){mods.forEach(function(mid){within.filter(function(e){return e.ids.indexOf(mid)>=0;}).slice(0,4).forEach(function(e){if(out.indexOf(e)<0)out.push(e);});});within.forEach(function(e){if(out.length<8&&out.indexOf(e)<0)out.push(e);});}else out=within.slice(0,8);   /* 計畫有好幾個疾病時，每個疾病各列幾組，不要被其中一個占滿 */
+  var out=[];if(mods.length>1){mods.forEach(function(mid){within.filter(function(e){return e.ids.indexOf(mid)>=0;}).slice(0,4).forEach(function(e){if(out.indexOf(e)<0)out.push(e);});});within.forEach(function(e){if(out.length<16&&out.indexOf(e)<0)out.push(e);});}else out=within.slice(0,16);   /* 計畫有好幾個疾病時，每個疾病各列幾組，不要被其中一個占滿 */
+  /* 依「要測什麼」挑 3–4 組常用的放最前面（2026-10-09 user：專家組合不錯；排列組合對專家像雜訊，但自由組合完全保留） */
+  var base=mods.length?mods[0]:(ofKind("qol").indexOf("c30")>=0?"c30":null),top=[];
+  if(t.tpl==="triage"){
+    [["最小負擔",["core8"]],["較完整",["full19"]],["美國 NCI 版",["proctcae"]]].forEach(function(p){
+      var e=within.filter(function(x){return x.ids.length===p[1].length&&p[1].every(function(id){return x.ids.indexOf(id)>=0;});})[0];
+      if(e&&top.indexOf(e)<0){e.purpose=p[0];top.push(e);}});
+  }else if(base){
+    [["最小負擔",[base]],["加日常功能",[base,"adl2o"]],["含健康效用值",[base,"eq5d"]],["含情緒",[base,"hads"]]].forEach(function(p){
+      var e=within.filter(function(x){return x.ids.length===p[1].length&&p[1].every(function(id){return x.ids.indexOf(id)>=0;});})[0];
+      if(e&&top.indexOf(e)<0){e.purpose=p[0];top.push(e);}});
+  }
+  var rest=out.filter(function(e){return top.indexOf(e)<0;});
   within.forEach(function(e){delete e.score;});
-  return {within:out,common:common,n:within.length};}
+  return {top:top,within:rest,common:common,n:within.length};}
 /* 套用推薦組合：取代這個模板目前的量表（全部設為主要量表）；檢查權限 */
 function applyCombo(m,sid,tid,ids,actor){if(!canEdit(m,actor,sid))return {ok:false,msg:DENY_EDIT};var s=study(m,sid),t=s&&tplOf(s,tid),d=t&&by(TEMPLATES,t.tpl);if(!t)return {ok:false,msg:"找不到模板"};
   if(!d.patient)return {ok:false,msg:"這個模板不需要病人填問卷，不能放量表"};
@@ -707,9 +719,9 @@ function dupNote(ids,sid){if(!ids)return "";var oth=ids.filter(function(i){retur
   return '<span class="dupn">也用於：'+(named.length?esc(named.join("、")):"")+(hid?(named.length?"；":"")+'另有 '+hid+' 個你看不到的計畫':"")+'</span>';}
 var SEGC=["var(--c5)","var(--c2)","var(--c3)","var(--c1)","var(--c4)","var(--c0)"];   /* 負擔條的分段色＝量表左邊的色塊，一對一對得上 */
 function cadOpts(t){return Object.keys(S.CADENCES).filter(function(c){return t.tpl==="triage"?(c==="visit"||c==="perCycle"):t.tpl==="pprom"?(c==="appB"||c==="perCycle"||c==="everyOther"||c==="weekly"):t.tpl==="irae"?c==="irae":c==="none";});}
-function comboSel(s,t){var rc=S.recommendCombos(M,s.id,t.tid);if(!rc.within.length&&!rc.common.length)return "";
+function comboSel(s,t){var rc=S.recommendCombos(M,s.id,t.tid);if(!rc.top.length&&!rc.within.length&&!rc.common.length)return "";
   function opt(e){return '<option value="'+e.ids.join(",")+'">'+esc(e.label)+'</option>';}
-  return '<label class="tc tcc'+(t.scales.length?"":" first")+'"><span>'+(t.scales.length?"推薦組合":"推薦組合（一次加一組）")+'</span><select data-act="combo" data-sid="'+s.id+'" data-tid="'+t.tid+'" aria-label="推薦組合"><option value="">'+(t.scales.length?"選一組（會取代目前的量表）…":"選一組…")+'</option>'+(rc.within.length?'<optgroup label="不超過上限（共 '+rc.n+' 組，先列 '+rc.within.length+' 組）">'+rc.within.map(opt).join("")+'</optgroup>':"")+(rc.common.length?'<optgroup label="常見搭配，但超過上限">'+rc.common.map(opt).join("")+'</optgroup>':"")+'</select></label>';}
+  return '<label class="tc tcc'+(t.scales.length?"":" first")+'"><span>'+(t.scales.length?"推薦組合":"推薦組合（一次加一組）")+'</span><select data-act="combo" data-sid="'+s.id+'" data-tid="'+t.tid+'" aria-label="推薦組合"><option value="">'+(t.scales.length?"選一組（會取代目前的量表）…":"選一組…")+'</option>'+(rc.top.length?'<optgroup label="依目的選">'+rc.top.map(function(e){return '<option value="'+e.ids.join(",")+'">'+esc(e.purpose+"："+e.label)+'</option>';}).join("")+'</optgroup>':"")+(rc.within.length?'<optgroup label="其他不超過上限（列 '+rc.within.length+'／'+rc.n+'）">'+rc.within.map(opt).join("")+'</optgroup>':"")+(rc.common.length?'<optgroup label="常見搭配，超過上限">'+rc.common.map(opt).join("")+'</optgroup>':"")+'</select></label>';}
 function tplBlock(s,t,dupMap,H0){var d=S.by(S.TEMPLATES,t.tpl),ld=S.tplLoad(t,M.speed),over=d.patient&&((d.budgetItems&&ld.items>d.budgetItems)||(d.budgetMin&&ld.min>d.budgetMin)),cads=cadOpts(t);
   var h='<div class="btpl'+(over?" red":"")+(feat("templates",t.tpl)?" rc":"")+'" data-tid="'+t.tid+'" data-b="template:'+t.tpl+'"><div class="tl-l"><div class="th" draggable="true" data-d="'+dpl({kind:"template",id:t.tpl,tid:t.tid,from:{studyId:s.id}})+'" title="'+esc(d.note)+'"><span class="tn">'+esc(d.name)+'</span>'+(feat("templates",t.tpl)?'<span class="rec">推薦</span>':"")+'<button class="x" type="button" data-act="rm" data-kind="template" data-sid="'+s.id+'" data-tid="'+t.tid+'" aria-label="移除模板">×</button></div>';
   if(d.patient){h+='<div class="tctl"><label class="tc"><span>頻率</span><select data-act="cad" data-sid="'+s.id+'" data-tid="'+t.tid+'" aria-label="頻率">'+cads.map(function(c){return '<option value="'+c+'"'+(c===t.cadence?" selected":"")+'>'+esc(S.CADENCES[c].replace(/（.*$/,""))+'</option>';}).join("")+'</select></label>'+
