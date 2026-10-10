@@ -300,6 +300,8 @@ h3{font-size:1rem;color:var(--ink);}
 .pmtk-m{font-size:.8rem;color:var(--soft);margin:3px 0;} .pmtk-act{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;} .pmtk .btn.armed{background:var(--err);border-color:var(--err);color:var(--sheet);}
 /* 權杖管理清單在全站 #modal 內（不在 .prom 底下），只用 token、無硬編色（暗色下 --err 是淺色，所以撤銷確認鈕文字用 --sheet 而不是白；test/prom_contrast.mjs 驗） */
 .chip{font-size:.84rem;color:var(--soft);} .chip b{color:var(--ink);font-weight:600;}
+.buildmark{font-size:.72rem;color:var(--soft);opacity:.75;margin-left:6px;white-space:nowrap;}@media (max-width:560px){.buildmark{display:none;}}  /* 手機頁首很擠，隱藏；仍可用 window.__build 查 */
+.failbar{position:sticky;top:0;z-index:41;background:#FDECEC;color:#8a1c1c;border-bottom:1px solid #F0B4B4;padding:8px 16px;font-size:.95rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}.failbar b{font-weight:700;} .failbar .btn{min-height:36px;}@media (max-width:880px),(pointer:coarse){.failbar .btn{min-height:44px;}}
 .bkbar{position:sticky;top:0;z-index:40;background:#FBF1DE;color:#6d4205;border-bottom:1px solid #E8CC95;padding:8px 16px;font-size:.9rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;} .bkbar[hidden]{display:none!important;} .bkhint{font-size:.8rem;opacity:.85;}
 .inst{border:2px solid var(--rule);border-radius:8px;margin:0 0 18px;} .inst .ih b{background:#0D6468;color:#fff;padding:2px 9px;border-radius:4px;} .inst.done{background:var(--well);} .inst.done .ib,.inst.collapsed .ib{display:none;}
 .inst .f.filled{border-left:3px solid #0D6468;padding-left:10px;background:linear-gradient(90deg,rgba(13,100,104,.06),transparent 40%);} .inst.compact .f:not(.filled):not(.req):not(.srcrow){display:none;} .inst.compact .srcrow{display:none;} .inst.compact h3[data-sech]{display:none;}
@@ -444,12 +446,13 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
 </head>
 <body>
 <div style="background:#F7EAD2;color:#7a4b06;padding:6px 16px;font-size:.92rem;text-align:center">測試版：只能輸入假資料，請勿輸入真實病人資料</div>
+<div id="failbar" class="failbar" hidden role="alert" aria-live="assertive"><b>沒有存成功</b> <span id="failmsg"></span> <button class="btn" type="button" id="failgo" hidden>重新讀取</button><button class="btn" type="button" id="failx" aria-label="關閉這則提醒">關閉</button></div>
 <div id="bkbar" class="bkbar" hidden><span id="bkmsg"></span> <button class="btn go" type="button" id="bkgo">立即下載加密備份</button> <span class="bkhint">存到 J:\escc_cmuh\cloud_backups\</span></div>
 <div class="bar">
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-10-10 20:34 47dc2ca</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -1451,7 +1454,7 @@ var SEC=(function(){
   /* this page's disease module; each study (research space) under /studies/{sid} belongs to one module */
   var MODULE="escc",DEFAULT_SID="ESCC",DEFAULT_NAME="食道鱗狀細胞癌(ESCC)";
   /* 2026-10-03 P10：「門診 ePRO」是另一個研究空間（mode:"prom"）：自己的成員、ePRO 金鑰、權杖與紀錄，病人不需要研究編號；登入後在「選擇作業」挑 */
-  var CLINIC_SID="CLINIC",CLINIC_NAME="門診 ePRO",IRAE_SID="IRAE",IRAE_NAME="irAE 登錄",STUDIES=[],CHOOSER_USER=null;
+  var CLINIC_SID="CLINIC",CLINIC_NAME="門診 ePRO",IRAE_SID="IRAE",IRAE_NAME="irAE 登錄",STUDIES=[],CHOOSER_USER=null,RETURN_TO=null;   /* RETURN_TO：由切換作業進到選擇畫面時，記住原本的作業，才能提供「取消」（2026-10-10） */
   function modeRank(m){return m==="prom"?2:m==="irae"?1:0;}
   function byMode(a,b){return modeRank(a.mode)-modeRank(b.mode)||String(a.name).localeCompare(String(b.name));}
   var enc=new TextEncoder(),dec=new TextDecoder();
@@ -1459,8 +1462,21 @@ var SEC=(function(){
   var EMU=/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&/[?&]emu=1/.test(location.search);
   var AUTH=null,FS=null,SESSION=null,PROFILE=null,PRIV=null,PUBK=null,PW=null;
   var DEKS={},DOCS={},USERS={},MEMBERS={},GLOBAL=null,pendingW=0,conflicts={},saveT=null,lastAct=Date.now(),loading=false;
-  window.__errs=[];window.addEventListener("error",function(e){window.__errs.push(String(e.message));});
-  window.addEventListener("unhandledrejection",function(e){window.__errs.push("rejection: "+String(e.reason&&e.reason.message||e.reason));});
+  /* JS 例外原本只存進 window.__errs 給測試用，使用者端完全看不見——診間出現例外時，
+     使用者看到的只是「按了沒反應」，而我們永遠不知道發生過（2026-10-10 P1）。
+     現在：顯示常駐橫幅（要手動關）＋寫一筆稽核。同一句錯誤只提示一次，避免洗版。 */
+  window.__errs=[];
+  var errSeen={},errShown=0;
+  function onJsErr(label,msg){
+    msg=String(msg||"").slice(0,300);
+    window.__errs.push(label?label+": "+msg:msg);
+    if(errSeen[msg])return;errSeen[msg]=1;
+    if(errShown<3&&window.failBar){errShown++;
+      window.failBar("系統發生錯誤，畫面上剛才的動作可能沒有完成。請截圖告知（含右上角的版本字樣）；若畫面卡住請重新載入頁面。");}
+    try{if(SESSION&&!SESSION.offline)secLog("前端錯誤："+msg.slice(0,150));}catch(e){}
+  }
+  window.addEventListener("error",function(e){onJsErr("",e.message);});
+  window.addEventListener("unhandledrejection",function(e){onJsErr("rejection",e.reason&&e.reason.message||e.reason);});
   function b64(u){var s="";u=new Uint8Array(u);for(var i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s);}
   function ub64(s){var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
   function rnd(n){return crypto.getRandomValues(new Uint8Array(n));}
@@ -1530,8 +1546,12 @@ var SEC=(function(){
 
   /* ---------- saving: only changed patients, debounced; writes queue offline and sync later ---------- */
   function track(p,id){pendingW++;syncChip();p.then(function(){pendingW--;syncChip();},function(e){pendingW--;
-    if(id){conflicts[id]=1;toast("「"+id+"」沒有存到雲端："+(e&&e.code==="permission-denied"?"資料已在別處更新或已改派，請先登出再重新登入後編輯":cErr(e)));}
-    else toast("雲端寫入失敗："+cErr(e));syncChip();});}
+    /* 寫入失敗改走常駐橫幅（2026-10-10 P0）：toast 3.4 秒就不見，使用者會以為存好了。 */
+    var m=id?("「"+id+"」沒有存到雲端："+(e&&e.code==="permission-denied"?"資料已在別處更新或已改派，請先登出再重新登入後編輯":cErr(e)))
+            :("雲端寫入失敗："+cErr(e));
+    if(id)conflicts[id]=1;
+    if(window.failBar)window.failBar(m);else toast(m);
+    syncChip();});}
   function writePatient(id,s){
     var d=DOCS[id],isNew=!d,ref=col("patients").doc(id);if(conflicts[id])return Promise.resolve();
     var prep=isNew?(function(){if(!isAdmin())return Promise.resolve(false);var raw=rnd(32);
@@ -1577,8 +1597,33 @@ var SEC=(function(){
         (p.role==="admin"&&!L.some(function(x){return x.mode==="prom";})?'<p><button class="btn" type="button" id="aMkClinic">＋建立「門診 ePRO」空間</button></p>':"")+
         (p.role==="admin"&&!L.some(function(x){return x.mode==="irae";})?'<p><button class="btn" type="button" id="aMkIrae">＋建立「irAE 登錄」空間</button></p>':"");
       $$("[data-st]",$("#aBody")).forEach(function(b){b.onclick=function(){enter(u,p,L[+b.dataset.st]);};});
+      /* 取消切換（2026-10-10，user：6 的替代方案）。三個前提都成立才出現：
+         ①是由切換作業進來的（登入時沒有「原本的作業」可回）②原本那個作業還在清單裡
+         （切換時會重讀帳號文件，萬一剛被主持人移除就不能指向它）③畫面上真的有選項。
+         取消＝重新進入原本的空間；金鑰在切換時已清掉，所以會重新解密（跟正常進入一樣要等），
+         但不需要再輸密碼。寫入在拆掉之前就 flush 過了，所以取消不涉及未存資料。 */
+      var rt=RETURN_TO&&L.filter(function(x){return x.sid===RETURN_TO.sid;})[0];
+      if(rt){$("#aBody").insertAdjacentHTML("beforeend",
+          '<p><button class="btn" type="button" id="aCancelSw">取消，回到「'+esc(rt.name)+'」</button>'+
+          '<span class="adesc" style="display:block;margin:3px 0 0">會重新讀取並解密該空間的資料，不需要再輸入密碼。</span></p>');
+        var doCancel=function(){var b=$("#aCancelSw");if(!b||b.disabled)return;b.disabled=true;   /* 防連點：兩次 enter 會同時 loadAll */
+          secLog("取消切換作業，回到"+rt.name);enter(u,p,rt);};
+        $("#aCancelSw").onclick=doCancel;
+        try{if(window.history&&history.pushState&&!(history.state&&history.state.chooser))history.pushState({chooser:1},"");}catch(e){}
+        CHOOSER_CANCEL=doCancel;
+      }else CHOOSER_CANCEL=null;
       var mk=$("#aMkClinic");if(mk)mk.onclick=function(){mk.disabled=true;createPromSpace().then(function(){return start(u,p);},function(e){mk.disabled=false;err(cErr(e));});};
       var mi=$("#aMkIrae");if(mi)mi.onclick=function(){mi.disabled=true;createIraeSpace().then(function(){return start(u,p);},function(e){mi.disabled=false;err(cErr(e));});};});}
+  /* 選擇作業畫面的返回鍵：等於按「取消，回到原本的作業」。只有那顆按鈕存在時才接手，
+     登入時出現的選擇畫面行為完全不變（不推紀錄、返回鍵照舊）。 */
+  var CHOOSER_CANCEL=null;
+  if(typeof window!=="undefined"&&window.addEventListener)window.addEventListener("popstate",function(){
+    var m=document.getElementById("modal");if(m&&m.classList.contains("open"))return;   /* 對話框造成的返回不要處理 */
+    if(window.__MODALNAV&&Date.now()-window.__MODALNAV<1200)return;
+    var a=document.getElementById("auth");
+    if(!CHOOSER_CANCEL||!a||a.hidden)return;
+    var f=CHOOSER_CANCEL;CHOOSER_CANCEL=null;f();});
+
   /* 建立／切換作業空間（P10） */
   function createPromSpace(){if(!isAdmin())return Promise.reject(new Error("只有主持人可以建立"));
     return col("studies").doc(CLINIC_SID).get().then(function(d){if(d.exists&&d.data().mode==="prom")return {sid:CLINIC_SID,name:d.data().name||CLINIC_NAME,mode:"prom",existed:true};
@@ -1593,12 +1638,15 @@ var SEC=(function(){
     .then(function(st){if(!STUDIES.some(function(z){return z.sid===st.sid;})){STUDIES=STUDIES.concat([st]).sort(byMode);}var sw=$("#bSwitch");if(sw&&SESSION&&!SESSION.offline)sw.hidden=STUDIES.length<2;if(SESSION)secLog("建立 irAE 登錄空間 "+st.sid);return st;});}
   function switchSpace(){if(!SESSION||SESSION.offline||!CHOOSER_USER||STUDIES.length<2)return Promise.resolve();
     var u=CHOOSER_USER,p=PROFILE;try{tick();}catch(e){}secLog("切換作業");
+    RETURN_TO={sid:SESSION.sid,name:SESSION.studyName};
     return flush().then(function(){return Promise.race([FS.waitForPendingWrites(),new Promise(function(r){setTimeout(r,10000);})]);}).catch(function(){}).then(function(){
       if(typeof PROM!=="undefined")PROM.onLock();if(typeof IRAE!=="undefined")IRAE.onLock();DB=emptyDB();DEKS={};DOCS={};USERS={};MEMBERS={};GLOBAL=null;SESSION=null;cur=null;STATE={};
       $("#main").innerHTML="";$("#dock").hidden=true;$("#list").innerHTML="";var bb=$("#bkbar");if(bb)bb.hidden=true;$("#auth").hidden=false;err("");
       /* 重新讀一次自己的帳號文件：登入後才被主持人加進別的空間的人，切換作業時才看得到（舊版會沿用登入當下的 profile） */
       return col("users").doc(u.uid).get().then(function(d){var p2=d.exists?d.data():p;if(p2.role==="pending"||p2.role==="disabled")p2=p;PROFILE=p2;return start(u,p2);},function(){return start(u,p);});});}
-  function enter(u,p,st){SESSION={uid:u.uid,email:u.email,name:p.name||u.email,role:p.role==="admin"?"manager":"abstractor",fbRole:p.role,sid:st.sid,studyName:st.name,mode:st.mode||""};
+  function enter(u,p,st){RETURN_TO=null;CHOOSER_CANCEL=null;
+    try{if(window.history&&history.state&&history.state.chooser)history.replaceState({},"");}catch(e){}
+    SESSION={uid:u.uid,email:u.email,name:p.name||u.email,role:p.role==="admin"?"manager":"abstractor",fbRole:p.role,sid:st.sid,studyName:st.name,mode:st.mode||""};
     lastAct=Date.now();loading=true;$("#aSub").textContent="解密資料中…";$("#aBody").innerHTML='<p class="adesc" id="aProg"></p>';
     var pre=isAdmin()?Promise.resolve():col("members").doc(u.uid).get().then(function(m){var r=m.exists&&m.data().role;if(r==="nurse"||r==="doctor")SESSION.role=r;});
     return pre.then(function(){return loadAll(function(d,n){var e=$("#aProg");if(e)e.textContent=d+" / "+n;});}).catch(function(e){loading=false;SESSION=null;
@@ -5871,6 +5919,23 @@ function create(b,source){var id=b.pid+"_"+b.visit;if(!b.pid)return Promise.reje
     return x().col("prom").doc(id).set(data).then(function(){RECS[id]={id:id,meta:Object.assign({},data),body:b};sortOrder();return id;});});}
 function save(r,extra){return seal(r.body).then(function(o){var ver=(r.meta.ver||1)+1,data=Object.assign({iv:o.iv,ct:o.ct,ver:ver,updatedAt:x().TS(),updatedBy:meUid()},extra||{});
   var ref=x().col("prom").doc(r.id);return ref.update(data).then(function(){Object.assign(r.meta,data,{ver:ver});return ref.collection("log").add({uid:meUid(),at:x().TS(),ver:ver}).catch(function(){});});});}
+/* 初審／結案寫入失敗時給人看的話（2026-10-10 多角色同時操作壓力測試抓到：原本是
+   toast(e.message||cErr(e))，e.message 是原始的規則錯誤，醫師會看到
+   「PERMISSION_DENIED: evaluation error at L144:26 for 'update' ...」這種東西）。
+   最常見的原因就是同一筆剛被別人改掉（規則要求版本必須等於既有+1），所以直接講那件事
+   並說怎麼辦；我們自己丟的錯誤訊息（例如「請至少選一個等級」）照原樣顯示。 */
+function wErr(e){var c=e&&e.code||"";
+  if(c==="permission-denied"||/PERMISSION_DENIED|permission-denied/.test(String(e&&e.message||"")))
+    return "這筆剛被別人更新（可能已由其他人初審或結案），您這次的變更沒有存上去。請按下面的「重新讀取」看最新狀態，再決定要不要重做。";
+  return (e&&e.message)||x().cErr(e);}
+/* 寫入失敗要用常駐橫幅，不能用 toast（2026-10-10 P0：toast 3.4 秒就消失，醫師一轉頭
+   就會以為已經結案）。我們自己丟的檢查訊息（例如「請至少選一個等級」）仍走 toast，
+   那種是當下就會看到、而且不代表資料沒存。 */
+function isSaveFail(e){var c=e&&e.code||"";
+  return c==="permission-denied"||c==="unavailable"||c==="aborted"||c==="deadline-exceeded"
+    ||/PERMISSION_DENIED|permission-denied|UNAVAILABLE/.test(String(e&&e.message||""));}
+function wFail(e,retry){var m=wErr(e);
+  if(isSaveFail(e)&&window.failBar)window.failBar(m,retry||null);else toast(m);}
 function review(id,f){var r=RECS[id];if(!r)return Promise.reject(new Error("找不到紀錄"));if(!canReview())return Promise.reject(new Error("只有個管師或主持人可以初審"));
   var old=r.body,b=JSON.parse(JSON.stringify(old));applyReview(b,{by:meUid(),name:meName(),at:Date.now(),note:f.note,contacted:f.contacted,urgency:f.urgency,signal:f.signal,terms:f.terms,suggest:f.suggest,confirms:f.confirms});
   var en=enrich(b,prevBody(b.pid,b.filledAt,id));r.body=b;
@@ -6332,12 +6397,12 @@ function wire(r,en){wireTodo(r);SELB=r.body;rowsEl().forEach(function(row){var t
       bt.onclick=function(){$$(".gb",row).forEach(function(z){z.classList.remove("on");});bt.classList.add("on");PICK[term]=parseInt(bt.dataset.g,10);updCnt();show(bt.dataset.g);};});
     var inf=$(".info",row);if(inf)inf.onclick=function(){row.nextElementSibling.classList.toggle("hid");};row.onclick=function(ev){if(ev.target.closest(".gb")||ev.target.closest(".info"))return;FOCUS=rowsEl().indexOf(row);paintFocus();};});
   var tf=$("#pmTf");if(tf)tf.oninput=drawChips;$("#pmClose").onclick=function(){mBack();SEL=null;NOAUTO=true;$("#pmDet").innerHTML="";PICK={};TERMS=[];$$("#pmTbl tr.prow").forEach(function(z){z.classList.remove("on");});};
-  var rv=$("#pmRev");if(rv)rv.onclick=function(){review(r.id,{note:$("#pmNote").value,contacted:$("#pmCt").checked,urgency:$("#pmUrg").value,signal:$("#pmSig").value,terms:TERMS,suggest:PICK,confirms:DRAFT[r.id]}).then(function(){toast("已送出（"+meName()+"）");EN=ens();drawKpi();drawList();if(SEL===r.id){PICK={};TERMS=[];drawDetail(r.id);}}).catch(function(e){toast(e.message||x().cErr(e));});};
+  var rv=$("#pmRev");if(rv)rv.onclick=function(){review(r.id,{note:$("#pmNote").value,contacted:$("#pmCt").checked,urgency:$("#pmUrg").value,signal:$("#pmSig").value,terms:TERMS,suggest:PICK,confirms:DRAFT[r.id]}).then(function(){toast("已送出（"+meName()+"）");EN=ens();drawKpi();drawList();if(SEL===r.id){PICK={};TERMS=[];drawDetail(r.id);}}).catch(function(e){wFail(e,function(){return loadAll().then(function(){EN=ens();drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);});});});};
   var rn=$("#pmRevNext");if(rn)rn.onclick=function(){var ids=listIds(),i=ids.indexOf(r.id),nx=ids[i+1]||ids[i-1]||null;
-    review(r.id,{note:$("#pmNote").value,contacted:$("#pmCt").checked,urgency:$("#pmUrg").value,signal:$("#pmSig").value,terms:TERMS,suggest:PICK,confirms:DRAFT[r.id]}).then(function(){toast("已送出，下一位 "+(nx?RECS[nx].body.pid:"（沒有了）"));PICK={};TERMS=[];EN=ens();SEL=nx;drawKpi();drawList();if(nx)drawDetail(nx);else $("#pmDet").innerHTML='<p class="pm-empty">本診病人已全部檢視完畢。</p>';if(nx)hDet(nx);mTop();}).catch(function(e){toast(e.message||x().cErr(e));});};
+    review(r.id,{note:$("#pmNote").value,contacted:$("#pmCt").checked,urgency:$("#pmUrg").value,signal:$("#pmSig").value,terms:TERMS,suggest:PICK,confirms:DRAFT[r.id]}).then(function(){toast("已送出，下一位 "+(nx?RECS[nx].body.pid:"（沒有了）"));PICK={};TERMS=[];EN=ens();SEL=nx;drawKpi();drawList();if(nx)drawDetail(nx);else $("#pmDet").innerHTML='<p class="pm-empty">本診病人已全部檢視完畢。</p>';if(nx)hDet(nx);mTop();}).catch(function(e){wFail(e,function(){return loadAll().then(function(){EN=ens();drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);});});});};
   var okn=$("#pmOkNext");if(okn)okn.onclick=function(){var ids=listIds(),i=ids.indexOf(r.id),nx=ids[i+1]||ids[i-1]||null;if(nx===r.id)nx=null;
-    confirm(r.id,PICK,$("#pmPlan").value).then(function(){toast("已確認並結案（"+meName()+"），下一位 "+(nx&&RECS[nx]?RECS[nx].body.pid:"（沒有了）"));PICK={};TERMS=[];EN=ens();SEL=nx;drawKpi();drawList();if(nx)drawDetail(nx);else $("#pmDet").innerHTML='<p class="pm-empty">本診病人已全部確認完畢。</p>';if(nx)hDet(nx);mTop();}).catch(function(e){toast(e.message||x().cErr(e));});};
-  var ok=$("#pmOk");if(ok)ok.onclick=function(){confirm(r.id,PICK,$("#pmPlan").value).then(function(){toast("已確認並結案（"+meName()+"）");PICK={};TERMS=[];EN=ens();drawKpi();drawList();drawDetail(r.id);}).catch(function(e){toast(e.message||x().cErr(e));});};
+    confirm(r.id,PICK,$("#pmPlan").value).then(function(){toast("已確認並結案（"+meName()+"），下一位 "+(nx&&RECS[nx]?RECS[nx].body.pid:"（沒有了）"));PICK={};TERMS=[];EN=ens();SEL=nx;drawKpi();drawList();if(nx)drawDetail(nx);else $("#pmDet").innerHTML='<p class="pm-empty">本診病人已全部確認完畢。</p>';if(nx)hDet(nx);mTop();}).catch(function(e){wFail(e,function(){return loadAll().then(function(){EN=ens();drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);});});});};
+  var ok=$("#pmOk");if(ok)ok.onclick=function(){confirm(r.id,PICK,$("#pmPlan").value).then(function(){toast("已確認並結案（"+meName()+"）");PICK={};TERMS=[];EN=ens();drawKpi();drawList();drawDetail(r.id);}).catch(function(e){wFail(e,function(){return loadAll().then(function(){EN=ens();drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);});});});};
   var ch=$("#pmChart");if(ch)ch.onclick=function(){openChart(r,en);};
   var ro=$("#pmReopen");if(ro)ro.onclick=function(){ask("重新開啟此筆紀錄？結案標記將取消，紀錄不會刪除。").then(function(y){if(!y)return;reopen(r.id).then(function(){toast("已重開");EN=ens();drawList();drawDetail(r.id);}).catch(function(e){toast(e.message||x().cErr(e));});});};
   var dl=$("#pmDel");if(dl)dl.onclick=function(){dialog({title:"永久刪除這筆 ePRO 紀錄？",msg:"紀錄 "+r.id+" 會被永久刪除，無法復原（留稽核紀錄）。這是給清測試資料用的；真實病人請用「結案」。請輸入研究編號確認。",fields:[{k:"c",label:"輸入研究編號："+r.body.pid,req:1}],ok:"永久刪除"}).then(function(v){if(!v)return;
@@ -7191,6 +7256,28 @@ function grantKeys(){return store().openKey().then(function(){var M=x().members(
   return Promise.all(jobs).then(function(a){return a.reduce(function(n,v){return n+v;},0);});});}
 return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:function(){return LIST.length;},home:home,openSubject:openSubject,grantKeys:grantKeys,grantOne:grantOne,revokeOne:revokeOne,store:store,
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
+})();
+
+window.__build="2026-10-10 20:34 47dc2ca";
+
+/* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
+   toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
+   一條要手動關掉的橫幅；有需要時可以帶一個「重新讀取」動作。 */
+(function(){
+  window.failBar=function(msg,onRetry){
+    var b=document.getElementById("failbar");
+    if(!b){if(typeof toast==="function")toast(msg);return;}
+    document.getElementById("failmsg").textContent=msg;
+    var g=document.getElementById("failgo");
+    if(onRetry){g.hidden=false;g.onclick=function(){g.disabled=true;
+      Promise.resolve().then(onRetry).then(function(){b.hidden=true;},function(){}).then(function(){g.disabled=false;});};}
+    else{g.hidden=true;g.onclick=null;}
+    b.hidden=false;
+    try{b.scrollIntoView({block:"nearest"});}catch(e){}
+  };
+  window.failBarHide=function(){var b=document.getElementById("failbar");if(b)b.hidden=true;};
+  document.addEventListener("click",function(ev){
+    if(ev.target&&ev.target.id==="failx")window.failBarHide();});
 })();
 
 
