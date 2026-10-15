@@ -452,7 +452,7 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-10-10 20:34 47dc2ca</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-10-15 09:37 830c173</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -1448,7 +1448,7 @@ function dialog(o){return new Promise(function(res){
    Each user's private key is wrapped with their own password (PBKDF2-SHA256, 600k); the investigator's is also
    wrapped with a one-time recovery code. Plaintext exists only in this page's memory while signed in.
    Server-side access control: firestore.rules (tested in the emulator). */
-var RN={user:"登錄人員",admin:"主持人",manager:"主持人",abstractor:"登錄人員",nurse:"個管師",doctor:"醫師",physician:"醫師",auditor:"稽核員",pending:"待核准",disabled:"已停用"};
+var RN={user:"登錄人員",admin:"主持人",manager:"主持人",abstractor:"登錄人員",nurse:"個管師",doctor:"醫師",pharm:"臨床藥師",physician:"醫師",auditor:"稽核員",pending:"待核准",disabled:"已停用"};
 var SEC=(function(){
   var ITER=600000,IDLE_MS=15*60*1000,DEBOUNCE=3000;
   /* this page's disease module; each study (research space) under /studies/{sid} belongs to one module */
@@ -1531,7 +1531,7 @@ var SEC=(function(){
   function loadAll(progress){
     DB=emptyDB();DEKS={};DOCS={};conflicts={};
     if(SESSION.mode==="irae"&&!isAdmin())return Promise.resolve({n:0,miss:0,fromCache:false});   /* irAE 空間：沒有病歷摘錄，研究助理／醫師的資料由 IRAE 模組自己讀 */
-    if(SESSION.role==="nurse"||SESSION.role==="doctor")return PROM.loadAll(progress);  /* 個管師/醫師：只讀 ePRO，讀不到病歷摘錄(規則也擋) */
+    if(SESSION.role==="nurse"||SESSION.role==="doctor"||SESSION.role==="pharm")return PROM.loadAll(progress);  /* 個管師/醫師：只讀 ePRO，讀不到病歷摘錄(規則也擋) */
     var q=isAdmin()?col("patients"):col("patients").where("assignee","==",SESSION.uid);
     return q.get().then(function(qs){var docs=qs.docs,done=0,miss=0,out=[];
       var next=function(i){if(i>=docs.length)return Promise.resolve();return Promise.all(docs.slice(i,i+50).map(function(d){
@@ -1648,10 +1648,15 @@ var SEC=(function(){
     try{if(window.history&&history.state&&history.state.chooser)history.replaceState({},"");}catch(e){}
     SESSION={uid:u.uid,email:u.email,name:p.name||u.email,role:p.role==="admin"?"manager":"abstractor",fbRole:p.role,sid:st.sid,studyName:st.name,mode:st.mode||""};
     lastAct=Date.now();loading=true;$("#aSub").textContent="解密資料中…";$("#aBody").innerHTML='<p class="adesc" id="aProg"></p>';
-    var pre=isAdmin()?Promise.resolve():col("members").doc(u.uid).get().then(function(m){var r=m.exists&&m.data().role;if(r==="nurse"||r==="doctor")SESSION.role=r;});
+    var pre=isAdmin()?Promise.resolve():col("members").doc(u.uid).get().then(function(m){var d=m.exists&&m.data(),r=d&&d.role;
+      /* 2026-10-14：成員可帶有效期 until（臨床藥師實習生兩週一輪）。規則端會擋，這裡也擋一次 ——
+         否則過期的人進得到畫面、按下去才被拒，看起來像系統壞了。 */
+      if(d&&d.until&&d.until.toDate&&d.until.toDate()<=new Date())return;
+      if(r==="nurse"||r==="doctor"||r==="pharm"){SESSION.role=r;if(d.until&&d.until.toDate)SESSION.until=d.until.toDate();}});
     return pre.then(function(){return loadAll(function(d,n){var e=$("#aProg");if(e)e.textContent=d+" / "+n;});}).catch(function(e){loading=false;SESSION=null;
       $("#aSub").textContent="讀取資料失敗";$("#aBody").innerHTML='<p class="adesc">'+esc(cErr(e))+'</p><p><button class="btn" type="button" id="aBack">回到登入畫面</button></p>';
       $("#aBack").onclick=function(){AUTH.signOut().then(showLogin);};throw e;}).then(function(r){loading=false;secLog("登入");applySession();
+      expiryNotice();
       if(isAdmin()&&!PROFILE.recPriv)toast("您尚未建立復原碼。請按右上角「建立復原碼」；否則忘記密碼時，資料將無法復原");
       if(r.miss)toast(isAdmin()?r.miss+" 位病人無法以您目前的金鑰解密（可能原因：金鑰曾經重建）。這些資料以舊金鑰加密，請聯絡系統維護者":r.miss+" 位病人尚未授權給您的金鑰，請通知主持人");if(r.regranted)toast("已自動把 "+r.regranted+" 位病人重新授權給更新過金鑰的助理");if(r.fromCache)toast("目前離線：所顯示者為這台電腦上次同步的資料");});}
   function wipe(){if(typeof PROM!=="undefined")PROM.onLock();if(typeof IRAE!=="undefined")IRAE.onLock();DB=emptyDB();DEKS={};DOCS={};USERS={};MEMBERS={};GLOBAL=null;PRIV=null;PW=null;SESSION=null;PROFILE=null;cur=null;STATE={};
@@ -1676,7 +1681,7 @@ var SEC=(function(){
   /* admin: approve / disable; approving re-grants the user's assigned patients to their (possibly new) key */
   /* global account role (user/disabled) + membership in the current study; approving also re-grants this study's assigned patients */
   function setRole(uid,role,name){if(!isAdmin())return Promise.reject(new Error("只有主持人可以核准"));
-    var sid=SESSION.sid,upd={approvedAt:TS(),approvedBy:SESSION.uid},join=["abstractor","nurse","doctor"].indexOf(role)>=0;upd.role=join||role==="user"?"user":role;if(name)upd.name=name;
+    var sid=SESSION.sid,upd={approvedAt:TS(),approvedBy:SESSION.uid},join=["abstractor","nurse","doctor","pharm"].indexOf(role)>=0;upd.role=join||role==="user"?"user":role;if(name)upd.name=name;
     if(join)upd["studies."+sid]=true;
     return col("users").doc(uid).update(upd).then(function(){if(join)return col("members").doc(uid).set({role:role,name:name||USERS[uid].name||"",at:TS()});})
       .then(refreshUsers).then(function(){secLog((join?"核准並加入本研究("+RN[role]+") ":"設定帳號 "+upd.role+" ")+USERS[uid].email);return (join?(SESSION.mode==="irae"?iraeGrant(uid):(role==="abstractor"?regrant(uid):PROM.grant(uid))):Promise.resolve()).then(function(){return role==="nurse"||role==="doctor"?0:promRevokeStale();});});}
@@ -1782,6 +1787,18 @@ var SEC=(function(){
   function can(a){return !!SESSION&&(PERM[a]||[]).indexOf(SESSION.role)>=0;}
 
   /* ---------- UI ---------- */
+  /* 到期預告（cb 2026-10-15 覆核建議）：存取權限四週到期。
+     不預告的話，實習藥師可能在值班中途突然什麼都不能做，而且不會知道為什麼。
+     七天內開始提醒；當天到期講得更明白。 */
+  function expiryNotice(){
+    if(!SESSION||!SESSION.until)return;
+    var ms=SESSION.until-Date.now(),d=Math.ceil(ms/86400000);
+    if(d>7)return;
+    var when=SESSION.until.toLocaleDateString()+" "+SESSION.until.toTimeString().slice(0,5);
+    toast(d<=0?"您在本研究的存取權限已到期，請聯絡主持人":
+          d<=1?"您在本研究的存取權限將於今天 "+when.slice(-5)+" 到期，請提早收尾或聯絡主持人":
+               "您在本研究的存取權限將於 "+when+" 到期（還有 "+d+" 天）");
+  }
   function applySession(){
     var r=SESSION.role,ui=r==="manager"?"abstractor":r;
     $("#who").value=SESSION.name;$("#role").value=ui;document.body.dataset.role=ui;
@@ -1865,11 +1882,11 @@ var SEC=(function(){
   }
   function renderUsers(){cur=null;$("#dock").hidden=true;$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取帳號中…</p></section>';
     return refreshUsers().then(drawUsers,function(e){toast(cErr(e));});}
-  function joinBtns(uid,pre){return (SESSION&&SESSION.mode==="prom"?["nurse","doctor"]:SESSION&&SESSION.mode==="irae"?["abstractor","doctor"]:["abstractor","nurse","doctor"]).map(function(r){return '<button class="btn'+(r==="abstractor"?" go":"")+'" type="button" data-ok="'+uid+'" data-mr="'+r+'">'+pre+RN[r]+'</button>';}).join(" ")+" ";}
+  function joinBtns(uid,pre){return (SESSION&&SESSION.mode==="prom"?["nurse","doctor","pharm"]:SESSION&&SESSION.mode==="irae"?["abstractor","doctor"]:["abstractor","nurse","doctor"]).map(function(r){return '<button class="btn'+(r==="abstractor"?" go":"")+'" type="button" data-ok="'+uid+'" data-mr="'+r+'">'+pre+RN[r]+'</button>';}).join(" ")+" ";}
   function drawUsers(){
     var m=$("#main"),sn=esc(SESSION.studyName||SESSION.sid);
     var rank=function(uid){var u=USERS[uid];return u.role==="pending"||u.role==="abstractor"?0:u.role==="admin"?3:1;};
-    var rows=Object.keys(USERS).sort(function(a,b){return rank(a)-rank(b);}).map(function(uid){var u=USERS[uid],me=uid===SESSION.uid,mb=MEMBERS[uid],inS=mb&&["abstractor","nurse","doctor"].indexOf(mb.role)>=0;
+    var rows=Object.keys(USERS).sort(function(a,b){return rank(a)-rank(b);}).map(function(uid){var u=USERS[uid],me=uid===SESSION.uid,mb=MEMBERS[uid],inS=mb&&["abstractor","nurse","doctor","pharm"].indexOf(mb.role)>=0;
       var n=DB.order.filter(function(id){return DB.assign[id]===uid;}).length,act="";
       if(me)act="（您）";
       else if(u.role==="pending"||u.role==="abstractor")act=joinBtns(uid,"核准並加入為");  /* "abstractor" = approved under v1 rules */
@@ -5703,9 +5720,17 @@ G.init(PROM_CTCAE,PROM_PANEL);
 function x(){if(!X)X=SEC._x;return X;}
 function S(){return SEC.session();}
 function role(){var s=S();return s?s.role:null;}
-function clin(){return role()==="nurse"||role()==="doctor";}
+/* ⚠️ 要新增／移除角色時，先跑這一行，逐處確認（2026-10-15 cb 的建議：把需要記性的事換成會回答的指令）：
+     grep -nE "'(nurse|doctor|pharm|abstractor)'|\"(nurse|doctor|pharm|abstractor)\"" \
+       prom_module.js cloud_module.js firestore.rules
+   2026-10-15 當日是 24 處（規則 4、工作站 14、ePRO 6）。**數字會漂，指令才是依據** ——
+   我這一輪就是靠「原則」而漏掉金鑰重新授權那一處，而它正好落在我自己寫下的原則裡面。
+   容易漏的幾類：權限判斷、金鑰授權、**金鑰回收**、**金鑰重新授權**、畫面分支、角色中文對照表（有兩份）。 */
+function clin(){return role()==="nurse"||role()==="doctor"||role()==="pharm";}
 function promSpace(){var s=S();return !!s&&s.mode==="prom";}
-function canReview(){return role()==="nurse"||role()==="manager";}
+/* 2026-10-14 使用者裁示「藥師同為初審權限」：pharm 併入初審這一層。
+   結案仍是 canConfirm()（醫師／主持人），所以藥師能初審、不能結案 —— 最終結論的責任沒有移動。 */
+function canReview(){return role()==="nurse"||role()==="manager"||role()==="pharm";}
 function canConfirm(){return role()==="doctor"||role()==="manager";}
 function docOnly(){return role()==="doctor";}  /* 醫師專用畫面差異（2026-10-08 user「Ok」：醫師頁 9 條，第 6 條「照個管師建議一鍵帶入」保守不做） */
 function meUid(){var s=S();return s?s.uid:"";}
@@ -5838,7 +5863,9 @@ function enrich(b,prev,draft){var ev=evOf(b,draft),e=G.summary(ev),fl=F.fire(PRO
   if(pr&&tri.level!=="red")tri={level:"confirm",n_grade:tri.n_grade,why:["有 "+pr+" 項紅旗相關待確認"].concat(tri.why||[])};
   return {envelope:e,flags:fl,prev:pv,unfilled:unfilledOf(b),overlaid:Object.keys(confMap(b,draft)).filter(function(k){return k.charAt(0)!=="!";}),quiet:(function(){var M=lm();if(!M||!b.list)return [];var q=M.quietFlags(b.list,b.treatments||[]);return Object.keys(q).filter(function(k){return q[k];});})(),triage:tri,cc_brief:String((b.cc||{}).text||"").trim().slice(0,40),
     reviewed:!!(b.layer2&&b.layer2.length),confirmed:!!b.layer3,hasText:hasText};}
-function applyReview(b,en){var e={by:en.by,name:en.name,at:en.at,note:String(en.note||""),contacted:!!en.contacted,urgency:en.urgency||"routine",
+/* 2026-10-14：多記一個 role。個管師讀到一筆初審時，需要知道這是同儕的判斷、還是實習藥師的判斷 ——
+   不是為了不信任，是為了知道要不要再看一眼。舊紀錄沒有這個欄位，顯示時一律當成個管師。 */
+function applyReview(b,en){var e={by:en.by,name:en.name,role:en.role||"",at:en.at,note:String(en.note||""),contacted:!!en.contacted,urgency:en.urgency||"routine",
   signal:en.signal||"",terms:(en.terms||[]).slice(),suggest:Object.assign({},en.suggest||{})};var cf=confClean(en.confirms);if(Object.keys(cf).length)e.confirms=cf;b.layer2=(b.layer2||[]).concat([e]);return b;}
 function applyConfirm(b,en){b.layer3={by:en.by,name:en.name,at:en.at,grades:Object.assign({},en.grades||{}),plan:String(en.plan||"")};return b;}
 function newBody(o){return {pid:String(o.pid||"").trim(),visit:o.visit||("v"+Date.now().toString(36)),filledAt:o.filledAt||Date.now(),filledBy:o.filledBy||"self",
@@ -5855,7 +5882,14 @@ function chartText(b,en,pick,planNow,whoNow){var L=[],l3=b.layer3,g=l3?l3.grades
   L.push("");if(en.flags.today.length){L.push("病人回報");en.flags.today.forEach(function(f){L.push("　"+f.text);});}
   var cc=String((b.cc||{}).text||"").trim();if(cc)L.push("病人自述「"+cc+"」");
   if(en.unfilled.length)L.push("未填 "+en.unfilled.length+" 題："+en.unfilled.join(" ／ "));
-  (b.layer2||[]).forEach(function(l){L.push("個管師判斷　"+l.name+"　"+tsText(l.at)+(l.note?"："+l.note:""));});return L.join("\n");}
+  (b.layer2||[]).forEach(function(l){L.push(revTitle(l)+"　"+l.name+"　"+tsText(l.at)+(l.note?"："+l.note:""));});return L.join("\n");}
+/* 初審那一筆是誰做的。
+   ⚠️ 舊紀錄沒有 role 時**不要猜**（cb 2026-10-15 覆核抓到我原本猜「個管師」是錯的）：
+   主持人在畫面上本來就能初審（canReview 含 manager），醫師在規則層也寫得進去，
+   所以一筆沒記角色的舊初審可能不是個管師的。而這個欄位存在的目的正是讓人判斷「要不要再看一眼」——
+   把醫師或主持人的判斷掛成個管師，會讓人做出相反的決定。沉默的紀錄不要替它發言。 */
+function revWho(l){var r=l&&l.role;return r==="pharm"?"臨床藥師":r==="nurse"?"個管師":r==="doctor"?"醫師":r==="manager"?"主持人":"";}
+function revTitle(l){var w=revWho(l);return w?w+"判斷":"初審判斷（角色未記錄）";}
 
 /* ---------- 金鑰 ---------- */
 function openKey(){return x().col("meta").doc("promkey").get().then(function(d){
@@ -5876,15 +5910,25 @@ function revoke(uid){if(!x().isAdmin())return Promise.reject(new Error("只有�
   return x().col("meta").doc("promkey").update({keys:keys,kfp:kfp,ver:(PK.ver||1)+1,updatedAt:x().TS()}).then(function(){PK.keys=keys;PK.kfp=kfp;PK.ver=(PK.ver||1)+1;SEC.secLog("收回 ePRO 金鑰 "+uid);return writeRecipients();});});}
 /* 離開研究／改角色後，收回「已不是個管師/醫師、也不是主持人」的人的 ePRO 金鑰與收件人名冊（2026-10-01：先前 PROM.revoke 全站無人呼叫）。
    純函式 staleKeyUids 可在 node 測；members/users 沒載入（空）時一律不動，免得誤收回所有人。保留：自己、主持人帳號、(帳號 user 且成員角色 nurse/doctor)。 */
+/* 誰「應該」持有 ePRO 金鑰。
+   ⚠️ 回收(staleKeyUids)與重新授權(regrantStale)**必須共用這一個述詞**，否則兩邊會各自漂移：
+   2026-10-15 cb 抓到我只修了回收那邊、漏了重新授權那邊 —— 症狀一模一樣：
+   藥師換瀏覽器或清過資料之後永遠不會被重新授權，讀得到、解不開、畫面空白、沒有錯誤訊息。
+   而且兩個函式是先授權後收回接著跑，名單不一致時，已過期的人會被「授權→收回」來回寫，
+   安全日誌每次多兩筆互相抵銷的紀錄。
+   成員有效期：過期就當成不再是成員（這是「到期自動失效」的金鑰側）。 */
+function memberLive(m){return !(m&&m.until&&m.until.toDate&&m.until.toDate()<=new Date());}
+function keyEligible(u,m){return !!(u&&u.role==="user"&&m&&memberLive(m)&&(m.role==="nurse"||m.role==="doctor"||m.role==="pharm"));}
 function staleKeyUids(keys,M,U,me){var ks=Object.keys(keys||{});if(!ks.length||!Object.keys(M||{}).length||!Object.keys(U||{}).length)return [];
-  return ks.filter(function(uid){if(uid===me)return false;var u=U[uid],m=M[uid];if(u&&u.role==="admin")return false;return !(u&&u.role==="user"&&m&&(m.role==="nurse"||m.role==="doctor"));});}
+  return ks.filter(function(uid){if(uid===me)return false;var u=U[uid],m=M[uid];if(u&&u.role==="admin")return false;
+    return !keyEligible(u,m);});}
 function revokeStale(){if(!x().isAdmin()||!PK)return Promise.resolve(0);
   var gone=staleKeyUids(PK.keys,x().members(),x().users(),meUid());if(!gone.length)return Promise.resolve(0);
   var keys=Object.assign({},PK.keys),kfp=Object.assign({},PK.kfp);gone.forEach(function(uid){delete keys[uid];delete kfp[uid];});
   return x().col("meta").doc("promkey").update({keys:keys,kfp:kfp,ver:(PK.ver||1)+1,updatedAt:x().TS()}).then(function(){PK.keys=keys;PK.kfp=kfp;PK.ver=(PK.ver||1)+1;SEC.secLog("收回 ePRO 金鑰（已非個管師／醫師）"+gone.length+" 人");return writeRecipients();}).then(function(){return gone.length;});}
 /* 個管師/醫師重建金鑰後，主持人載入時自動重新授權(對齊病歷摘錄的 staleRegrant) */
 function regrantStale(){if(!x().isAdmin()||!PK)return Promise.resolve(0);var U=x().users(),M=x().members(),jobs=[];
-  Object.keys(M).forEach(function(uid){var m=M[uid];if(!(m.role==="nurse"||m.role==="doctor"))return;var u=U[uid];if(!u||!u.pub||u.role!=="user")return;
+  Object.keys(M).forEach(function(uid){var m=M[uid],u=U[uid];if(!keyEligible(u,m))return;if(!u.pub)return;
     jobs.push(x().fpOf(u.pub).then(function(fp){if(PK.kfp[uid]!==fp||!PK.keys[uid])return grant(uid).then(function(){return 1;});return 0;}));});
   return Promise.all(jobs).then(function(a){return a.reduce(function(s,v){return s+v;},0);});}
 
@@ -5936,8 +5980,8 @@ function isSaveFail(e){var c=e&&e.code||"";
     ||/PERMISSION_DENIED|permission-denied|UNAVAILABLE/.test(String(e&&e.message||""));}
 function wFail(e,retry){var m=wErr(e);
   if(isSaveFail(e)&&window.failBar)window.failBar(m,retry||null);else toast(m);}
-function review(id,f){var r=RECS[id];if(!r)return Promise.reject(new Error("找不到紀錄"));if(!canReview())return Promise.reject(new Error("只有個管師或主持人可以初審"));
-  var old=r.body,b=JSON.parse(JSON.stringify(old));applyReview(b,{by:meUid(),name:meName(),at:Date.now(),note:f.note,contacted:f.contacted,urgency:f.urgency,signal:f.signal,terms:f.terms,suggest:f.suggest,confirms:f.confirms});
+function review(id,f){var r=RECS[id];if(!r)return Promise.reject(new Error("找不到紀錄"));if(!canReview())return Promise.reject(new Error("只有個管師、臨床藥師或主持人可以初審"));
+  var old=r.body,b=JSON.parse(JSON.stringify(old));applyReview(b,{by:meUid(),name:meName(),role:role(),at:Date.now(),note:f.note,contacted:f.contacted,urgency:f.urgency,signal:f.signal,terms:f.terms,suggest:f.suggest,confirms:f.confirms});
   var en=enrich(b,prevBody(b.pid,b.filledAt,id));r.body=b;
   /* 草稿在送出當下就切離（confirms 已複製進這一筆）：存檔期間繼續做的修改屬於下一筆，不能被存檔完成的回呼清掉；存失敗就把草稿還回去（2026-10-04 UI 壓力測試抓到的競態） */
   var snap=DRAFT[id],snapForm=FORM[id];delete DRAFT[id];delete FORM[id];
@@ -6254,7 +6298,7 @@ function listIds(){var ids=ORDER.filter(function(id){return inScope(RECS[id]);})
 function counts(){var c={active:0,open:0,all:ORDER.length};ORDER.forEach(function(id){var r=RECS[id];if(inScope(r,"open"))c.open++;if(inScope(r,"active"))c.active++;});return c;}
 function ago(ms){if(!ms)return "";var h=(Date.now()-ms)/36e5;return h<1?"剛剛":h<24?Math.floor(h)+" 小時前":h<48?"昨天":Math.floor(h/24)+" 天前";}
 function render(){VIEW=true;document.body.classList.add("prom-view");if(typeof cur!=="undefined")cur=null;var dk=$("#dock");if(dk)dk.hidden=true;EN=ens();
-  var m=$("#main"),s=S(),r=role(),rn={manager:"主持人",nurse:"個管師",doctor:"醫師"}[r]||r;
+  var m=$("#main"),s=S(),r=role(),rn={manager:"主持人",nurse:"個管師",doctor:"醫師",pharm:"臨床藥師"}[r]||r;
   m.innerHTML='<section class="sheet report prom"><div class="phead"><h3 title="'+E(rn+'　'+s.name+'　CTCAE '+PROM_PANEL.ctcae_version+'・題庫 v'+PROM_PANEL.version)+'">ePRO 症狀清單・'+E(s.studyName||s.sid)+'</h3>'+
     '<span class="sp"></span>'+(s.offline?'<span class="kbd">離線備份檢視・唯讀</span>':(docOnly()?'':'<button class="btn" type="button" id="pmTok">發連結給病人</button>')+'<button class="btn" type="button" id="pmFont" title="切換字級：標準／大／特大">字級 <b>'+FSN[FSI]+'</b></button><details class="pm-more" id="pmMoreBox"><summary class="btn" id="pmMore">更多 ▾</summary><div class="pm-menu">'+(docOnly()?'<button class="btn" type="button" id="pmTok">發連結給病人</button>':'')+'<button class="btn" type="button" id="pmTokMgr">連結管理</button>'+(canConfirm()||canReview()?'<button class="btn" type="button" id="pmInbox">重新讀取</button>':'')+'<button class="btn" type="button" id="pmRef">重新整理</button>'+(x().isAdmin()?(promSpace()?'':'<button class="btn" type="button" id="pmDemo">載入示範資料（合成）</button>')+'<button class="btn" type="button" id="pmClean">清除測試資料…</button>'+(!promSpace()&&!x().studies().some(function(z){return z.mode==="prom";})?'<button class="btn" type="button" id="pmMkSpace">建立「門診 ePRO」空間…</button>':''):'')+'</div></details>')+'</div>'+
     '<div class="pm-sumline" id="pmKpi"></div>'+'<div class="pm-shell"><div class="pm-rail"><div class="lbar" id="pmBar"></div><div class="pm-list"><table id="pmTbl"></table></div><div class="kbd pm-ccdstat" id="pmCcdStat"></div></div><div class="pm-mwrap"><button class="btn pm-mback" type="button" id="pmBack">← 回清單</button><div class="pm-main" id="pmDet"></div></div></div></section>';
@@ -6274,7 +6318,10 @@ function render(){VIEW=true;document.body.classList.add("prom-view");if(typeof c
   drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);else $("#pmDet").innerHTML='<p class="pm-empty">請由左側清單選取一位病人；有紅點者請優先處理。<br><span class="kbd pm-keys"><b>j</b>/<b>k</b> 換病人</span></p>';}
 function drawKpi(){var h=$("#pmKpi");if(!h)return;var ids=ORDER.filter(function(id){return inScope(RECS[id]);});
   var red=0,open=0,cc=0,un=0;ids.forEach(function(id){var e=EN[id];if(e.flags.today.length)red++;if(!e.reviewed)open++;if(e.hasText)cc++;if(e.unfilled.length)un++;});
-  h.innerHTML='<span class="sl-main"><b class="'+(red?"red":"")+'">'+red+'</b> 位看診時優先處理</span>'+(docOnly()?'<span><b>'+waitDoc()+'</b> 位待醫師確認</span>':'<span><b>'+open+'</b> 位待個管師看</span>')+'<span><b>'+cc+'</b> 位有話要說</span><span><b>'+un+'</b> 位有題目沒填</span>';}   /* 數字一律放前面（2026-10-09 A2：原本一個在前三個在後） */
+  h.innerHTML='<span class="sl-main"><b class="'+(red?"red":"")+'">'+red+'</b> 位看診時優先處理</span>'+(docOnly()?'<span><b>'+waitDoc()+'</b> 位待醫師確認</span>'
+     /* 個管師那句維持原本用字（e2e 也釘著：個管師畫面刻意不出現「初審」兩個字）。
+        其他能初審的人（臨床藥師、主持人）看到的是中性的說法，而不是別人的職稱。 */
+     :'<span><b>'+open+'</b> 位'+(role()==="nurse"?"待個管師看":"還沒有人看")+'</span>')+'<span><b>'+cc+'</b> 位有話要說</span><span><b>'+un+'</b> 位有題目沒填</span>';}   /* 數字一律放前面（2026-10-09 A2：原本一個在前三個在後） */
 function drawList(){drawCcdStat();var n={red:0,confirm:0,act:0,read:0,skip:0},sc=ORDER.filter(function(id){return inScope(RECS[id]);});sc.forEach(function(id){n[lv(EN[id])]++;});var c=counts();
   $("#pmBar").innerHTML='<span class="seg"><button class="fbtn'+(FILT==="todo"?" on":"")+'" data-f="todo" title="看診時優先處理＋待確認＋建議安排檢查">需要處理 <b>'+(n.red+n.confirm+n.act)+'</b></button><button class="fbtn'+(FILT==="read"?" on":"")+'" data-f="read">看一眼就好 <b>'+n.read+'</b></button>'+
     (canConfirm()?'<button class="fbtn'+(FILT==="doc"?" on":"")+'" data-f="doc">待醫師確認 <b>'+waitDoc()+'</b></button>':'')+'<button class="fbtn'+(FILT==="all"?" on":"")+'" data-f="all">全部 <b>'+sc.length+'</b></button></span>'+
@@ -6322,7 +6369,7 @@ function drawDetail(id){var r=RECS[id];if(!r){$("#pmDet").innerHTML="";return;}v
   if(en.flags.today.length)gist+='<span class="g g-red">優先處理 <b>'+en.flags.today.length+'</b></span>';if(en.hasText)gist+='<span class="g g-vio">有話要說</span>';
   if(chg.length)gist+='<span class="g g-amb">惡化 <b>'+chg.length+'</b></span>';if(en.unfilled.length)gist+='<span class="g g-grey">未填 <b>'+en.unfilled.length+'</b></span>';
   if(!en.flags.today.length&&!en.hasText&&!chg.length)gist+='<span class="g g-ok">無需今日處理</span>';
-  gist+=(l2?'<span class="g g-vio">個管師 '+E(l2.name)+(b.layer2.length>1?"（共 "+b.layer2.length+" 次）":"")+'</span>':"")+(r.meta.closed?'<span class="g g-ok">已結案 '+E(b.layer3?b.layer3.name:"")+'</span>':"")+
+  gist+=(l2?'<span class="g g-vio">'+(revWho(l2)||"初審")+' '+E(l2.name)+(b.layer2.length>1?"（共 "+b.layer2.length+" 次）":"")+'</span>':"")+(r.meta.closed?'<span class="g g-ok">已結案 '+E(b.layer3?b.layer3.name:"")+'</span>':"")+
     '<span style="margin-left:auto" class="kbd" title="CTCAE v'+E(b.ctcaeV)+'・紀錄版本 '+E(r.meta.ver||1)+'・代碼 '+E(b.visit)+'">填寫 '+E(tsText(b.filledAt))+'</span></div>';
   var L="",L2="",wt=evOf(b,DRAFT[id]).weight||{},wtx=(wt.baseline_kg&&wt.now_kg)?"（"+wt.baseline_kg+" → "+wt.now_kg+" kg，"+Math.round((wt.now_kg-wt.baseline_kg)/wt.baseline_kg*100)+"%）":"";
   if(en.flags.today.length)L+='<div class="box b-red"><h3>看診時優先處理</h3><ul>'+en.flags.today.map(function(f){return "<li>"+E(f.text)+(/體重/.test(f.text)?E(wtx):"")+(flagConfirmed(f,en)?' <span class="g g-vio">個管師確認</span>':"")+"</li>";}).join("")+'</ul></div>';
@@ -6332,7 +6379,7 @@ function drawDetail(id){var r=RECS[id];if(!r){$("#pmDet").innerHTML="";return;}v
   var unkL=[];if(en.unfilled.length)unkL.push("未填："+en.unfilled.join("、"));en.flags.unknown.forEach(function(f){if((en.quiet||[]).indexOf(f.id)>=0)return;unkL.push("資料不足："+f.text);});   /* D2：病人明確答「沒有」的不再列 */
   if(unkL.length){var uh=unkL.slice(0,2).map(function(u){return "<li>"+E(u)+"</li>";}).join(""),ut=unkL.slice(2);
     L2+='<div class="box b-grey"><h3>沒填的題目（不代表沒症狀）</h3><ul>'+uh+'</ul>'+(ut.length?'<details class="more"><summary>其餘 '+ut.length+' 項</summary><ul>'+ut.map(function(u){return "<li>"+E(u)+"</li>";}).join("")+'</ul></details>':"")+'</div>';}
-  var L3="";(b.layer2||[]).forEach(function(l,i){L3+='<div class="box b-cc"><h3>個管師判斷'+(b.layer2.length>1?"（第 "+(i+1)+" 次）":"")+'</h3><div class="kv"><dt>判斷者</dt><dd>'+E(l.name)+'　'+E(tsText(l.at))+'</dd><dt>怎麼處理</dt><dd>'+E(URG[l.urgency]||l.urgency)+'　'+(l.contacted?"已電聯":"未電聯")+(l.signal?"　"+E(SIG[l.signal]||l.signal):"")+'</dd>'+
+  var L3="";(b.layer2||[]).forEach(function(l,i){L3+='<div class="box b-cc"><h3>'+revTitle(l)+(b.layer2.length>1?"（第 "+(i+1)+" 次）":"")+'</h3><div class="kv"><dt>判斷者</dt><dd>'+E(l.name)+'　'+E(tsText(l.at))+'</dd><dt>怎麼處理</dt><dd>'+E(URG[l.urgency]||l.urgency)+'　'+(l.contacted?"已電聯":"未電聯")+(l.signal?"　"+E(SIG[l.signal]||l.signal):"")+'</dd>'+
     (l.terms&&l.terms.length?'<dt>CTCAE 項目</dt><dd>'+E(l.terms.join("、"))+'</dd>':"")+(l.note?'<dt>備註</dt><dd>'+E(l.note)+'</dd>':"")+(confLines(l.confirms).length?'<dt>確認／量測</dt><dd>'+E(confLines(l.confirms).join("；"))+'</dd>':"")+'</div></div>';});
   if(b.layer3)L3+='<div class="box b-ok"><h3>醫師確認</h3><div class="kv"><dt>確認</dt><dd>'+E(b.layer3.name)+'　'+E(tsText(b.layer3.at))+'</dd><dt>等級</dt><dd>'+E(Object.keys(b.layer3.grades).sort().map(function(k){return k+" G"+b.layer3.grades[k];}).join("、")||"—")+'</dd>'+(b.layer3.plan?'<dt>處置</dt><dd>'+E(b.layer3.plan)+'</dd>':"")+'</div></div>';
   L3+='<details class="more"><summary>病人原始回答（不能修改）</summary>'+rawAnswers(b)+'</details>';
@@ -6348,7 +6395,7 @@ function drawDetail(id){var r=RECS[id];if(!r){$("#pmDet").innerHTML="";return;}v
     '<li><b>問有沒有影響生活</b>「這個不舒服，有沒有影響您煮飯、買菜、打電話？洗澡、穿衣、吃飯、上廁所呢？」紀錄裡沒填的，請補問。</li>'+
     '<li><b>問家裡的支持</b>「這幾天家裡有人陪嗎？藥有按時吃嗎？下次回診是哪天？」寫在「備註」。</li>'+
     '<li><b>決定怎麼處理</b>可以等回診再談，選「回診時處理」；要早點看，選「提早處理」（請病人提早回診或先安排檢查）；要馬上看，請病人直接就醫或掛急診，並選「緊急」（清單會變紅）。</li></ol></details>';
-  if(canReview()&&!r.meta.closed)bar+='<div class="actbar"><span class="kbd">個管師判斷</span><select id="pmUrg" aria-label="怎麼處理">'+["routine","priority","urgent"].map(function(v){return '<option value="'+v+'"'+((FORM[id]&&FORM[id].urg?FORM[id].urg===v:(l2||{}).urgency===v)?" selected":"")+'>'+URG[v]+'</option>';}).join("")+'</select>'+
+  if(canReview()&&!r.meta.closed)bar+='<div class="actbar"><span class="kbd">'+(revWho({role:role()})||"初審")+'判斷</span><select id="pmUrg" aria-label="怎麼處理">'+["routine","priority","urgent"].map(function(v){return '<option value="'+v+'"'+((FORM[id]&&FORM[id].urg?FORM[id].urg===v:(l2||{}).urgency===v)?" selected":"")+'>'+URG[v]+'</option>';}).join("")+'</select>'+
     '<details class="pm-more" id="pmOptBox"><summary class="btn">電話結果</summary><div class="pm-menu up"><label>電話確認結果　<select id="pmSig">'+["","real","false_alarm"].map(function(v){return '<option value="'+v+'"'+((FORM[id]&&FORM[id].sig!==undefined?FORM[id].sig===v:(l2||{}).signal===v)?" selected":"")+'>'+SIG[v]+'</option>';}).join("")+'</select></label><label><input type="checkbox" id="pmCt"'+((FORM[id]&&FORM[id].ct!==undefined?FORM[id].ct:(l2||{}).contacted)?" checked":"")+'> 已電聯</label></div></details>'+
     '<input id="pmNote" placeholder="備註（例如電話問到的內容）" value="'+E((FORM[id]||{}).note||"")+'">'+(nredD?'<span class="g g-red cf-hint">還有 '+nredD+' 項紅旗相關待確認</span>':"")+'<button class="btn" type="button" id="pmRev"'+(nredD?' disabled title="紅旗相關的待確認還沒處理完"':"")+'>送出</button><button class="btn go" type="button" id="pmRevNext" title="快捷鍵：Enter"'+(nredD?' disabled':"")+'>送出，下一位</button></div>';
   if(canConfirm()&&!r.meta.closed)bar+='<div class="actbar"><span class="kbd">醫師確認</span><span class="cnt" id="pmCnt">還沒選等級</span><input id="pmPlan" placeholder="處置（選填）"><button class="btn go" type="button" id="pmOkNext">確認並結案，下一位</button><button class="btn" type="button" id="pmOk">確認並結案</button><button class="btn" type="button" id="pmChart">複製到病歷</button></div>';
@@ -6435,7 +6482,7 @@ function onLock(){VIEW=false;LOADED=false;PK=null;RECS={};ORDER=[];SEL=null;docu
 return {loadAll:loadAll,render:render,onSession:onSession,onLock:onLock,onLeave:onLeave,grant:grant,revoke:revoke,regrantStale:regrantStale,revokeStale:revokeStale,loadDemo:loadDemo,importPayload:importPayload,review:review,confirm:confirm,reopen:reopen,remove:remove,create:create,
   issueToken:issueToken,issueTokens:issueTokens,revokeToken:revokeToken,cleanScan:cleanScan,cleanApply:cleanApply,openCleanTest:openCleanTest,listTokens:listTokens,tokLink:tokLink,consumeInbox:consumeInbox,writeRecipients:writeRecipients,lastConsume:lastConsume,purgeInbox:purgeInbox,loadFromBackup:loadFromBackup,qrSvg:qrSvg,
   core:{lm:lm,panel:PROM_PANEL,fire:function(ev){return F.fire(PROM_PANEL,ev);},confClean:confClean,confMap:confMap,evOf:evOf,pendingOf:pendingOf,decOf:decOf,listClean:listClean,ccStatText:ccStatText,inferTx:inferTx,autoCode:autoCode,genPid:genPid,pidOk:pidOk,testCandidates:testCandidates,ccDiscord:ccDiscord,ccStats:ccStats,ccMentions:ccMentions,CC_RULES:CC_RULES,enrich:enrich,applyReview:applyReview,applyConfirm:applyConfirm,newBody:newBody,chartText:chartText,inScope:inScope,unfilledOf:unfilledOf,deltasOf:deltasOf,demoBodies:demoBodies,lastReview:lastReview},
-  _t:{staleKeyUids:staleKeyUids,seal:seal,openCt:openCt,setKey:function(k){PK=k;},recs:function(){return RECS;},order:function(){return ORDER;},setScope:function(s){SCOPE=s;},setFilt:function(f){FILT=f;},listIds:function(){EN=ens();return listIds();}}};
+  _t:{staleKeyUids:staleKeyUids,keyEligible:keyEligible,seal:seal,openCt:openCt,setKey:function(k){PK=k;},recs:function(){return RECS;},order:function(){return ORDER;},setScope:function(s){SCOPE=s;},setFilt:function(f){FILT=f;},listIds:function(){EN=ens();return listIds();}}};
 })();
 
 /* ---------- irAE 登錄（M1-a）：時間軸、資料字典、儲存層、畫面 ---------- */
@@ -7258,7 +7305,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-10-10 20:34 47dc2ca";
+window.__build="2026-10-15 09:37 830c173";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
