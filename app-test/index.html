@@ -452,7 +452,7 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-10-18 22:41 75767d3</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-10-18 22:50 627a71f</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -1997,7 +1997,14 @@ var SEC=(function(){
     $("#aBack").onclick=function(){AUTH.signOut().then(showLogin);};
   }
   function renderUsers(){cur=null;$("#dock").hidden=true;$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取帳號中…</p></section>';
-    return refreshUsers().then(drawUsers,function(e){toast(cErr(e));});}
+    return refreshUsers().then(loadQuotas).then(drawUsers,function(e){toast(cErr(e));});}
+  /* 練習空間的連結額度(2026-10-18,user:加重設額度按鈕):規則上限 3 張,主持人可刪除計數重設 */
+  var QUOTAS={},PQ_MAX_UI=3;
+  function inPractice(){return !!SESSION&&STUDIES.some(function(z){return z.sid===SESSION.sid&&z.practice;});}
+  function loadQuotas(){QUOTAS={};if(!inPractice())return Promise.resolve();
+    return col("practice_quota").get().then(function(qs){qs.forEach(function(d){QUOTAS[d.id]=d.data().n||0;});},function(){});}
+  function resetQuota(uid){if(!isAdmin())return Promise.reject(new Error("只有主持人可以重設"));
+    return col("practice_quota").doc(uid).delete().then(function(){secLog("重設練習額度 "+(USERS[uid]&&USERS[uid].email||uid));delete QUOTAS[uid];});}
   function joinBtns(uid,pre){return (SESSION&&SESSION.mode==="prom"?["nurse","doctor","pharm"]:SESSION&&SESSION.mode==="irae"?["abstractor","doctor"]:["abstractor","nurse","doctor"]).map(function(r){return '<button class="btn'+(r==="abstractor"?" go":"")+'" type="button" data-ok="'+uid+'" data-mr="'+r+'">'+pre+RN[r]+'</button>';}).join(" ")+" ";}
   function drawUsers(){
     var m=$("#main"),sn=esc(SESSION.studyName||SESSION.sid);
@@ -2007,11 +2014,13 @@ var SEC=(function(){
       if(me)act="（您）";
       else if(u.role==="pending"||u.role==="abstractor")act=joinBtns(uid,"核准並加入為");  /* "abstractor" = approved under v1 rules */
       else if(u.role==="disabled")act='<button class="btn" type="button" data-on="'+uid+'">恢復帳號</button>';
-      else if(u.role==="user")act=(inS?(mb.until?'<button class="btn" type="button" data-ext="'+uid+'">延長四週</button> ':'')+'<button class="btn" type="button" data-leave="'+uid+'">移出本研究</button> ':joinBtns(uid,"加入為"))+'<button class="btn warn" type="button" data-off="'+uid+'">停用帳號</button>';
-      return '<tr><td>'+esc(u.name||"")+'<br><span class="desc">'+esc(u.email||"")+'</span></td><td>'+esc(RN[u.role]||u.role)+'</td><td>'+(u.role==="admin"?"全部":inS?"✓ "+esc(RN[mb.role]||mb.role)+(mb.until&&mb.until.toDate?'<br><span class="desc">'+(mb.until.toDate()<=new Date()?"已到期 ":"有效至 ")+mb.until.toDate().toISOString().slice(0,10)+'</span>':""):"—")+'</td><td>'+(inS||n?n:"")+'</td><td>'+act+'</td></tr>';}).join("");
+      else if(u.role==="user")act=(inS?(mb.until?'<button class="btn" type="button" data-ext="'+uid+'">延長四週</button> ':'')+(inPractice()&&QUOTAS[uid]?'<button class="btn" type="button" data-qreset="'+uid+'">重設練習額度</button> ':'')+'<button class="btn" type="button" data-leave="'+uid+'">移出本研究</button> ':joinBtns(uid,"加入為"))+'<button class="btn warn" type="button" data-off="'+uid+'">停用帳號</button>';
+      return '<tr><td>'+esc(u.name||"")+'<br><span class="desc">'+esc(u.email||"")+'</span></td><td>'+esc(RN[u.role]||u.role)+'</td><td>'+(u.role==="admin"?"全部":inS?"✓ "+esc(RN[mb.role]||mb.role)+(mb.until&&mb.until.toDate?'<br><span class="desc">'+(mb.until.toDate()<=new Date()?"已到期 ":"有效至 ")+mb.until.toDate().toISOString().slice(0,10)+'</span>':"")+(inPractice()&&mb.role!=="admin"?'<br><span class="desc">練習連結 '+(QUOTAS[uid]||0)+'／'+PQ_MAX_UI+'</span>':""):"—")+'</td><td>'+(inS||n?n:"")+'</td><td>'+act+'</td></tr>';}).join("");
     m.innerHTML='<section class="sheet report"><h3>帳號管理・'+sn+'</h3><p class="desc">新帳號請先於 Firebase 主控台 → Authentication 建立（電子郵件＋初始密碼）。對方首次登入後，帳號將出現於此，請按「核准並加入本研究」。顯示名稱裡的「申請：…」是對方自己勾選的身份，僅供參考；請依實際身份選角色（PI／sub-PI 目前先在顯示名稱標示）。同一帳號可加入多個研究；「移出本研究」僅影響本研究，「停用帳號」則使該人員在所有研究中皆無法讀取任何病人。</p>'+
       '<div class="tw"><table><thead><tr><th>帳號</th><th>帳號狀態</th><th>本研究成員</th><th>分派人數</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
       '<h3>安全紀錄(本研究最近 50 筆)</h3><div class="tw" id="seclog"><p class="desc">讀取中…</p></div></section>';
+    $$("[data-qreset]",m).forEach(function(b){b.onclick=function(){var uid=b.dataset.qreset;ask("重設 "+(USERS[uid]&&USERS[uid].email||"")+" 的練習額度？重設後他可以再發 "+PQ_MAX_UI+" 張練習連結；已發的連結和已填的資料都不受影響。").then(function(ok){if(!ok)return;b.disabled=true;
+      resetQuota(uid).then(function(){toast("已重設練習額度");renderUsers();},function(e){b.disabled=false;toast(cErr(e));});});};});
     $$("[data-ext]",m).forEach(function(b){b.onclick=function(){b.disabled=true;extendMember(b.dataset.ext,PHARM_DAYS).then(function(){toast("已延長四週");renderUsers();},function(e){b.disabled=false;toast(cErr(e));});};});
     $$("[data-ok]",m).forEach(function(b){b.onclick=function(){var uid=b.dataset.ok,mr=b.dataset.mr||"abstractor";dialog({title:"加入「"+(SESSION.studyName||SESSION.sid)+"」為"+RN[mr]+":"+(USERS[uid].email||""),msg:mr==="abstractor"?"登錄人員僅能檢視分派給自己的病歷摘錄，無法檢視 PROM。":mr==="pharm"?"臨床藥師可檢視本研究全部 ePRO 症狀紀錄並初審，不能結案，也無法檢視病歷摘錄。到期後自動失效，可在本頁「延長四週」。":"個管師／醫師可檢視本研究全部 ePRO 症狀紀錄，但無法檢視病歷摘錄。",
         fields:[{k:"n",label:"顯示名稱",value:USERS[uid].name||"",req:1}].concat(mr==="pharm"?[{k:"d",label:"有效天數(預設 28 天＝四週)",value:String(PHARM_DAYS),req:1}]:[]),ok:"加入"})
@@ -7434,7 +7443,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-10-18 22:41 75767d3";
+window.__build="2026-10-18 22:50 627a71f";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
