@@ -452,7 +452,7 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-10-15 09:37 830c173</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-10-18 17:34 ed53fb4</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -1505,6 +1505,10 @@ var SEC=(function(){
   function pwOk(pw){return String(pw||"").length>=8;}
   function cErr(e){var c=e&&e.code||"";return {"auth/invalid-credential":"帳號或密碼錯誤","auth/wrong-password":"帳號或密碼錯誤","auth/user-not-found":"帳號或密碼錯誤","auth/invalid-email":"電子郵件格式不符",
     "auth/too-many-requests":"嘗試次數過多，雲端服務已暫時限制登入，解除時間由雲端服務決定；解除前請勿重複嘗試。","auth/network-request-failed":"無法連線至雲端（請確認網路）","auth/user-disabled":"帳號已停用","auth/requires-recent-login":"請重新登入後再變更密碼",
+    "auth/popup-blocked":"瀏覽器擋住了 Google 登入視窗。請在網址列右側允許此網站的快顯視窗，再按一次「以 Google 帳號登入」",
+    "auth/popup-closed-by-user":"Google 登入視窗已關閉，尚未登入","auth/cancelled-popup-request":"Google 登入視窗已關閉，尚未登入",
+    "auth/account-exists-with-different-credential":"這個信箱已用其他方式建立帳號，請聯絡主持人","auth/operation-not-allowed":"雲端尚未開啟 Google 登入，請聯絡主持人",
+    "auth/unauthorized-domain":"這個網址尚未獲准使用 Google 登入，請聯絡主持人",
     "permission-denied":"沒有權限","unavailable":"目前離線"}[c]||(e&&e.message)||String(e);}
 
   /* ---------- Firebase ---------- */
@@ -1578,6 +1582,13 @@ var SEC=(function(){
   /* ---------- accounts ---------- */
   function signIn(email,pw){fb();return AUTH.signInWithEmailAndPassword(email,pw).then(function(c){PW=pw;
     return col("users").doc(c.user.uid).get().then(function(p){return {user:c.user,profile:p.exists?p.data():null};});});}
+  /* 2026-10-18 Google 登入（user：帳號綁個人 Gmail，比較不會把密碼外借；公司信箱常共用）。
+     登入身分＝Google；金鑰仍以另一組「金鑰密碼」包裝（零知識設計不變），所以外借要同時交出 Gmail 和金鑰密碼。
+     testCred 只在模擬器（?emu=1）有效，供 e2e 以 signInWithCredential 模擬 Google 帳號。 */
+  function signInGoogle(testCred){fb();var pv=new firebase.auth.GoogleAuthProvider();pv.setCustomParameters({prompt:"select_account"});
+    var go=EMU&&testCred?AUTH.signInWithCredential(firebase.auth.GoogleAuthProvider.credential(testCred)):AUTH.signInWithPopup(pv);
+    return go.then(function(c){return col("users").doc(c.user.uid).get().then(function(p){return {user:c.user,profile:p.exists?p.data():null};});});}
+  function isGoogleUser(u){u=u||(AUTH&&AUTH.currentUser);return !!u&&(u.providerData||[]).some(function(x){return x&&x.providerId==="google.com";});}
   function createProfile(u,pw,name,asPI){return newPair().then(function(kp){var rec=asPI?recoveryCode():null;
     return Promise.all([wrap(kp.pkcs8,pw),rec?wrap(kp.pkcs8,normRec(rec)):null]).then(function(w){var doc={email:u.email,name:name,role:"pending",pub:kp.pub,priv:w[0],created:TS()};
       if(w[1])doc.recPriv=w[1];return col("users").doc(u.uid).set(doc).then(function(){return rec;});});});}
@@ -1667,7 +1678,11 @@ var SEC=(function(){
     return flush().then(function(){return Promise.race([FS.waitForPendingWrites(),new Promise(function(r){setTimeout(r,10000);})]);}).then(function(){
       if(pendingW)toast("還有 "+pendingW+" 筆沒上傳到雲端(目前離線)。下次在這台電腦用同一個帳號登入時會自動上傳。");return AUTH.signOut();}).catch(function(){}).then(wipe);}
   function changeOwn(oldPw,newPw){if(!pwOk(newPw))return Promise.reject(new Error("新密碼至少 8 字元"));
-    var u=AUTH.currentUser;return u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,oldPw)).catch(function(){throw new Error("目前密碼錯誤");})
+    var u=AUTH.currentUser;
+    /* Google 帳號沒有 Firebase 密碼：用舊金鑰密碼解得開金鑰就是證明，只重新包裝金鑰 */
+    if(isGoogleUser(u))return unwrap(PROFILE.priv,oldPw).catch(function(){throw new Error("目前金鑰密碼錯誤");}).then(function(raw){return wrap(raw,newPw);})
+      .then(function(w){return col("users").doc(SESSION.uid).update({priv:w}).then(function(){PROFILE.priv=w;});}).then(function(){PW=newPw;secLog("變更自己的金鑰密碼");});
+    return u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,oldPw)).catch(function(){throw new Error("目前密碼錯誤");})
       .then(function(){return unwrap(PROFILE.priv,oldPw);}).then(function(raw){return wrap(raw,newPw);})
       .then(function(w){return col("users").doc(SESSION.uid).update({priv:w}).then(function(){PROFILE.priv=w;return u.updatePassword(newPw);});}).then(function(){PW=newPw;secLog("變更自己的密碼");});}
   function rekeySelf(u,pw){return newPair().then(function(kp){return wrap(kp.pkcs8,pw).then(function(w){
@@ -1676,8 +1691,14 @@ var SEC=(function(){
     return unwrap(PROFILE.priv,curPw).then(function(raw){var rec=recoveryCode();return wrap(raw,normRec(rec)).then(function(w){
       return col("users").doc(SESSION.uid).update({recPriv:w}).then(function(){PROFILE.recPriv=w;secLog(PROFILE.recPriv?"重新建立復原碼":"建立復原碼");return rec;});});},
       function(){throw new Error("目前密碼錯誤");});}
-  function recoverPI(u,p,code,pw){return unwrap(p.recPriv,normRec(code)).then(function(raw){return wrap(raw,pw);},function(){throw new Error("復原碼不正確");})
-    .then(function(w){return col("users").doc(u.uid).update({priv:w}).then(function(){p.priv=w;return p;});});}
+  /* 2026-10-18：救回時連公鑰一起還原成「復原碼那把私鑰」對應的公鑰。
+     若主持人曾誤按重建金鑰（pub 被換成新的），只還原 priv 會讓之後新授權的病人包給一把沒有私鑰的公鑰。 */
+  function pubOfPkcs8(raw){return crypto.subtle.importKey("pkcs8",raw,RSA,true,["decrypt"]).then(function(k){return crypto.subtle.exportKey("jwk",k);})
+    .then(function(j){return crypto.subtle.importKey("jwk",{kty:"RSA",n:j.n,e:j.e,alg:"RSA-OAEP-256",ext:true},RSA,true,["encrypt"]);}).then(function(k){return crypto.subtle.exportKey("spki",k);}).then(b64);}
+  function recoverPI(u,p,code,pw){return unwrap(p.recPriv,normRec(code)).then(function(raw){return Promise.all([wrap(raw,pw),pubOfPkcs8(raw)]);},function(){throw new Error("復原碼不正確");})
+    .then(function(x){var upd={priv:x[0]};
+      if(x[1]!==p.pub){if(p.role!=="pending")throw new Error("金鑰已救回，但公鑰與帳號不一致，需由系統維護者處理；請勿繼續操作");upd.pub=x[1];upd.rekeyAt=TS();}   /* 規則只允許「待核准」時本人改 pub */
+      return col("users").doc(u.uid).update(upd).then(function(){p.priv=x[0];if(upd.pub)p.pub=upd.pub;return p;});});}
   /* admin: approve / disable; approving re-grants the user's assigned patients to their (possibly new) key */
   /* global account role (user/disabled) + membership in the current study; approving also re-grants this study's assigned patients */
   function setRole(uid,role,name){if(!isAdmin())return Promise.reject(new Error("只有主持人可以核准"));
@@ -1819,7 +1840,8 @@ var SEC=(function(){
   function busy(f,on,label){var b=$("button[type=submit]",f);if(b){b.disabled=on;if(label)b.textContent=label;}}
   function showLogin(){
     $("#aSub").textContent="請使用主持人提供給您的帳號登入";
-    form('<form><label class="mf"><span>電子郵件</span><input name="e" type="text" inputmode="email" autocapitalize="off" spellcheck="false" autocomplete="username" required></label>'+
+    form('<form><p><button class="btn go" type="button" id="aGoogle">以 Google 帳號登入</button></p><p class="adesc">研究登錄人員（助理）請用自己的 Google 帳號登入；其他人員用下方電子郵件與密碼。</p>'+
+      '<label class="mf"><span>電子郵件</span><input name="e" type="text" inputmode="email" autocapitalize="off" spellcheck="false" autocomplete="username" required></label>'+
       '<label class="mf"><span>密碼</span><input name="p" type="password" autocomplete="current-password" required></label>'+
       '<button class="btn go" type="submit" id="aGo">登入</button></form><p class="alinks"><button type="button" class="lk" id="lkForgot">忘記密碼</button><button type="button" class="lk" id="lkBackup">開啟加密備份檔（無需網路）</button></p>'+
       (fbOK()?'':'<p class="adesc" style="color:var(--err)">目前無法連線至雲端服務，僅能開啟加密備份檔。</p>'),function(f){
@@ -1827,6 +1849,8 @@ var SEC=(function(){
       var em=val(f,"e").replace(/\s+/g,""),pw=f.elements.p.value;busy(f,true,"驗證中…");
       signIn(em,pw).then(function(r){return route(r.user,r.profile,pw);}).catch(function(e){busy(f,false,"登入");err(cErr(e));f.elements.p.value="";});});
     $("#lkBackup").onclick=showOpenBackup;
+    $("#aGoogle").onclick=function(){if(!fbOK()){err("目前無法連線至雲端服務，請改用「開啟加密備份檔」");return;}var b=$("#aGoogle");b.disabled=true;err("");
+      signInGoogle().then(function(r){return routeGoogle(r.user,r.profile);}).catch(function(e){b.disabled=false;err(cErr(e));});};
     $("#lkForgot").onclick=function(){if(!fbOK())return;var em=($("#aBody input[name=e]").value||"").normalize("NFKC").replace(/\s+/g,"");if(!em){err("請先於上方輸入您的電子郵件");return;}
       fb();AUTH.sendPasswordResetEmail(em).then(function(){err("");toast("已寄出重設密碼的郵件至 "+em+"。重設後請再回來登入。");},function(e){err(cErr(e));});};
   }
@@ -1834,7 +1858,7 @@ var SEC=(function(){
     if(!p)return showFirst(u,pw);
     if(p.role==="disabled"){AUTH.signOut();return err("此帳號已停用，請聯絡主持人");}
     return openKeys(p,pw).then(function(ok){
-      if(!ok)return p.role==="admin"&&p.recPriv?showRecoverPI(u,p,pw):showRekey(u,p,pw);
+      if(!ok)return p.recPriv?showRecoverPI(u,p,pw):showRekey(u,p,pw);   /* 有復原碼的帳號（主持人）一律走復原碼，不重建金鑰 */
       if(p.role==="pending"){PROFILE=p;return showPending(u,p);}
       return start(u,p);});
   }
@@ -1842,13 +1866,13 @@ var SEC=(function(){
   var APPLY=["PI","sub-PI","醫師","護理長／護理師／個管師","研究助理"],TITLES=["教授","副教授","助理教授","老師","醫師","護理長","護理師","個管師","研究助理"],UNITS=["學校","醫院","其他"];
   function composeName(n,sel,unit,title,utype){var tag=sel&&sel.length?"申請："+sel.join("、"):"",place=unit?(utype?utype+"："+unit:unit):(utype||""),extra=[tag,title,place].filter(Boolean).join("｜"),out=extra?n+"（"+extra+"）":n;return out.slice(0,80);}
   function showFirst(u,pw){
-    $("#aSub").textContent="首次登入：建立您的加密金鑰";
-    form('<form><p class="adesc">您的金鑰以您的登入密碼保護，僅您本人可開啟。建立後須待主持人核准，方可開始作業。</p>'+
+    $("#aSub").textContent=isGoogleUser(u)?"首次登入（步驟 2／2）：填寫基本資料":"首次登入：建立您的加密金鑰";
+    form('<form><p class="adesc">您的金鑰以您的'+(isGoogleUser(u)?"金鑰密碼":"登入密碼")+'保護，僅您本人可開啟。建立後須待主持人核准，方可開始作業。</p>'+
       '<label class="mf"><span>您的姓名（供主持人辨識）</span><input name="n" required maxlength="30"></label>'+
       '<fieldset style="border:0;padding:0;margin:8px 0"><legend style="padding:0"><b>申請身份</b>（可複選；僅供主持人核准時參考，實際權限由主持人決定）</legend>'+
-      APPLY.map(function(x){return '<label class="ck" style="min-height:40px"><input type="checkbox" name="ap" value="'+esc(x)+'"> '+esc(x)+'</label>';}).join("")+'</fieldset>'+
+      APPLY.map(function(x){return '<label class="ck" style="min-height:44px"><input type="checkbox" name="ap" value="'+esc(x)+'"> '+esc(x)+'</label>';}).join("")+'</fieldset>'+
       '<label class="mf"><span>職稱（選填；可選也可自己填）</span><input name="t" list="aTitles" maxlength="12" autocomplete="off"><datalist id="aTitles">'+TITLES.map(function(x){return '<option value="'+esc(x)+'">';}).join("")+'</datalist></label>'+
-      '<fieldset style="border:0;padding:0;margin:8px 0"><legend style="padding:0"><b>所屬單位</b>（選填）</legend>'+UNITS.map(function(x){return '<label class="ck" style="display:inline-flex;margin-right:14px;min-height:40px"><input type="radio" name="ut" value="'+esc(x)+'"> '+esc(x)+'</label>';}).join("")+'</fieldset>'+
+      '<fieldset style="border:0;padding:0;margin:8px 0"><legend style="padding:0"><b>所屬單位</b>（選填）</legend>'+UNITS.map(function(x){return '<label class="ck" style="display:inline-flex;margin-right:14px;min-height:44px"><input type="radio" name="ut" value="'+esc(x)+'"> '+esc(x)+'</label>';}).join("")+'</fieldset>'+
       '<label class="mf"><span>單位名稱（選填）</span><input name="u" maxlength="30"></label>'+
       '<details style="margin:10px 0"><summary class="adesc">系統主持人首次設定（一般使用者請勿展開）</summary><label class="ck"><input type="checkbox" name="pi"> 我是系統主持人（僅限首位建立系統的人；會多產生一組復原碼）</label></details>'+
       '<button class="btn go" type="submit">建立金鑰</button></form>',function(f){var n0=val(f,"n"),unit=val(f,"u"),title=val(f,"t"),utEl=f.querySelector("input[name=ut]:checked"),utype=utEl?utEl.value:"",pi=f.elements.pi.checked,sel=[].slice.call(f.querySelectorAll("input[name=ap]:checked")).map(function(c){return c.value;});if(!n0)return err("請填名字");var n=composeName(n0,sel,unit,title,utype);busy(f,true,"建立中…");
@@ -1858,12 +1882,13 @@ var SEC=(function(){
     $("#aSub").textContent="請立即保存復原碼（僅顯示這一次）";
     form('<form><p class="adesc">忘記密碼時，僅能以這組復原碼復原您的金鑰；若無復原碼，所有加密資料將無法開啟。請存入 KeePass，勿存放於這台電腦。</p>'+
       '<p class="rcode">'+esc(rec)+'</p><label class="ck"><input type="checkbox" name="ok"> 我已將復原碼存入 KeePass</label>'+
-      '<button class="btn go" type="submit">下一步</button></form>',function(f){if(!f.elements.ok.checked)return err("請先確認已保存復原碼");showPending(u,{});});
+      '<button class="btn go" type="submit">下一步</button></form>',function(f){if(!f.elements.ok.checked)return err("請先確認已保存復原碼");showPending(u,{pi:true});});
   }
   function showPending(u,p){
     $("#aSub").textContent="等待核准";
     form('<form><p class="adesc">帳號 '+esc(u.email)+' 的金鑰已建立，待主持人核准。核准後請重新登入，即可開始作業。</p>'+
-      '<p class="adesc" style="color:var(--soft)">（主持人首次設定：請至 Firebase 主控台 → Firestore → users → 您的帳號，將 role 改為 admin，再回來登入。）</p>'+
+      /* 主控台設定說明只給剛建立系統的主持人看（2026-10-18：原本助理、醫師也看得到內部說明） */
+      (p&&(p.pi||p.recPriv)?'<p class="adesc" style="color:var(--soft)">（主持人首次設定：請至 Firebase 主控台 → Firestore → users → 您的帳號，將 role 改為 admin，再回來登入。）</p>':'')+
       '<button class="btn go" type="submit">回到登入畫面</button></form>',function(){AUTH.signOut().then(showLogin);});
   }
   function showRekey(u,p,pw){
@@ -1873,11 +1898,87 @@ var SEC=(function(){
       rekeySelf(u,pw).then(function(){showPending(u,p);}).catch(function(e){busy(f,false,"重新建立金鑰");err(cErr(e));});});
     $("#aBack").onclick=function(){AUTH.signOut().then(showLogin);};
   }
+  /* Google 登入後：沒有帳號文件 → 設定金鑰密碼 → 原本的首次登入畫面；有 → 輸入金鑰密碼解開金鑰。
+     密碼錯誤時留在同一畫面重試（不像 email 帳號那樣導向「重新建立金鑰」，因為 Google 帳號的金鑰密碼不會被別處改掉）。 */
+  function routeGoogle(u,p){
+    if(p&&p.role==="disabled"){AUTH.signOut();showLogin();return err("此帳號已停用，請聯絡主持人");}
+    return p?showKeyUnlock(u,p):showKeySet(u);}
+  var KEYNOTE='金鑰密碼用來保護您的加密金鑰，和 Google 密碼無關。請另設一組、背起來，不要寫下來或告訴別人。';
+  /* 金鑰密碼的檢查：長度、兩次相同、不是 Gmail 帳號名稱；有勾選確認欄時要勾 */
+  function keyChecks(f,u){var a=f.elements.k.value,b=f.elements.k2.value,id=String(u&&u.email||"").split("@")[0].toLowerCase();
+    return [{ok:pwOk(a),t:"至少 8 個字元",e:"金鑰密碼至少 8 字元"},{ok:!!a&&a===b,t:"兩次輸入相同",e:"兩次輸入的金鑰密碼不同"},
+      {ok:!!a&&!(id&&a.toLowerCase().indexOf(id)>=0),t:"不含您的 Gmail 帳號名稱",e:"金鑰密碼不可包含您的 Gmail 帳號名稱"}];}
+  function keyPairOk(f,u){var c=keyChecks(f,u);for(var i=0;i<c.length;i++)if(!c[i].ok){err(c[i].e);return null;}
+    if(f.elements.ack&&!f.elements.ack.checked){err("請先勾選：我了解忘記金鑰密碼無法找回");return null;}return f.elements.k.value;}
+  function keyLive(f,u){var box=$("#kChk",f);if(!box)return;var paint=function(){var a=f.elements.k.value||f.elements.k2.value,n=f.elements.k.value.length,cn=$("#kCnt",f);
+      if(cn)cn.textContent=n?"已輸入 "+n+" 個字元"+(n<8?"，還差 "+(8-n)+" 個":""):"";
+      box.innerHTML=keyChecks(f,u).map(function(c){return '<li style="'+(c.ok?"":"color:var(--err)")+'">'+(c.ok?"✓ ":a?"✗ ":"○ ")+esc(c.t)+'</li>';}).join("");};
+    f.elements.k.addEventListener("input",paint);f.elements.k2.addEventListener("input",paint);
+    var sh=f.elements.show;if(sh)sh.addEventListener("change",function(){f.elements.k.type=f.elements.k2.type=sh.checked?"text":"password";});paint();}
+  var KEYFORM='<p class="adesc"><b>設定時要輸入兩次</b>（第二次是確認，兩次要完全相同）；之後每次登入只要輸入一次。</p>'+
+      '<label class="mf"><span>金鑰密碼（至少 8 個字元）<span id="kCnt" style="color:var(--soft);margin-left:8px"></span></span><input name="k" type="password" autocomplete="new-password" required></label>'+
+      '<label class="mf"><span>再輸入一次（確認用，要和上面完全相同）</span><input name="k2" type="password" autocomplete="new-password" required></label>'+
+      '<label class="ck" style="min-height:44px"><input type="checkbox" name="show"> 顯示我輸入的字（旁邊沒有人時再勾）</label>'+
+      '<ul id="kChk" class="adesc" style="list-style:none;padding:0;margin:0 0 10px"></ul>';
+  function showKeySet(u){
+    $("#aSub").textContent="首次登入（步驟 1／2）：設定金鑰密碼";
+    form('<form><p class="adesc">已用 Google 帳號 <b>'+esc(u.email)+'</b> 登入。接下來請設定一組「金鑰密碼」。</p>'+
+      '<p class="adesc"><b>這是什麼</b>：病人資料在雲端是加密的，只有您的金鑰打得開；金鑰密碼就是開這把金鑰的密碼。主持人和系統管理者都看不到它。</p>'+
+      '<p class="adesc"><b>什麼時候要輸入</b>：每次用 Google 登入後，還要再輸入這組金鑰密碼，才看得到分派給您的病人。</p>'+
+      '<p class="adesc"><b>怎麼設</b>：和 Google 密碼不同的另一組，至少 8 個字元。不要用生日、電話、身分證號、病歷號或 Gmail 帳號名稱。'+
+        '用 3～4 個不相關的詞串成一句最好記，例如「藍色雨傘七點早餐」（這只是示範，請勿照用）。</p>'+
+      '<p class="adesc"><b>怎麼保管</b>：背起來。不寫在便利貼、檔案或手機記事，也不告訴任何人，包括同事。</p>'+
+      '<p class="adesc"><b>忘記了怎麼辦</b>：無法找回，連主持人也無法替您查詢。只能在登入時按「忘記金鑰密碼」重新建立金鑰，再等主持人核准一次；已分派的病人和已填的資料都會保留。</p>'+
+      KEYFORM+
+      '<label class="ck" style="min-height:44px"><input type="checkbox" name="ack"> 我了解：金鑰密碼忘記了無法找回，只能重新建立並等主持人核准</label>'+
+      '<button class="btn go" type="submit">下一步：填寫基本資料</button> <button class="btn" type="button" id="aBack">取消</button></form>',function(f){var k=keyPairOk(f,u);if(!k)return;PW=k;showFirst(u,k);});
+    keyLive($("#aBody form"),u);
+    $("#aBack").onclick=function(){AUTH.signOut().then(showLogin);};
+  }
+  function showKeyUnlock(u,p){
+    $("#aSub").textContent="輸入金鑰密碼";
+    form('<form><p class="adesc">Google 帳號 '+esc(u.email)+' 已登入。請輸入您的金鑰密碼以開啟加密資料（每次登入輸入一次）。</p>'+
+      '<p class="adesc">若您原本是用電子郵件和密碼登入本系統，金鑰密碼就是您<b>原來的登入密碼</b>。</p>'+
+      '<label class="mf"><span>金鑰密碼</span><input name="k" type="password" autocomplete="current-password" required></label>'+
+      '<button class="btn go" type="submit">開啟</button> <button class="btn" type="button" id="aBack">取消</button></form>'+
+      '<p class="alinks">'+(p.recPriv?'<button type="button" class="lk" id="lkKeyRec">忘記密碼：用復原碼救回</button>':'<button type="button" class="lk" id="lkKeyForgot">忘記金鑰密碼</button>')+'</p>',function(f){var k=f.elements.k.value;busy(f,true,"解密中…");
+      openKeys(p,k).then(function(ok){
+        if(!ok){busy(f,false,"開啟");f.elements.k.value="";return err("金鑰密碼不正確");}
+        PW=k;if(p.role==="pending"){PROFILE=p;return showPending(u,p);}return start(u,p);}).catch(function(e){busy(f,false,"開啟");err(cErr(e));});});
+    $("#aBack").onclick=function(){AUTH.signOut().then(showLogin);};
+    /* 主持人（有復原碼）絕不走重建金鑰：重建會換掉公鑰並降為待核准（2026-10-18 實際發生） */
+    if($("#lkKeyForgot"))$("#lkKeyForgot").onclick=function(){showKeyForgot(u,p);};
+    if($("#lkKeyRec"))$("#lkKeyRec").onclick=function(){showRecoverPIGoogle(u,p);};
+  }
+  function showRecoverPIGoogle(u,p){
+    $("#aSub").textContent="用復原碼救回主持人金鑰";
+    form('<form><p class="adesc">請輸入當初建立系統時保存的復原碼（KeePass 或紙本），並設定新的金鑰密碼。救回後，原本的病人資料全部照常可以開啟。</p>'+
+      '<label class="mf"><span>復原碼</span><input name="c" autocomplete="off" required></label>'+KEYFORM+
+      '<button class="btn go" type="submit">救回並登入</button> <button class="btn" type="button" id="aBack">取消</button></form>',function(f){var k=keyPairOk(f,u);if(!k)return;busy(f,true,"處理中…");
+      recoverPI(u,p,val(f,"c"),k).then(function(p2){return openKeys(p2,k).then(function(){PW=k;secLog("以復原碼救回主持人金鑰");return afterRecover(u,p2);});}).catch(function(e){busy(f,false,"救回並登入");err(cErr(e));});});
+    keyLive($("#aBody form"),u);
+    $("#aBack").onclick=function(){showKeyUnlock(u,p);};
+  }
+  /* 救回後若帳號仍是「待核准」（主持人誤按重建金鑰時被降級），主持人身分只能由系統維護者在主控台恢復 */
+  function afterRecover(u,p2){if(p2.role==="pending"){PROFILE=p2;$("#aSub").textContent="金鑰已救回";
+      $("#aBody").innerHTML='<p class="adesc">原本的金鑰已救回。帳號目前仍是「待核准」，請通知系統維護者恢復主持人身分後再登入。</p><p><button class="btn" type="button" id="aBack">回到登入畫面</button></p>';
+      $("#aBack").onclick=function(){AUTH.signOut().then(showLogin);};return;}
+    return start(u,p2);}
+  function showKeyForgot(u,p){
+    if(p.recPriv)return showRecoverPIGoogle(u,p);
+    $("#aSub").textContent="忘記金鑰密碼：重新建立金鑰";
+    form('<form><p class="adesc">舊的金鑰密碼無法找回。重新建立金鑰後，需由主持人再核准一次；您原本分派到的病人及已填資料皆會保留。'+KEYNOTE+'</p>'+
+      KEYFORM+
+      '<button class="btn go" type="submit">重新建立金鑰</button> <button class="btn" type="button" id="aBack">取消</button></form>',function(f){var k=keyPairOk(f,u);if(!k)return;busy(f,true,"建立中…");
+      rekeySelf(u,k).then(function(){PW=k;showPending(u,p);}).catch(function(e){busy(f,false,"重新建立金鑰");err(cErr(e));});});
+    keyLive($("#aBody form"),u);
+    $("#aBack").onclick=function(){showKeyUnlock(u,p);};
+  }
   function showRecoverPI(u,p,pw){
     $("#aSub").textContent="用復原碼救回主持人金鑰";
     form('<form><p class="adesc">您的密碼已變更，請輸入當初保存於 KeePass 的復原碼。</p><label class="mf"><span>復原碼</span><input name="c" autocomplete="off" required></label>'+
       '<button class="btn go" type="submit">救回並登入</button> <button class="btn" type="button" id="aBack">取消</button></form>',function(f){busy(f,true,"處理中…");
-      recoverPI(u,p,val(f,"c"),pw).then(function(p2){return openKeys(p2,pw).then(function(){secLog("以復原碼救回主持人金鑰");return start(u,p2);});}).catch(function(e){busy(f,false,"救回並登入");err(cErr(e));});});
+      recoverPI(u,p,val(f,"c"),pw).then(function(p2){return openKeys(p2,pw).then(function(){secLog("以復原碼救回主持人金鑰");return afterRecover(u,p2);});}).catch(function(e){busy(f,false,"救回並登入");err(cErr(e));});});
     $("#aBack").onclick=function(){AUTH.signOut().then(showLogin);};
   }
   function renderUsers(){cur=null;$("#dock").hidden=true;$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取帳號中…</p></section>';
@@ -1996,8 +2097,8 @@ var SEC=(function(){
           form('<form><p class="adesc">'+(had?"舊的復原碼已失效。":"")+'請存入 KeePass，並列印一份紙本，鎖存於辦公室。若無此復原碼，密碼遺失時所有加密資料將無法開啟。</p><p class="rcode">'+esc(rec)+'</p>'+
             '<label class="ck"><input type="checkbox" name="ok"> 我已保存這組復原碼</label><button class="btn go" type="submit">回到工作台</button></form>',function(f){if(!f.elements.ok.checked)return err("請先確認已保存");$("#auth").hidden=true;});
         }).catch(function(e){toast(cErr(e));});});};
-    $("#bPw").onclick=function(){if(!SESSION)return;dialog({title:"變更密碼",fields:[{k:"o",label:"目前密碼",type:"password",req:1},{k:"n",label:"新密碼(至少 8 字元)",type:"password",req:1},{k:"n2",label:"再輸入一次新密碼",type:"password",req:1}],ok:"變更"})
-      .then(function(v){if(!v)return;if(v.n!==v.n2){toast("兩次新密碼不同");return;}changeOwn(v.o,v.n).then(function(){toast("密碼已變更");}).catch(function(e){toast(cErr(e));});});};
+    $("#bPw").onclick=function(){if(!SESSION)return;var W=isGoogleUser()?"金鑰密碼":"密碼";dialog({title:"變更"+W,fields:[{k:"o",label:"目前"+W,type:"password",req:1},{k:"n",label:"新"+W+"（至少 8 字元）",type:"password",req:1},{k:"n2",label:"再輸入一次新"+W,type:"password",req:1}],ok:"變更"})
+      .then(function(v){if(!v)return;if(v.n!==v.n2){toast("兩次新"+W+"不同");return;}changeOwn(v.o,v.n).then(function(){toast(W+"已變更");}).catch(function(e){toast(cErr(e));});});};
     showAuth();return Promise.resolve();
   }
   return {backupName:backupName,backupBar:backupBar,doBackup:doBackup,lastBackup:function(){return lastBackup;},session:function(){return SESSION;},init:init,can:can,backupString:backupString,restoreText:restoreText,secLog:secLog,persist:persist,flush:flush,uname:uname,
@@ -7305,7 +7406,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-10-15 09:37 830c173";
+window.__build="2026-10-18 17:34 ed53fb4";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
