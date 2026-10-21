@@ -302,6 +302,16 @@ h3{font-size:1rem;color:var(--ink);}
 .chip{font-size:.84rem;color:var(--soft);} .chip b{color:var(--ink);font-weight:600;}
 .buildmark{font-size:.72rem;color:var(--soft);opacity:.75;margin-left:6px;white-space:nowrap;}@media (max-width:560px){.buildmark{display:none;}}  /* 手機頁首很擠，隱藏；仍可用 window.__build 查 */
 .failbar{position:sticky;top:0;z-index:41;background:#FDECEC;color:#8a1c1c;border-bottom:1px solid #F0B4B4;padding:8px 16px;font-size:.95rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}.failbar b{font-weight:700;} .failbar .btn{min-height:36px;}@media (max-width:880px),(pointer:coarse){.failbar .btn{min-height:44px;}}
+.failbar[hidden]{display:none!important;} 
+@media (pointer:coarse),(max-width:560px){.prom .btn,.prom select,.prom .fbtn,.bar .btn,.bar summary.btn,.pm-menu .btn,#modal .acts .btn,.pm-mback{min-height:44px!important;} .prom select{max-width:100%;} #pmScope{min-width:0;width:100%;} .prom .info{min-width:44px;} .prom details:not(.pm-more)>summary{padding-top:11px;padding-bottom:11px;} .pm-menu label{min-height:44px;} .pm-menu label input[type=checkbox]{width:22px;height:22px;}}  /* 2026-10-21 觸控點擊目標至少 44px（Apple 44pt／Material 48dp／WCAG 2.5.5）；「已電聯」整列可點 */
+.touch-only{display:none;} @media (hover:none),(pointer:coarse){.prom .touch-only{display:block;} .prom .pm-meta{flex-basis:100%;} .prom .pm-fdesc{display:inline-block;}}  /* 2026-10-21 原本只放在滑鼠提示（title）的說明，觸控裝置看不到；只在觸控裝置顯示 */
+@media (max-width:560px),(max-height:500px) and (pointer:coarse){.bar h1,.bar .sp{display:none;} .bar>*{order:3;} .bar #chip{order:1;flex:1 1 0;min-width:10em;} .bar #sync{order:2;} .bar summary.btn{display:inline-flex;align-items:center;padding-top:0;padding-bottom:0;}}  /* 手機直／橫向：身分列＋同步狀態一列、按鈕一列 */  /* 2026-10-21 手機頁首：標題併入身分列（身分列已有作業名稱），帳號相關按鈕收進「帳號 ▾」 */
+.waitbar{position:sticky;top:0;z-index:41;background:#FBF1DE;color:#6d4205;border-bottom:1px solid #E8CC95;padding:10px 16px;font-size:.95rem;} .waitbar[hidden]{display:none!important;}
+.iabar{position:fixed;top:0;left:0;right:0;z-index:95;background:#FBF1DE;color:#6d4205;border-bottom:1px solid #E8CC95;padding:10px 16px;font-size:.95rem;line-height:1.5;} .iabar .btn{min-height:44px;margin-left:6px;}
+  /* 2026-10-21：.failbar 的 display:flex 蓋過 hidden，10-10 起每次登入頂端都常駐「沒有存成功」 */
+.pm-menu{max-width:calc(100vw - 16px);} .pm-menu .btn{box-sizing:border-box;}  /* width:100% 加左右 padding 原本會凸出選單 19px */ @media (max-width:560px){.pm-menu label{white-space:normal;flex-wrap:wrap;}}
+@media (max-width:560px){html,body{overflow-x:clip;}}  /* 2026-10-21 保險：任何元素超出右緣都不可把手機版面撐寬（撐寬時整頁縮小、可左右晃） */
+@media (max-width:880px){body.pm-m-det #pmKpi{display:none;}}  /* 2026-10-21 手機看單一病人時，清單層的統計不佔第一屏（工具列保留：詳情裡仍要能按字級、重新讀取）；回清單就出現 */ @media (max-width:560px){.prom .phead h3{display:none;}}  /* 手機：清單標題與頁首重複（頁首已有作業名稱），工具列直接頂上 */
 .bkbar{position:sticky;top:0;z-index:40;background:#FBF1DE;color:#6d4205;border-bottom:1px solid #E8CC95;padding:8px 16px;font-size:.9rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;} .bkbar[hidden]{display:none!important;} .bkhint{font-size:.8rem;opacity:.85;}
 .inst{border:2px solid var(--rule);border-radius:8px;margin:0 0 18px;} .inst .ih b{background:#0D6468;color:#fff;padding:2px 9px;border-radius:4px;} .inst.done{background:var(--well);} .inst.done .ib,.inst.collapsed .ib{display:none;}
 .inst .f.filled{border-left:3px solid #0D6468;padding-left:10px;background:linear-gradient(90deg,rgba(13,100,104,.06),transparent 40%);} .inst.compact .f:not(.filled):not(.req):not(.srcrow){display:none;} .inst.compact .srcrow{display:none;} .inst.compact h3[data-sech]{display:none;}
@@ -446,13 +456,14 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
 </head>
 <body>
 <div style="background:#F7EAD2;color:#7a4b06;padding:6px 16px;font-size:.92rem;text-align:center">測試版：只能輸入假資料，請勿輸入真實病人資料</div>
+<div id="waitbar" class="waitbar" hidden role="status" aria-live="polite"><b>還沒送到雲端</b> <span id="waitmsg"></span></div>
 <div id="failbar" class="failbar" hidden role="alert" aria-live="assertive"><b>沒有存成功</b> <span id="failmsg"></span> <button class="btn" type="button" id="failgo" hidden>重新讀取</button><button class="btn" type="button" id="failx" aria-label="關閉這則提醒">關閉</button></div>
 <div id="bkbar" class="bkbar" hidden><span id="bkmsg"></span> <button class="btn go" type="button" id="bkgo">立即下載加密備份</button> <span class="bkhint">存到 J:\escc_cmuh\cloud_backups\</span></div>
 <div class="bar">
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-10-18 22:50 627a71f</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-10-21 19:28 e583cb4</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -1838,7 +1849,7 @@ var SEC=(function(){
   function applySession(){
     var r=SESSION.role,ui=r==="manager"?"abstractor":r;
     $("#who").value=SESSION.name;$("#role").value=ui;document.body.dataset.role=ui;
-    $("#chip").innerHTML="<b>"+esc(SESSION.name)+"</b>・"+RN[SESSION.fbRole]+"・"+esc(SESSION.studyName||"");$("#bUsers").hidden=r!=="manager";$("#bAssign").hidden=r!=="manager";
+    $("#chip").innerHTML="<b>"+esc(SESSION.name)+"</b>・"+RN[SESSION.role==="manager"||SESSION.role==="abstractor"?SESSION.fbRole:SESSION.role]+"・"+esc(SESSION.studyName||"");$("#bUsers").hidden=r!=="manager";$("#bAssign").hidden=r!=="manager";
     $$("#menu .dd button").forEach(function(b){b.hidden=!can(b.dataset.act);});$$("#menu .dd hr").forEach(function(h){h.hidden=r!=="manager";});
     var bR2=$("#bRec");if(bR2){bR2.hidden=!isAdmin()||!!SESSION.offline;bR2.textContent=PROFILE&&PROFILE.recPriv?"復原碼":"⚠ 建立復原碼";}
     $("#bUsers").hidden=$("#bUsers").hidden||!!SESSION.offline;$("#bAssign").hidden=$("#bAssign").hidden||!!SESSION.offline;$("#bPw").hidden=!!SESSION.offline;$("#bLock").textContent=SESSION.offline?"關閉備份":"登出";
@@ -6101,6 +6112,13 @@ function save(r,extra){return seal(r.body).then(function(o){var ver=(r.meta.ver|
    「PERMISSION_DENIED: evaluation error at L144:26 for 'update' ...」這種東西）。
    最常見的原因就是同一筆剛被別人改掉（規則要求版本必須等於既有+1），所以直接講那件事
    並說怎麼辦；我們自己丟的錯誤訊息（例如「請至少選一個等級」）照原樣顯示。 */
+/* 2026-10-21 弱訊號／離線：Firestore 的寫入在斷線時會一直等到恢復連線才完成，原本按「送出」後畫面完全沒反應（量到 6 秒無任何提示），
+   手機在院內訊號不穩時容易重按或離開。送出期間鎖住按鈕、主按鈕改「送出中…」；2.5 秒還沒完成就掛常駐提示，完成後自動收掉。 */
+function busy(p){var bs=$$("#pmDet .pm-foot button.btn").filter(function(b){return !b.disabled;}),main=$("#pmRevNext")||$("#pmOkNext"),t0=main&&main.textContent;
+  bs.forEach(function(b){b.disabled=true;});if(main)main.textContent="送出中…";
+  var tm=setTimeout(function(){if(window.waitBar)window.waitBar(navigator.onLine===false?"目前沒有網路。":"網路很慢或中斷。");},2500);
+  function done(){clearTimeout(tm);if(window.waitBarHide)window.waitBarHide();bs.forEach(function(b){if(b.isConnected)b.disabled=false;});if(main&&main.isConnected&&t0)main.textContent=t0;}
+  return p.then(function(v){done();return v;},function(e){done();throw e;});}
 function wErr(e){var c=e&&e.code||"";
   if(c==="permission-denied"||/PERMISSION_DENIED|permission-denied/.test(String(e&&e.message||"")))
     return "這筆剛被別人更新（可能已由其他人初審或結案），您這次的變更沒有存上去。請按下面的「重新讀取」看最新狀態，再決定要不要重做。";
@@ -6240,7 +6258,8 @@ function openIssueDialog(){
     try{localStorage.setItem("promTx",tx.join(","));localStorage.setItem("promKind",kind==="visit"?"1":"0");}catch(e){}
     issueTokens({pid:v.p,n:v.n,kind:kind,treatments:tx,baselineKg:v.w,birth4:v.b,label:v.l,base:location.origin+location.pathname.replace(/[^/]*$/,"")+"prom_patient.html"}).then(function(rs){
       if(rs.length===1){var r=rs[0],pr2=dialog({title:"連結已發出",msg:"請病人以手機相機掃描此 QR 碼（或將連結製成小卡）。連結不含姓名或病歷號。"+(r.kind==="visit"?"這條連結用一次就失效。":"整個療程都用這條連結；可請病人加到手機主畫面。")+" 請將代號寫在小卡上，並自行記錄該卡發給哪一位病人（雲端不儲存身分資料）。",fields:[{k:"u",label:"連結（全選複製）",type:"textarea",value:r.link}],ok:"複製"});
-        var svg=qrSvg(r.link,7),bx=$("#mBody");if(bx){var d=document.createElement("div");d.className="pmqr";d.innerHTML='<div class="pmcode">'+E(r.pid)+'</div>'+(svg||"");bx.insertBefore(d,bx.querySelector("label.mf"));}
+        var svg=qrSvg(r.link,7),bx=$("#mBody");if(bx){var d=document.createElement("div");d.className="pmqr";d.innerHTML='<div class="pmcode">'+E(r.pid)+'</div>'+(svg||"");bx.insertBefore(d,bx.querySelector("label.mf"));
+          if(navigator.share){var sh=document.createElement("button");sh.type="button";sh.className="btn";sh.id="pmShare";sh.textContent="分享連結…";sh.onclick=function(){navigator.share({url:r.link}).catch(function(){});};d.appendChild(sh);}}   /* 2026-10-21 手機：自己當病人練習時掃不到自己螢幕上的 QR，改用系統分享傳到別的 App 或自己 */
         pr2.then(function(w){if(w&&navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(r.link).then(function(){toast("已複製");});});return;}
       var pr3=dialog({title:"已發出 "+rs.length+" 張",msg:"每張代號不同。按「列印小卡」整頁印出，剪開發給病人；請自己記下哪張發給誰（雲端不存身分）。",fields:[{k:"u",label:"代號與連結（全選複製）",type:"textarea",value:rs.map(function(r){return r.pid+"\t"+r.link;}).join("\n")}],ok:"關閉",info:true});mcls("pm-wide");
       var bx2=$("#mBody");if(bx2){var g=document.createElement("div");g.innerHTML='<div class="pmcards">'+rs.map(cardHtml).join("")+'</div><p><button class="btn go" type="button" id="pmPrint">列印小卡</button></p>';bx2.insertBefore(g,bx2.querySelector("label.mf"));var pb=$("#pmPrint");if(pb)pb.onclick=function(){printCards(rs);};}
@@ -6464,7 +6483,7 @@ function drawList(){drawCcdStat();var n={red:0,confirm:0,act:0,read:0,skip:0},sc
   $("#pmBar").innerHTML='<span class="seg"><button class="fbtn'+(FILT==="todo"?" on":"")+'" data-f="todo" title="看診時優先處理＋待確認＋建議安排檢查">需要處理 <b>'+(n.red+n.confirm+n.act)+'</b></button><button class="fbtn'+(FILT==="read"?" on":"")+'" data-f="read">看一眼就好 <b>'+n.read+'</b></button>'+
     (canConfirm()?'<button class="fbtn'+(FILT==="doc"?" on":"")+'" data-f="doc">待醫師確認 <b>'+waitDoc()+'</b></button>':'')+'<button class="fbtn'+(FILT==="all"?" on":"")+'" data-f="all">全部 <b>'+sc.length+'</b></button></span>'+
     '<select class="pm-scope" id="pmScope"><option value="active"'+(SCOPE==="active"?" selected":"")+'>這一診（'+WINDOW_H+' 小時內未結案）'+c.active+'</option><option value="open"'+(SCOPE==="open"?" selected":"")+'>所有未結案 '+c.open+'</option><option value="all"'+(SCOPE==="all"?" selected":"")+'>含已結案 '+c.all+'</option></select>'+
-    '<span class="kbd pm-skip">'+n.skip+' 位不用點開（'+Math.round(n.skip/Math.max(1,sc.length)*100)+'%）</span>';
+    '<span class="kbd touch-only pm-fdesc">「需要處理」＝優先處理＋待確認＋建議檢查</span>'+'<span class="kbd pm-skip">'+n.skip+' 位不用點開（'+Math.round(n.skip/Math.max(1,sc.length)*100)+'%）</span>';
   var ids=listIds(),h="",GN={red:"看診時優先處理",confirm:"待確認（先打電話或量測）",act:"建議安排檢查",read:"看一眼就好",skip:"不用點開"},grp=null;
   if(!NOAUTO&&(!SEL||ids.indexOf(SEL)<0)){SEL=ids[0]||null;PICK={};TERMS=[];AUTODRAW=true;}
   if(!ids.length)h+='<tr><td class="desc" style="padding:18px 8px">'+(FILT==="todo"?"這一診目前沒有需要處理的病人。":FILT==="doc"?"目前沒有等醫師確認的病人。":"沒有符合的項目。")+'</td></tr>';
@@ -6508,7 +6527,7 @@ function drawDetail(id){var r=RECS[id];if(!r){$("#pmDet").innerHTML="";return;}v
   if(chg.length)gist+='<span class="g g-amb">惡化 <b>'+chg.length+'</b></span>';if(en.unfilled.length)gist+='<span class="g g-grey">未填 <b>'+en.unfilled.length+'</b></span>';
   if(!en.flags.today.length&&!en.hasText&&!chg.length)gist+='<span class="g g-ok">無需今日處理</span>';
   gist+=(l2?'<span class="g g-vio">'+(revWho(l2)||"初審")+' '+E(l2.name)+(b.layer2.length>1?"（共 "+b.layer2.length+" 次）":"")+'</span>':"")+(r.meta.closed?'<span class="g g-ok">已結案 '+E(b.layer3?b.layer3.name:"")+'</span>':"")+
-    '<span style="margin-left:auto" class="kbd" title="CTCAE v'+E(b.ctcaeV)+'・紀錄版本 '+E(r.meta.ver||1)+'・代碼 '+E(b.visit)+'">填寫 '+E(tsText(b.filledAt))+'</span></div>';
+    '<span style="margin-left:auto" class="kbd" title="CTCAE v'+E(b.ctcaeV)+'・紀錄版本 '+E(r.meta.ver||1)+'・代碼 '+E(b.visit)+'">填寫 '+E(tsText(b.filledAt))+'</span><span class="kbd touch-only pm-meta">CTCAE v'+E(b.ctcaeV)+'・紀錄版本 '+E(r.meta.ver||1)+'・代碼 '+E(b.visit)+'</span></div>';
   var L="",L2="",wt=evOf(b,DRAFT[id]).weight||{},wtx=(wt.baseline_kg&&wt.now_kg)?"（"+wt.baseline_kg+" → "+wt.now_kg+" kg，"+Math.round((wt.now_kg-wt.baseline_kg)/wt.baseline_kg*100)+"%）":"";
   if(en.flags.today.length)L+='<div class="box b-red"><h3>看診時優先處理</h3><ul>'+en.flags.today.map(function(f){return "<li>"+E(f.text)+(/體重/.test(f.text)?E(wtx):"")+(flagConfirmed(f,en)?' <span class="g g-vio">個管師確認</span>':"")+"</li>";}).join("")+'</ul></div>';
   if(en.hasText){L+='<div class="box b-cc"><h3>病人自己說的話</h3>';if(String(cc.text||"").trim())L+='<p class="ccq">'+E(cc.text)+'</p>'+ccNoteHtml(b);if((b.mediaFailed||[]).indexOf("audio")>=0)L+='<p class="msg" style="color:var(--err)">⚠️ 病人已錄音，但檔案儲存失敗，請直接聯絡病人。</p>';L+='</div>';}
@@ -6539,7 +6558,7 @@ function drawDetail(id){var r=RECS[id];if(!r){$("#pmDet").innerHTML="";return;}v
   if(canConfirm()&&!r.meta.closed)bar+='<div class="actbar"><span class="kbd">醫師確認</span><span class="cnt" id="pmCnt">還沒選等級</span><input id="pmPlan" placeholder="處置（選填）"><button class="btn go" type="button" id="pmOkNext">確認並結案，下一位</button><button class="btn" type="button" id="pmOk">確認並結案</button><button class="btn" type="button" id="pmChart">複製到病歷</button></div>';
   if(r.meta.closed)bar+='<div class="actbar"><span class="kbd">已結案</span><button class="btn" type="button" id="pmChart">複製到病歷</button>'+(x().isAdmin()?'<button class="btn warn" type="button" id="pmReopen">重開（主持人）</button>':"")+'</div>';
   var tail='<div class="actbar pm-tail"><button class="btn" type="button" id="pmClose">關閉</button>'+(x().isAdmin()?'<button class="btn warn" type="button" id="pmDel">刪除紀錄（主持人）</button>':"")+'<span class="kbd pm-keys"><b>j</b>/<b>k</b> 換病人　<b>↑</b>/<b>↓</b> 換項目　<b>0</b>–<b>4</b> 給級　<b>i</b> 原文　<b>Enter</b> '+(canConfirm()?"確認並結案":"送出，下一位")+'</span></div>';
-  $("#pmDet").innerHTML=gist+'<div class="pm-sum"><div>'+escBox+(L||'<div class="box b-ok"><h3>無需今日處理</h3><p class="mini">沒有紅旗、沒有病人留言、沒有惡化。</p></div>')+todo+'</div><div>'+L2+'</div></div><div class="pm-ev">'+R+'</div>'+scr+(L3?'<details class="more pm-hist"><summary>紀錄：個管師判斷／醫師確認／病人填答全文</summary>'+L3+'</details>':"")+tail+'<div class="pm-foot">'+bar+'</div>';FOCUS=0;drawChips();wire(r,en);paintFocus();}
+  $("#pmDet").innerHTML=gist+'<div class="pm-sum"><div>'+escBox+(L||'<div class="box b-ok"><h3>無需今日處理</h3><p class="mini">沒有紅旗、沒有病人留言、沒有惡化。</p></div>')+todo+'</div><div>'+L2+'</div></div><div class="pm-ev">'+(/class="trow"/.test(R)?'<p class="kbd touch-only pm-legend">「系統預判」是依病人回答推估的等級，還要有人確認；「資料不足」是病人該題沒填。</p>':"")+R+'</div>'+scr+(L3?'<details class="more pm-hist"><summary>紀錄：個管師判斷／醫師確認／病人填答全文</summary>'+L3+'</details>':"")+tail+'<div class="pm-foot">'+bar+'</div>';FOCUS=0;drawChips();wire(r,en);paintFocus();}
 function byOrgan(list,b){if(!list.length)return '<p class="mini">（無）</p>';var g={};list.forEach(function(z){(g[z.soc]=g[z.soc]||[]).push(z);});
   var order=["肺","心臟","腸胃","肝膽","內分泌","神經","腎臟","皮膚","眼睛","肌肉骨骼","血液","代謝營養","全身","其他"],h="";
   order.forEach(function(soc){if(!g[soc])return;h+='<div class="soc"><div class="soch">'+E(soc)+'<span class="n">'+g[soc].length+' 項</span></div>';g[soc].forEach(function(z){h+=termRow(z,b);});h+='</div>';});return h;}
@@ -6582,12 +6601,12 @@ function wire(r,en){wireTodo(r);SELB=r.body;rowsEl().forEach(function(row){var t
       bt.onclick=function(){$$(".gb",row).forEach(function(z){z.classList.remove("on");});bt.classList.add("on");PICK[term]=parseInt(bt.dataset.g,10);updCnt();show(bt.dataset.g);};});
     var inf=$(".info",row);if(inf)inf.onclick=function(){row.nextElementSibling.classList.toggle("hid");};row.onclick=function(ev){if(ev.target.closest(".gb")||ev.target.closest(".info"))return;FOCUS=rowsEl().indexOf(row);paintFocus();};});
   var tf=$("#pmTf");if(tf)tf.oninput=drawChips;$("#pmClose").onclick=function(){mBack();SEL=null;NOAUTO=true;$("#pmDet").innerHTML="";PICK={};TERMS=[];$$("#pmTbl tr.prow").forEach(function(z){z.classList.remove("on");});};
-  var rv=$("#pmRev");if(rv)rv.onclick=function(){review(r.id,{note:$("#pmNote").value,contacted:$("#pmCt").checked,urgency:$("#pmUrg").value,signal:$("#pmSig").value,terms:TERMS,suggest:PICK,confirms:DRAFT[r.id]}).then(function(){toast("已送出（"+meName()+"）");EN=ens();drawKpi();drawList();if(SEL===r.id){PICK={};TERMS=[];drawDetail(r.id);}}).catch(function(e){wFail(e,function(){return loadAll().then(function(){EN=ens();drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);});});});};
+  var rv=$("#pmRev");if(rv)rv.onclick=function(){busy(review(r.id,{note:$("#pmNote").value,contacted:$("#pmCt").checked,urgency:$("#pmUrg").value,signal:$("#pmSig").value,terms:TERMS,suggest:PICK,confirms:DRAFT[r.id]})).then(function(){toast("已送出（"+meName()+"）");EN=ens();drawKpi();drawList();if(SEL===r.id){PICK={};TERMS=[];drawDetail(r.id);}}).catch(function(e){wFail(e,function(){return loadAll().then(function(){EN=ens();drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);});});});};
   var rn=$("#pmRevNext");if(rn)rn.onclick=function(){var ids=listIds(),i=ids.indexOf(r.id),nx=ids[i+1]||ids[i-1]||null;
-    review(r.id,{note:$("#pmNote").value,contacted:$("#pmCt").checked,urgency:$("#pmUrg").value,signal:$("#pmSig").value,terms:TERMS,suggest:PICK,confirms:DRAFT[r.id]}).then(function(){toast("已送出，下一位 "+(nx?RECS[nx].body.pid:"（沒有了）"));PICK={};TERMS=[];EN=ens();SEL=nx;drawKpi();drawList();if(nx)drawDetail(nx);else $("#pmDet").innerHTML='<p class="pm-empty">本診病人已全部檢視完畢。</p>';if(nx)hDet(nx);mTop();}).catch(function(e){wFail(e,function(){return loadAll().then(function(){EN=ens();drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);});});});};
+    busy(review(r.id,{note:$("#pmNote").value,contacted:$("#pmCt").checked,urgency:$("#pmUrg").value,signal:$("#pmSig").value,terms:TERMS,suggest:PICK,confirms:DRAFT[r.id]})).then(function(){toast("已送出，下一位 "+(nx?RECS[nx].body.pid:"（沒有了）"));PICK={};TERMS=[];EN=ens();SEL=nx;drawKpi();drawList();if(nx)drawDetail(nx);else $("#pmDet").innerHTML='<p class="pm-empty">本診病人已全部檢視完畢。</p>';if(nx)hDet(nx);mTop();}).catch(function(e){wFail(e,function(){return loadAll().then(function(){EN=ens();drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);});});});};
   var okn=$("#pmOkNext");if(okn)okn.onclick=function(){var ids=listIds(),i=ids.indexOf(r.id),nx=ids[i+1]||ids[i-1]||null;if(nx===r.id)nx=null;
-    confirm(r.id,PICK,$("#pmPlan").value).then(function(){toast("已確認並結案（"+meName()+"），下一位 "+(nx&&RECS[nx]?RECS[nx].body.pid:"（沒有了）"));PICK={};TERMS=[];EN=ens();SEL=nx;drawKpi();drawList();if(nx)drawDetail(nx);else $("#pmDet").innerHTML='<p class="pm-empty">本診病人已全部確認完畢。</p>';if(nx)hDet(nx);mTop();}).catch(function(e){wFail(e,function(){return loadAll().then(function(){EN=ens();drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);});});});};
-  var ok=$("#pmOk");if(ok)ok.onclick=function(){confirm(r.id,PICK,$("#pmPlan").value).then(function(){toast("已確認並結案（"+meName()+"）");PICK={};TERMS=[];EN=ens();drawKpi();drawList();drawDetail(r.id);}).catch(function(e){wFail(e,function(){return loadAll().then(function(){EN=ens();drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);});});});};
+    busy(confirm(r.id,PICK,$("#pmPlan").value)).then(function(){toast("已確認並結案（"+meName()+"），下一位 "+(nx&&RECS[nx]?RECS[nx].body.pid:"（沒有了）"));PICK={};TERMS=[];EN=ens();SEL=nx;drawKpi();drawList();if(nx)drawDetail(nx);else $("#pmDet").innerHTML='<p class="pm-empty">本診病人已全部確認完畢。</p>';if(nx)hDet(nx);mTop();}).catch(function(e){wFail(e,function(){return loadAll().then(function(){EN=ens();drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);});});});};
+  var ok=$("#pmOk");if(ok)ok.onclick=function(){busy(confirm(r.id,PICK,$("#pmPlan").value)).then(function(){toast("已確認並結案（"+meName()+"）");PICK={};TERMS=[];EN=ens();drawKpi();drawList();drawDetail(r.id);}).catch(function(e){wFail(e,function(){return loadAll().then(function(){EN=ens();drawKpi();drawList();if(SEL&&RECS[SEL])drawDetail(SEL);});});});};
   var ch=$("#pmChart");if(ch)ch.onclick=function(){openChart(r,en);};
   var ro=$("#pmReopen");if(ro)ro.onclick=function(){ask("重新開啟此筆紀錄？結案標記將取消，紀錄不會刪除。").then(function(y){if(!y)return;reopen(r.id).then(function(){toast("已重開");EN=ens();drawList();drawDetail(r.id);}).catch(function(e){toast(e.message||x().cErr(e));});});};
   var dl=$("#pmDel");if(dl)dl.onclick=function(){dialog({title:"永久刪除這筆 ePRO 紀錄？",msg:"紀錄 "+r.id+" 會被永久刪除，無法復原（留稽核紀錄）。這是給清測試資料用的；真實病人請用「結案」。請輸入研究編號確認。",fields:[{k:"c",label:"輸入研究編號："+r.body.pid,req:1}],ok:"永久刪除"}).then(function(v){if(!v)return;
@@ -6607,12 +6626,13 @@ document.addEventListener("keydown",function(ev){if(ev.key==="Escape")$$("detail
 document.addEventListener("click",function(ev){$$("details.pm-more[open]").forEach(function(d){if(!d.contains(ev.target))d.removeAttribute("open");});});
 function ensureButton(){if($("#bProm"))return;var b=document.createElement("button");b.className="btn";b.type="button";b.id="bProm";b.textContent="ePRO 症狀";var u=$("#acctBox")||$("#bUsers");u.parentNode.insertBefore(b,u);
   b.onclick=function(){if(S()&&S().offline){render();return;}$("#main").innerHTML='<section class="sheet report"><p class="desc">讀取 ePRO 中…</p></section>';loadAll().then(function(){return regrantStale();}).then(function(n){return revokeStale().then(function(g){if(g)toast("已收回 "+g+" 位已離開／改角色成員的 ePRO 金鑰");return n;});}).then(function(n){if(n)toast("已自動把 ePRO 金鑰重新授權給 "+n+" 位更新過金鑰的成員");render();},function(e){toast(e.message||x().cErr(e));});};}
-function tidyHeader(){var lk=$("#bLock");if(!lk||$("#acctBox"))return;var items=["#bUsers","#bRec","#bPw"].map(function(q){return $(q);}).filter(Boolean);if(items.length<2)return;
-  var d=document.createElement("details");d.className="pm-more";d.id="acctBox";d.innerHTML='<summary class="btn" id="acctSum">帳號 ▾</summary><div class="pm-menu"></div>';lk.parentNode.insertBefore(d,lk);var m=d.querySelector(".pm-menu");items.forEach(function(b){m.appendChild(b);b.addEventListener("click",function(){d.removeAttribute("open");});});}
+/* 2026-10-21 手機（≤560px）所有角色都收成「帳號 ▾」且把登出也收進去：頁首原本折成 3–4 列，第一屏看不到病人 */
+function tidyHeader(){var lk=$("#bLock");if(!lk||$("#acctBox"))return;var nar=!!(window.matchMedia&&matchMedia("(max-width:560px),(max-height:500px) and (pointer:coarse)").matches);var items=["#bUsers","#bRec","#bPw"].map(function(q){return $(q);}).filter(function(b){return b&&!b.hidden;});if(items.length<2&&!nar)return;
+  var d=document.createElement("details");d.className="pm-more";d.id="acctBox";d.innerHTML='<summary class="btn" id="acctSum">帳號 ▾</summary><div class="pm-menu"></div>';lk.parentNode.insertBefore(d,lk);var m=d.querySelector(".pm-menu");if(nar)items.push(lk);items.forEach(function(b){m.appendChild(b);b.addEventListener("click",function(){d.removeAttribute("open");});});}
 function onSession(){var s=S();if(!s)return;if(s.mode==="irae")return;   /* irAE 登錄空間由 IRAE 模組負責（醫師角色不可落入 ePRO 畫面） */
-VIEW=false;var h1=document.querySelector("h1");if(h1){if(!h1.dataset.orig)h1.dataset.orig=h1.textContent;h1.textContent=promSpace()?"門診 ePRO":clin()?"ePRO 症狀":h1.dataset.orig;}
+VIEW=false;var h1=document.querySelector("h1");if(h1){if(!h1.dataset.orig)h1.dataset.orig=h1.textContent;h1.textContent=promSpace()?(practiceSpace()?"ePRO 練習":"門診 ePRO"):clin()?"ePRO 症狀":h1.dataset.orig;}
   document.body.classList.toggle("prom-space",promSpace());
-  if(x().isAdmin())tidyHeader();
+  if(x().isAdmin()||(window.matchMedia&&matchMedia("(max-width:560px),(max-height:500px) and (pointer:coarse)").matches))tidyHeader();
   if(clin()){document.body.classList.add("prom-only");render();}else{document.body.classList.remove("prom-only");if(x().isAdmin())ensureButton();var b=$("#bProm");if(b)b.hidden=!x().isAdmin()||(!!s.offline&&!LOADED);
     if(promSpace()&&x().isAdmin()&&!s.offline){loadAll().then(function(){return regrantStale();}).then(function(){return revokeStale();}).then(function(){render();},function(e){toast(e.message||x().cErr(e));});}}}
 function onLeave(){VIEW=false;document.body.classList.remove("prom-view");document.documentElement.style.fontSize="";var pb=$("#bProm");if(pb)pb.classList.remove("on");}
@@ -7443,7 +7463,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-10-18 22:50 627a71f";
+window.__build="2026-10-21 19:28 e583cb4";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
@@ -7461,6 +7481,28 @@ window.__build="2026-10-18 22:50 627a71f";
     try{b.scrollIntoView({block:"nearest"});}catch(e){}
   };
   window.failBarHide=function(){var b=document.getElementById("failbar");if(b)b.hidden=true;};
+  window.waitBar=function(why){var b=document.getElementById("waitbar");if(!b)return;document.getElementById("waitmsg").textContent=(why||"")+"恢復連線後會自動送出，請先不要關閉這一頁或登出。";b.hidden=false;};
+  window.waitBarHide=function(){var b=document.getElementById("waitbar");if(b)b.hidden=true;};
+  /* 2026-10-21 從 LINE／Facebook／Instagram 等社群軟體內建瀏覽器開啟：Google 登入視窗常被擋，且關掉就沒了。
+     偵測到就在最上方提示改用 Chrome／Safari，並給「複製網址」。（學生指引早已寫「不要從社群軟體裡開」，頁面本身補上。） */
+  (function(){var ua=navigator.userAgent||"";
+    if(!/\bLine\/|FBAN|FBAV|FB_IAB|Instagram|MicroMessenger|KAKAOTALK|\bMessenger/i.test(ua))return;
+    function show(){if(document.getElementById("iabar"))return;var b=document.createElement("div");b.id="iabar";b.className="iabar";b.setAttribute("role","alert");
+      b.innerHTML='<b>您是在社群軟體裡開啟本頁</b>，Google 登入可能被擋。請按右上角「⋯」選「用瀏覽器開啟」，或複製網址貼到 Chrome／Safari。<button class="btn" type="button" id="iacopy">複製網址</button>';
+      document.body.appendChild(b);var fit=function(){var h=b.offsetHeight;document.body.style.paddingTop=h+"px";var a=document.getElementById("auth");if(a)a.style.paddingTop=(h+18)+"px";};fit();addEventListener("resize",fit);
+      document.getElementById("iacopy").onclick=function(){var u=location.href;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(function(){if(typeof toast==="function")toast("已複製網址");},function(){prompt("請長按複製網址",u);});else prompt("請長按複製網址",u);};}
+    if(document.body)show();else document.addEventListener("DOMContentLoaded",show);})();
+  /* 2026-10-21 下拉選單（details.pm-more）打開時若超出畫面左右緣，整個往內移。
+     臨床藥師手機版：「電話結果」選單貼著按鈕左緣往右展開，390 寬時右緣到 437，整頁版面被撐寬。 */
+  function clampX(m){if(!m)return;m.style.transform="";m.style.maxWidth="calc(100vw - 16px)";
+    var r=m.getBoundingClientRect(),vw=document.documentElement.clientWidth,dx=0;
+    if(r.right>vw-8)dx=vw-8-r.right;if(r.left+dx<8)dx=8-r.left;
+    if(dx)m.style.transform="translateX("+Math.round(dx)+"px)";}
+  document.addEventListener("toggle",function(ev){var d=ev.target;
+    if(d&&d.classList&&d.classList.contains("pm-more")&&d.open)clampX(d.querySelector(".pm-menu"));},true);
+  /* 頁首「資料 ▾」(主持人)：靠右對齊按鈕往左展開，手機上按鈕在左半邊時左緣跑到 -138，左半截看不到也捲不到 */
+  document.addEventListener("click",function(ev){if(!ev.target||!ev.target.closest||!ev.target.closest("#bMenu"))return;
+    setTimeout(function(){var mn=document.getElementById("menu");if(mn&&mn.classList.contains("open"))clampX(mn.querySelector(".dd"));},0);},true);
   document.addEventListener("click",function(ev){
     if(ev.target&&ev.target.id==="failx")window.failBarHide();});
 })();
