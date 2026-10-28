@@ -463,7 +463,7 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-10-21 19:28 e583cb4</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-10-28 20:54 4fdff85 nas 1c7ce1·119ddf·54150b</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -7463,7 +7463,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-10-21 19:28 e583cb4";
+window.__build="2026-10-28 20:54 4fdff85 nas 1c7ce1·119ddf·54150b";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
