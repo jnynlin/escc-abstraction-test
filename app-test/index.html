@@ -458,13 +458,13 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
 <body>
 <div style="background:#F7EAD2;color:#7a4b06;padding:6px 16px;font-size:.92rem;text-align:center">測試版：只能輸入假資料，請勿輸入真實病人資料</div>
 <div id="waitbar" class="waitbar" hidden role="status" aria-live="polite"><b>還沒送到雲端</b> <span id="waitmsg"></span></div>
-<div id="failbar" class="failbar" hidden role="alert" aria-live="assertive"><b>沒有存成功</b> <span id="failmsg"></span> <button class="btn" type="button" id="failgo" hidden>重新讀取</button><button class="btn" type="button" id="failx" aria-label="關閉這則提醒">關閉</button></div>
+<div id="failbar" class="failbar" hidden role="alert" aria-live="assertive"><b id="failttl">沒有存成功</b> <span id="failmsg"></span> <button class="btn" type="button" id="failgo" hidden>重新讀取</button><button class="btn" type="button" id="failx" aria-label="關閉這則提醒">關閉</button></div>
 <div id="bkbar" class="bkbar" hidden><span id="bkmsg"></span> <button class="btn go" type="button" id="bkgo">立即下載加密備份</button> <span class="bkhint">存到 J:\escc_cmuh\cloud_backups\</span></div>
 <div class="bar">
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-13 22:37 fe72293 nas 218e8d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-13 22:47 3059326 nas 218e8d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -785,6 +785,10 @@ function xcheck(id,fm,inst,forComplete,E,W){
       if(a0<=b1&&b0<=a1)ov++;if(no>0&&yn>0&&no>yn&&a0<b0)ord=yn;});
     if(ov)W.push({f:"line_start",m:"與另外 "+ov+" 條治療線的日期重疊，請核對是否重複登錄或日期有誤"});
     if(ord)W.push({f:"line_no",m:"線別是第 "+no+" 線，但開始日早於第 "+ord+" 線，請核對線別或日期"});}
+  if(fm.id==="rt_course"&&inst&&inst.rt_start){var dupR=(r.rt_course||[]).filter(function(y){return y!==inst&&y.rt_start===inst.rt_start&&(y.rt_end||"")===(inst.rt_end||"");}).length;
+    if(dupR)W.push({f:"rt_start",m:"另有 "+dupR+" 筆放療的開始日與結束日都相同，請核對是否重複登錄"});}
+  if(fm.id==="staging_imaging"&&inst&&inst.si_date&&inst.si_modality){var dupI=(r.staging_imaging||[]).filter(function(y){return y!==inst&&y.si_date===inst.si_date&&y.si_modality===inst.si_modality;}).length;
+    if(dupI)W.push({f:"si_date",m:"另有 "+dupI+" 筆的檢查日期與檢查種類都相同，請核對是否重複登錄"});}
   if(fm.id==="pathology_specimen"&&inst&&inst.path_date){var dupP=(r.pathology_specimen||[]).filter(function(y){return y!==inst&&y.path_date===inst.path_date&&(y.path_type||"")===(inst.path_type||"")&&String(y.path_report_no||"").trim()===String(inst.path_report_no||"").trim();}).length;
     if(dupP)W.push({f:"path_date",m:"另有 "+dupP+" 筆的採檢日、檢體類別、報告編號都相同，請核對是否重複登錄"});}
   if(fm.id==="systemic_line"&&inst){var ln9=+inst.line_no||0;if(ln9>=1){var same9=(r.systemic_line||[]).filter(function(y){return y!==inst&&(+y.line_no||0)===ln9;}).length;
@@ -1549,7 +1553,7 @@ var SEC=(function(){
     window.__errs.push(label?label+": "+msg:msg);
     if(errSeen[msg])return;errSeen[msg]=1;
     if(errShown<3&&window.failBar){errShown++;
-      window.failBar("系統發生錯誤，畫面上剛才的動作可能沒有完成。請截圖告知（含右上角的版本字樣）；若畫面卡住請重新載入頁面。");}
+      window.failBar("剛才的動作可能沒有完成；資料有沒有存好，請看右上角的同步狀態。請截圖告知（含右上角的版本字樣）；若畫面卡住請重新載入頁面。",null,"畫面發生錯誤");}
     try{if(SESSION&&!SESSION.offline)secLog("前端錯誤："+msg.slice(0,150));}catch(e){}
   }
   window.addEventListener("error",function(e){onJsErr("",e.message);});
@@ -1765,6 +1769,7 @@ var SEC=(function(){
   function wipe(){if(typeof PROM!=="undefined")PROM.onLock();if(typeof IRAE!=="undefined")IRAE.onLock();DB=emptyDB();DEKS={};DOCS={};USERS={};MEMBERS={};GLOBAL=null;PRIV=null;PW=null;SESSION=null;PROFILE=null;cur=null;STATE={};
     $("#who").value="";$("#main").innerHTML="";$("#dock").hidden=true;$("#list").innerHTML="";var bb=$("#bkbar");if(bb)bb.hidden=true;if(window.failBarHide)window.failBarHide();showAuth();}
   function lock(reason){if(!SESSION){showAuth();return Promise.resolve();}
+    if(!/^閒置/.test(reason||""))RESUME=null;
     if(SESSION.offline){wipe();return Promise.resolve();}
     try{tick();}catch(e){}secLog("登出："+(reason||"手動"));
     return flush().then(function(){return Promise.race([FS.waitForPendingWrites(),new Promise(function(r){setTimeout(r,10000);})]);}).then(function(){
@@ -1929,6 +1934,8 @@ var SEC=(function(){
     if(SESSION.offline)$$("#menu .dd button").forEach(function(b){if(["load","chemoin","backup","restore","qin","sample"].indexOf(b.dataset.act)>=0)b.hidden=true;});
     var sw=$("#bSwitch");if(sw)sw.hidden=!(STUDIES.length>1)||!!SESSION.offline;
     $("#auth").hidden=true;syncChip();backupBar();queue=curQueues()[0].id;tab="core_abstraction";refreshStates();renderRail();renderMain();
+    /* 閒置登出後重新登入：回到剛才那位病人與分頁（同一人、同一研究空間、且仍看得到這位病人才回） */
+    try{var rz=RESUME;RESUME=null;if(rz&&rz.uid===SESSION.uid&&rz.sid===SESSION.sid&&myIds().indexOf(rz.id)>=0){if(FORM_BY[rz.tab])tab=rz.tab;openPt(rz.id);toast("已回到登出前的病人 "+rz.id);}}catch(e){console.error(e);}
     if(typeof PROM!=="undefined")PROM.onSession();
     if(typeof IRAE!=="undefined")IRAE.onSession();
   }
@@ -2190,7 +2197,10 @@ var SEC=(function(){
     $("#bPkgIn").onclick=function(){pickFile($("#fJson"),function(t){dialog({title:"匯入加密分包",fields:[{k:"p",label:"分包密碼",type:"password",req:1}],ok:"匯入"})
       .then(function(v){if(!v)return;importPackage(t,v.p).then(function(){toast("已匯入並加密上傳");refreshStates();renderRail();renderAssign();}).catch(function(e){toast(cErr(e));});});});};
   }
-  function idleCheck(){if(SESSION&&Date.now()-lastAct>IDLE_MS)lock("閒置 "+Math.round(IDLE_MS/60000)+" 分鐘自動登出");}
+  var RESUME=null,idleWarned=false;
+  function idleCheck(){if(!SESSION)return;var idle=Date.now()-lastAct;
+    if(idle>IDLE_MS){idleWarned=false;if(!SESSION.offline&&cur)RESUME={uid:SESSION.uid,sid:SESSION.sid,id:cur,tab:tab};lock("閒置 "+Math.round(IDLE_MS/60000)+" 分鐘自動登出");return;}
+    if(idle>IDLE_MS-90000){if(!idleWarned){idleWarned=true;toast("再約 1 分鐘沒有操作就會自動登出。動一下滑鼠或按任意鍵即可繼續。");}}else idleWarned=false;}
   function init(){
     fb();
     ["mousemove","keydown","click","scroll","touchstart"].forEach(function(ev){document.addEventListener(ev,function(){lastAct=Date.now();},{passive:true});});
@@ -2763,6 +2773,13 @@ if(typeof module!=="undefined")module.exports=DOCP;
    its source document noted, and uncertain values listed for the abstractor. Nothing leaves the browser. */
 var DOCIMPORT=(function(){
   var SRC_FOR={rt_course:"放療紀錄",pathology_specimen:"病理報告",biomarker:"病理報告",staging_imaging:"影像報告"},DOC_NAME={rt_course:"放療摘要",pathology_specimen:"病理報告",biomarker:"PD-L1／生物標記報告",staging_imaging:"分期影像報告（CT／PET／EUS／MRI）"};
+  /* 2026-11-13：同一份報告重貼會多一筆。回傳已存在的那一筆是第幾筆（1 起算），沒有則 0 */
+  var DUP_WHAT={rt_course:"開始日與結束日",staging_imaging:"檢查日期與檢查種類",pathology_specimen:"採檢日、檢體類別、報告編號都"};
+  function dupOf(arr,x,fmId){for(var i=0;i<(arr||[]).length;i++){var y=arr[i];
+      if(fmId==="rt_course"&&x.rt_start&&y.rt_start===x.rt_start&&(y.rt_end||"")===(x.rt_end||""))return i+1;
+      if(fmId==="staging_imaging"&&x.si_date&&x.si_modality&&y.si_date===x.si_date&&y.si_modality===x.si_modality)return i+1;
+      if(fmId==="pathology_specimen"&&x.path_date&&y.path_date===x.path_date&&(y.path_type||"")===(x.path_type||"")&&String(y.path_report_no||"").trim()===String(x.path_report_no||"").trim())return i+1;}
+    return 0;}
   function firstKeys(fmId){return sectionsOf(fmId).map(function(s){return s.key;});}
   function apply(id,fmId,parsed,docDate,fileName){
     var r=recOf(id),fm=FORM_BY[fmId],inst={_s:1,_uid:uid("i"),_docsrc:fileName||"貼上文字"},core=r.core_abstraction,coreFilled=[],unsure=[],set=0;
@@ -2777,6 +2794,7 @@ var DOCIMPORT=(function(){
     if(parsed.meta&&parsed.meta.boost)unsure.push("有多個劑量層(boost)："+parsed.meta.levels.map(function(l){return l.name+" "+l.cgy/100+" Gy/"+l.fx+" fx";}).join("、")+"；總劑量取最高層");
     if(parsed.meta&&parsed.meta.ptnm)unsure.push("摘要記載病理分期 "+parsed.meta.ptnm+"，請與病理表單核對");
     if(parsed.meta&&parsed.meta.histoNote)unsure.push(parsed.meta.histoNote);if(parsed.meta&&parsed.meta.dateNote)unsure.push(parsed.meta.dateNote);if(parsed.meta&&parsed.meta.marginGross)unsure.push("切緣距離取自肉眼描述，請以顯微結果為準");
+    var dupN=dupOf(r[fmId],inst,fmId);if(dupN)unsure.unshift("這位病人已有第 "+dupN+" 筆"+DUP_WHAT[fmId]+"相同，這一筆可能是重複登錄。確定重複的話，請按這一筆右上角的「刪除」");
     inst._docnote=unsure;
     r[fmId].push(inst);
     logChange(fmId,"由"+SRC_FOR[fmId]+"擷取新增第 "+r[fmId].length+" 筆（"+set+" 欄"+(coreFilled.length?"；核心補登帶入 "+coreFilled.join("、"):"")+"）");
@@ -7849,15 +7867,16 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-11-13 22:37 fe72293 nas 218e8d·3ae239·6d4a84";
+window.__build="2026-11-13 22:47 3059326 nas 218e8d·3ae239·6d4a84";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
    一條要手動關掉的橫幅；有需要時可以帶一個「重新讀取」動作。 */
 (function(){
-  window.failBar=function(msg,onRetry){
+  window.failBar=function(msg,onRetry,title){
     var b=document.getElementById("failbar");
     if(!b){if(typeof toast==="function")toast(msg);return;}
+    var tt=document.getElementById("failttl");if(tt)tt.textContent=title||"沒有存成功"; /* 2026-11-13：程式例外不再借用「沒有存成功」 */
     document.getElementById("failmsg").textContent=msg;
     var g=document.getElementById("failgo");
     if(onRetry){g.hidden=false;g.onclick=function(){g.disabled=true;
