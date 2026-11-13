@@ -464,7 +464,7 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-13 13:24 a06ff67 nas 218e8d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-13 19:43 28daea4 nas 218e8d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -2914,7 +2914,7 @@ var DOCIMPORT=(function(){
    只讀不寫：不改任何紀錄；按圖上的項目＝切到那一頁並捲到那一筆。提醒與錯誤直接取自 checkForm（與表單上的訊息相同）。
    稽核重摘模式不顯示（稽核員不能看原摘錄值）。 */
 var TLP=(function(){
-  var KEY="escc_tlp_open",ZKEY="escc_tlp_zoom",LABW=92;
+  var KEY="escc_tlp_open",ZKEY="escc_tlp_zoom",LABW=124,ROWH=36;
   var LANES=[
     {id:"img",name:"分期檢查與影像",c:"--tl-img"},{id:"path",name:"病理與檢體",c:"--tl-path"},
     {id:"rt",name:"放療",c:"--tl-rt"},{id:"sys",name:"治療線",c:"--tl-sys"},{id:"ev",name:"復發與事件",c:"--tl-ev"}];
@@ -2939,27 +2939,30 @@ var TLP=(function(){
       ".tlp-z button:last-child{border-right:0;} .tlp-z button.on{background:var(--ink);color:var(--sheet);}"+
       ".tlp-b{border-top:1px solid var(--rule);} .tlp-s{overflow-x:auto;position:relative;}"+
       ".tlp-t{position:relative;min-width:100%;}"+
-      ".tlp-ax{position:relative;height:62px;border-bottom:1px solid var(--rule);}"+
-      ".tlp-tk{position:absolute;top:34px;bottom:0;border-left:1px solid var(--rule);padding-left:4px;font-size:.76rem;color:var(--soft);white-space:nowrap;font-variant-numeric:tabular-nums;}"+
+      ".tlp-ax{position:relative;height:5.5rem;border-bottom:1px solid var(--rule);}"+
+      ".tlp-tk{position:absolute;top:3rem;bottom:0;line-height:1.3;overflow:hidden;border-left:1px solid var(--rule);padding-left:5px;font-size:.82rem;color:var(--soft);white-space:nowrap;font-variant-numeric:tabular-nums;}"+
       ".tlp-ln{display:flex;border-bottom:1px solid var(--rule);} .tlp-ln:last-child{border-bottom:0;}"+
-      ".tlp-lab{flex:none;padding:6px 8px;border-right:1px solid var(--rule);position:sticky;left:0;background:var(--sheet);z-index:3;font-size:.8rem;font-weight:600;line-height:1.3;}"+
+      ".tlp-lab{flex:none;display:flex;align-items:center;padding:8px 10px;border-right:1px solid var(--rule);position:sticky;left:0;background:var(--sheet);z-index:3;font-size:.9rem;font-weight:600;line-height:1.35;}"+
       ".tlp-lab span{display:block;border-left:4px solid var(--c);padding-left:5px;}"+
       ".tlp-tr{position:relative;flex:none;}"+
-      ".tlp-it{position:absolute;height:24px;display:flex;align-items:center;gap:5px;white-space:nowrap;font:inherit;font-size:.8rem;color:inherit;cursor:pointer;background:none;border:0;padding:0;z-index:1;}"+
-      ".tlp-it .dot{flex:none;width:11px;height:11px;border-radius:50%;background:var(--c);margin-left:-5px;border:2px solid var(--sheet);box-shadow:0 0 0 1px var(--c);}"+
+      ".tlp-it{position:absolute;height:30px;display:flex;align-items:center;gap:6px;white-space:nowrap;font:inherit;font-size:.9rem;color:inherit;cursor:pointer;background:none;border:0;padding:0;z-index:1;}"+
+      ".tlp-it .dot{flex:none;width:14px;height:14px;border-radius:50%;background:var(--c);margin-left:-7px;border:2px solid var(--sheet);box-shadow:0 0 0 1px var(--c);}"+
       ".tlp-it .dot.hollow{background:var(--sheet);}"+
-      ".tlp-it .bar{flex:none;height:12px;border-radius:3px;background:var(--c);min-width:5px;}"+
+      ".tlp-it .bar{flex:none;height:16px;border-radius:3px;background:var(--c);min-width:5px;}"+
       ".tlp-it .bar.open{background:linear-gradient(to right,var(--c) 40%,transparent);border-radius:3px 0 0 3px;}"+
-      ".tlp-it .tx{padding:0 4px;border-radius:3px;background:var(--sheet);}"+
+      ".tlp-it .tx{padding:1px 6px;border-radius:3px;background:var(--sheet);}"+
       ".tlp-it:hover .tx,.tlp-it:focus-visible .tx{text-decoration:underline;}"+
       ".tlp-it.w .tx{background:var(--iodine-soft);box-shadow:0 0 0 1.5px var(--iodine);}"+
       ".tlp-it.e .tx{background:var(--err-soft);box-shadow:0 0 0 1.5px var(--err);}"+
       ".tlp-v{position:absolute;top:0;bottom:0;border-left:2px solid var(--ink);z-index:0;pointer-events:none;}"+
       ".tlp-v.t0{border-left:2px dashed var(--soft);}"+
-      ".tlp-v i{position:absolute;top:2px;left:3px;font-style:normal;font-size:.72rem;background:var(--ink);color:var(--sheet);padding:0 5px;border-radius:3px;white-space:nowrap;}"+
-      ".tlp-v.t0 i{background:var(--soft);top:17px;}"+
-      ".tlp-u{padding:6px 12px;border-top:1px solid var(--rule);font-size:.82rem;display:flex;flex-wrap:wrap;gap:5px 8px;align-items:center;}"+
-      ".tlp-u button{font:inherit;font-size:.8rem;color:inherit;cursor:pointer;border:1px dashed var(--c);border-radius:4px;background:var(--sheet);padding:1px 7px;min-height:26px;}"+
+      ".tlp-v i{position:absolute;top:.15rem;left:3px;line-height:1.4;font-style:normal;font-size:.72rem;background:var(--ink);color:var(--sheet);padding:0 5px;border-radius:3px;white-space:nowrap;}"+
+      ".tlp-v.t0 i{background:var(--soft);top:1.5rem;}"+
+      ".tlp-w{position:relative;} .tlp-more{position:absolute;top:.2rem;z-index:4;font:inherit;font-size:.78rem;background:var(--ink);color:var(--sheet);border:0;border-radius:4px;padding:3px 9px;min-height:26px;cursor:pointer;}"+
+      ".tlp-more.r{right:6px;} .tlp-more.l{left:"+(LABW+6)+"px;}"+
+      ".tlp-u{padding:10px 12px;border-top:1px solid var(--rule);font-size:.82rem;display:flex;flex-wrap:wrap;gap:5px 8px;align-items:center;}"+
+      ".tlp-u button{font:inherit;font-size:.86rem;color:inherit;cursor:pointer;border:1px dashed var(--c);border-radius:4px;background:var(--sheet);padding:3px 9px;min-height:30px;}"+
+      ".tlp-emp{position:sticky;left:"+(LABW+14)+"px;align-self:center;color:var(--soft);font-size:.84rem;}"+
       ".tlp-n{padding:10px 12px;color:var(--soft);font-size:.86rem;}";
     document.head.appendChild(st);
   }
@@ -2996,29 +2999,40 @@ var TLP=(function(){
       var zoom=+ls(ZKEY,"0")||0,sc=document.querySelector("#main"),vw=Math.max(420,((sc&&sc.clientWidth)||900)-LABW-40),PADR=230;
       var ppd=zoom?vw/(zoom+60):(vw-PADR)/(hi-lo);if(zoom)hi=Math.max(hi,lo+zoom+60);
       var W=Math.round((hi-lo)*ppd)+PADR,X=function(n){return Math.round((n-lo)*ppd);};
-      var mpx=30.4*ppd,step=mpx>=92?1:mpx*3>=92?3:mpx*6>=92?6:mpx*12>=92?12:24,ticks="";
+      var mpx=30.4*ppd,step=mpx>=112?1:mpx*3>=112?3:mpx*6>=112?6:mpx*12>=112?12:24,ticks="";
       var d0=new Date(isoOf(lo)+"T00:00:00Z");d0.setUTCDate(1);d0.setUTCMonth(d0.getUTCMonth()+1);
       for(var d=d0;Math.round(d.getTime()/864e5)<hi+(PADR-20)/ppd;d.setUTCMonth(d.getUTCMonth()+1)){
         if(d.getUTCMonth()%step)continue;var n=Math.round(d.getTime()/864e5),mo=dx==null?null:Math.round((n-dx)/30.4);
         ticks+='<div class="tlp-tk" style="left:'+X(n)+'px"><b style="font-weight:500;color:var(--ink);display:block">'+(d.getUTCFullYear()-1911)+"/"+pad(d.getUTCMonth()+1)+'</b>'+(mo==null?"":mo>0?"診斷後 "+mo+" 個月":mo===0?"診斷當月":"診斷前")+'</div>';}
       var t0=typeof firstTxDate==="function"?firstTxDate(recOf(id)):"";
       var vl=(dx==null?"":'<div class="tlp-v" style="left:'+(LABW+X(dx))+'px"><i>診斷日</i></div>')+(t0?'<div class="tlp-v t0" style="left:'+(LABW+X(dn(t0)))+'px"><i>最早的治療開始日</i></div>':"");
-      h+='<div class="tlp-s"><div class="tlp-t" style="width:'+(W+LABW)+'px"><div class="tlp-ax" style="width:'+W+'px;margin-left:'+LABW+'px">'+ticks+'</div>';
+      h+='<div class="tlp-w"><div class="tlp-s"><div class="tlp-t" style="width:'+(W+LABW)+'px"><div class="tlp-ax" style="width:'+W+'px;margin-left:'+LABW+'px">'+ticks+'</div>';
       LANES.forEach(function(L){
         var li=dated.filter(function(x){return x.lane===L.id;}).sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:0;}),rows=[];
-        if(!li.length)return;
         var inner=li.map(function(x){var x0=X(dn(x.d)),open=x.bar&&!x.e,bw=x.bar?Math.max(5,open?Math.min(140,W-x0):X(dn(x.e))-x0):0;
-          var w=(x.bar?bw:11)+5+x.label.length*13+16,r=0;while(rows[r]!=null&&rows[r]>x0-8)r++;rows[r]=x0+w;
+          var w=(x.bar?bw:14)+6+x.label.length*15+20,r=0;while(rows[r]!=null&&rows[r]>x0-8)r++;rows[r]=x0+w;
           var tip=x.label+"｜"+roc(x.d)+(x.bar?" 至 "+(x.e?roc(x.e):"未填"):"")+(x.msgs.length?"｜"+x.msgs.join("；"):"");
-          return '<button type="button" class="tlp-it '+x.cls+'" data-form="'+x.form+'" data-f="'+x.f+'"'+(x.i!=null?' data-i="'+x.i+'"':"")+' style="left:'+x0+'px;top:'+(5+r*27)+'px" title="'+esc(tip)+'" aria-label="'+esc(tip)+'">'+
+          return '<button type="button" class="tlp-it '+x.cls+'" data-form="'+x.form+'" data-f="'+x.f+'"'+(x.i!=null?' data-i="'+x.i+'"':"")+' style="left:'+x0+'px;top:'+(8+r*ROWH)+'px" title="'+esc(tip)+'" aria-label="'+esc(tip)+'">'+
             (x.bar?'<span class="bar'+(open?" open":"")+'" style="width:'+bw+'px"></span>':'<span class="dot'+(x.hollow?" hollow":"")+'"></span>')+'<span class="tx">'+esc(x.label)+'</span></button>';}).join("");
-        h+='<div class="tlp-ln" style="--c:var('+L.c+')"><div class="tlp-lab" style="width:'+LABW+'px"><span>'+L.name+'</span></div><div class="tlp-tr" style="width:'+W+'px;height:'+(rows.length*27+10)+'px">'+inner+'</div></div>';});
-      h+=vl+'</div></div>';
+        h+='<div class="tlp-ln" style="--c:var('+L.c+')"><div class="tlp-lab" style="width:'+LABW+'px"><span>'+L.name+'</span></div><div class="tlp-tr" style="width:'+W+'px;height:'+(Math.max(1,rows.length)*ROWH+12)+'px">'+inner+'</div>'+(li.length?"":'<span class="tlp-emp" style="margin-left:-'+W+'px">尚無有日期的紀錄</span>')+'</div>';});
+      h+=vl+'</div></div><button type="button" class="tlp-more l" hidden></button><button type="button" class="tlp-more r" hidden></button></div>';
     }
     if(und.length)h+='<div class="tlp-u"><b>日期未填：</b>'+und.map(function(x){var L=LANES.filter(function(l){return l.id===x.lane;})[0];
-      return '<button type="button" style="--c:var('+L.c+')" data-form="'+x.form+'" data-f="'+x.f+'"'+(x.i!=null?' data-i="'+x.i+'"':"")+'>'+esc(x.label)+'</button>';}).join("")+'</div>';
+      return '<button type="button" style="--c:var('+L.c+')" data-form="'+x.form+'" data-f="'+x.f+'"'+(x.i!=null?' data-i="'+x.i+'"':"")+'>'+esc(undName(x))+'</button>';}).join("")+'</div>';
     return h;
   }
+  var UNDF={staging_imaging:"分期影像報告",pathology_specimen:"病理與檢體",rt_course:"放療療程",systemic_line:"治療線別",clin_event:"復發與事件"};
+  function undName(x){if(x.i==null)return x.label;var g={"影像":1,"檢體":1,"放療":1,"藥物治療":1,"事件":1}[x.label];
+    return UNDF[x.form]+" 第 "+(x.i+1)+" 筆"+(g?"":"（"+x.label+"）");}
+  /* 橫向捲動範圍外還有項目時，在左右邊緣顯示「還有 N 筆」，按了捲過去 */
+  function edge(){var box=document.getElementById("tlp"),s=box&&box.querySelector(".tlp-s");if(!s)return;
+    var bl=box.querySelector(".tlp-more.l"),br=box.querySelector(".tlp-more.r");if(!bl||!br)return;
+    var upd=function(){var a=s.scrollLeft,z=a+s.clientWidth-LABW,nl=0,nr=0,xl=-1,xr=-1;
+      [].forEach.call(s.querySelectorAll(".tlp-it"),function(it){var x=it.offsetLeft;
+        if(x>z-24){nr++;if(xr<0||x<xr)xr=x;}else if(x+it.offsetWidth<a+8){nl++;if(x>xl)xl=x;}});
+      br.hidden=!nr;bl.hidden=!nl;br.textContent="右邊還有 "+nr+" 筆 ▸";bl.textContent="◂ 左邊還有 "+nl+" 筆";
+      br.onclick=function(){s.scrollLeft=Math.max(0,xr-80);};bl.onclick=function(){s.scrollLeft=Math.max(0,xl-80);};};
+    s.onscroll=upd;upd();}
   function html(){
     if(!cur||auditMode())return "";css();var open=ls(KEY,"1")==="1",z=+ls(ZKEY,"0")||0;
     return '<section class="tlp" id="tlp" aria-label="病人時間軸"><div class="tlp-h"><button type="button" id="tlpTog" aria-expanded="'+open+'">'+(open?"▾":"▸")+' 時間軸</button>'+
@@ -3035,11 +3049,12 @@ var TLP=(function(){
       if(b.id==="tlpTog"){lsSet(KEY,ls(KEY,"1")==="1"?"0":"1");redraw(true);return;}
       if(b.dataset.z!=null){lsSet(ZKEY,b.dataset.z);redraw(true);return;}
       if(b.dataset.form)go(b);};
+    edge();
   }
   function redraw(whole){var box=document.getElementById("tlp");if(!box||!cur||auditMode())return;
     if(whole){var sl=0;var tmp=document.createElement("div");tmp.innerHTML=html();box.replaceWith(tmp.firstChild);bind();return;}
     var b=document.getElementById("tlpB");if(!b||b.hidden)return;var s=b.querySelector(".tlp-s"),left=s?s.scrollLeft:0;
-    b.innerHTML=body(cur);s=b.querySelector(".tlp-s");if(s)s.scrollLeft=left;}
+    b.innerHTML=body(cur);s=b.querySelector(".tlp-s");if(s)s.scrollLeft=left;edge();}
   var t=null;function refresh(){clearTimeout(t);t=setTimeout(function(){try{redraw(false);}catch(e){console.error(e);}},200);}
   return {html:html,bind:bind,refresh:refresh,items:items};
 })();
@@ -7676,7 +7691,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-11-13 13:24 a06ff67 nas 218e8d·3ae239·6d4a84";
+window.__build="2026-11-13 19:43 28daea4 nas 218e8d·3ae239·6d4a84";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
