@@ -464,7 +464,7 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-13 22:47 3059326 nas 218e8d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-15 20:45 22ecdc7 nas 218e8d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -1371,12 +1371,15 @@ function loadCsv(text){
   persist(true);refreshStates();renderRail();renderMain();
   ask("已載入預填資料：新增 "+add+" 位"+(upd?"，更新 "+upd+" 位（已摘錄的內容保留）":"")+"。",true);
 }
+function expSkipDemo(){return DB.order.some(function(id){return !/^DEMO/.test(id);});}
+function expIds(){var sk=expSkipDemo();return DB.order.filter(function(id){return !(sk&&/^DEMO/.test(id));});}
+function expDemoN(){return expSkipDemo()?DB.order.filter(function(id){return /^DEMO/.test(id)&&DB.rec[id];}).length:0;}
 function redcapCsv(){
   var cols=["record_id","redcap_repeat_instrument","redcap_repeat_instance"];
   FORMS.forEach(function(fm){(BYFORM[fm.id]||[]).forEach(function(f){if(!isData(f))return;
     if(f.t==="checkbox")f.ch.forEach(function(c){cols.push(f.v+"___"+c[0]);});else cols.push(f.v);});cols.push(fm.id+"_complete");});
   var lines=[cols.join(",")];
-  DB.order.forEach(function(id){
+  expIds().forEach(function(id){
     var r=DB.rec[id];if(!r)return;
     var base={record_id:id,redcap_repeat_instrument:"",redcap_repeat_instance:""},has=false;
     FORMS.filter(function(fm){return !fm.rep;}).forEach(function(fm){var src=r[fm.id];if(!src||!src._s)return;has=true;fill(base,fm,src,null,id);base[fm.id+"_complete"]=src._s===2?2:0;});
@@ -1400,7 +1403,7 @@ function redcapImportFiles(rowsPerFile){
     if(f.t==="checkbox")f.ch.forEach(function(c){o[f.v+"___"+c[0]]=Array.isArray(v)&&v.indexOf(c[0])>=0?1:0;});else o[f.v]=v==null?"":v;});
     var ss=src._srcs||{};Object.keys(ss).forEach(function(k){var key=SK[fm.id+"|"+k];if(!key||!ss[k].t)return;o[key+"_t"]=SRC_TYPES.indexOf(ss[k].t)+1;o[key+"_d"]=ss[k].d||"";});}
   var rows=[];
-  DB.order.forEach(function(id){var r=DB.rec[id];if(!r)return;var base={record_id:id,redcap_repeat_instrument:"",redcap_repeat_instance:""},has=false;
+  expIds().forEach(function(id){var r=DB.rec[id];if(!r)return;var base={record_id:id,redcap_repeat_instrument:"",redcap_repeat_instance:""},has=false;
     FORMS.filter(function(fm){return !fm.rep;}).forEach(function(fm){var src=r[fm.id];if(!src||!src._s)return;has=true;fill(base,fm,src,null,id);base[fm.id+"_complete"]=src._s===2?2:0;});
     if(has)rows.push(base);
     FORMS.filter(function(fm){return fm.rep;}).forEach(function(fm){(r[fm.id]||[]).forEach(function(x,i){var o={record_id:id,redcap_repeat_instrument:fm.id,redcap_repeat_instance:instNos(r,fm.id)[i]};
@@ -1410,14 +1413,14 @@ function redcapImportFiles(rowsPerFile){
     out.push({name:"ESCC_REDCap_import_"+who0+"_"+stampS+"_"+pad(i+1)+"of"+pad(n)+".csv",
       data:[cols.join(",")].concat(part.map(function(o){return cols.map(function(c){return csvCell(o[c]);}).join(",");})).join("\r\n")});}
   /* v9: 已刪除的筆數清單（REDCap 不會自己刪，要人工刪）。副檔名用 .txt，避免被當成匯入檔上傳 */
-  var gone=[];DB.order.forEach(function(id){var g=(DB.rec[id]||{})._gone;if(g)Object.keys(g).forEach(function(k){g[k].forEach(function(nn){gone.push(id+"\t"+k+"\t"+nn);});});});
+  var gone=[];expIds().forEach(function(id){var g=(DB.rec[id]||{})._gone;if(g)Object.keys(g).forEach(function(k){g[k].forEach(function(nn){gone.push(id+"\t"+k+"\t"+nn);});});});
   if(gone.length&&out.length)out.push({name:"ESCC_REDCap_已刪除筆數_請勿匯入_"+who0+"_"+stampS+".txt",
     data:["這些筆數已在登錄工具中刪除。若先前匯入過 REDCap，請到 REDCap 手動刪除對應的那一筆。","record_id\tredcap_repeat_instrument\tredcap_repeat_instance"].concat(gone).join("\r\n")});
   return out;
 }
 function sourcesCsv(){
   var L=["record_id,form,instance,section,source_document,document_date"];
-  DB.order.forEach(function(id){var r=DB.rec[id];if(!r)return;
+  expIds().forEach(function(id){var r=DB.rec[id];if(!r)return;
     FORMS.forEach(function(fm){var list=fm.rep?r[fm.id]:[r[fm.id]];list.forEach(function(src,i){var s=src&&src._srcs||{};
       Object.keys(s).forEach(function(k){if(s[k].t)L.push([id,fm.id,fm.rep?instNos(r,fm.id)[i]:"",csvCell((sectionsOf(fm.id).filter(function(x){return x.key===k;})[0]||{}).title||k),csvCell(s[k].t),s[k].d||""].join(","));});});});});
   return "\ufeff"+L.join("\r\n");
@@ -1496,8 +1499,8 @@ $$("#menu .dd button").forEach(function(b){b.onclick=function(){
   else if(a==="qin")pickFile($("#fCsv"),importAnswers);
   else if(a==="sample")drawSample();
   else if(a==="report")showAuditReport();
-  else if(a==="redcapx"){var fx=redcapImportFiles(400);if(!fx.length){toast("尚無任何已填資料");return;}
-    var ix=0;(function nx(){if(ix>=fx.length){toast("已匯出 "+fx.length+" 個 REDCap 匯入檔");return;}offer(fx[ix].name,fx[ix].data,function(){ix++;setTimeout(nx,900);});})();}
+  else if(a==="redcapx"){var fx=redcapImportFiles(400);if(!fx.length){toast(expDemoN()?"真實病人尚無任何已填資料（示範病人不匯出）":"尚無任何已填資料");return;}
+    var ix=0;(function nx(){if(ix>=fx.length){toast("已匯出 "+fx.length+" 個 REDCap 匯入檔"+(expDemoN()?"（不含示範病人）":""));return;}offer(fx[ix].name,fx[ix].data,function(){ix++;setTimeout(nx,900);});})();}
   else if(a==="redcap")offer("ESCC_abstraction_REDCap_"+nameStamp()+".csv",redcapCsv());
   else if(a==="srcs")offer("ESCC_來源文件_"+nameStamp()+".csv",sourcesCsv());
   else if(a==="backup")SEC.backupString().then(function(t){offer(SEC.backupName(),t,function(){lsSet(KEY_BK,String(Date.now()));});}).catch(function(e){toast(e.message);});
@@ -7867,7 +7870,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-11-13 22:47 3059326 nas 218e8d·3ae239·6d4a84";
+window.__build="2026-11-15 20:45 22ecdc7 nas 218e8d·3ae239·6d4a84";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
