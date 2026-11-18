@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex">
+<style>html{color-scheme:light}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>ESCC 工作畫面示意（雛形）</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* 版面：說明 → 三個檢視切換（現在／更動後：助理／更動後：醫師）。更動後的助理畫面＝病人總覽＋一個分頁分三區（待確認、要補的、不用填）。 */
+:root{--bg:#f3f4f1;--sheet:#fff;--well:#eef1f0;--ink:#1d2a2e;--soft:#56646a;--rule:#d5dad6;--teal:#0d6468;--teal-soft:#e0eeed;--warn:#8a4b0a;--warn-soft:#fbf1de;--go:#1f6b5c;--go-soft:#e1efea;--bad:#a8323e;--bad-soft:#fbe4e6;--doc:#4b3f8f;--doc-soft:#ebe8f8;--mark:#fff1a8;
+  --font:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;--mono:ui-monospace,"SFMono-Regular",Consolas,"Noto Sans Mono CJK TC",monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#161b1c;--sheet:#1f2627;--well:#273031;--ink:#e6ebe8;--soft:#9aa8a6;--rule:#374244;--teal:#63c3c0;--teal-soft:#1c3536;--warn:#e7b672;--warn-soft:#3a2f1c;--go:#5cc2ad;--go-soft:#1d3531;--bad:#ee8591;--bad-soft:#3d2126;--doc:#b3a8f0;--doc-soft:#2b2745;--mark:#5a4d10;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161b1c;--sheet:#1f2627;--well:#273031;--ink:#e6ebe8;--soft:#9aa8a6;--rule:#374244;--teal:#63c3c0;--teal-soft:#1c3536;--warn:#e7b672;--warn-soft:#3a2f1c;--go:#5cc2ad;--go-soft:#1d3531;--bad:#ee8591;--bad-soft:#3d2126;--doc:#b3a8f0;--doc-soft:#2b2745;--mark:#5a4d10;color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.65;padding-block:24px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+h1{font-size:1.5rem;margin:0;text-wrap:balance} h2{font-size:1.1rem;margin:0;text-wrap:balance} h3{font-size:1rem;margin:0}
+p{margin:0} .soft{color:var(--soft);font-size:.93rem}
+header{display:flex;flex-direction:column;gap:6px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font:inherit;font-weight:600;padding:8px 14px;border-radius:6px;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--teal);border-color:var(--teal);color:var(--sheet)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:10px 14px;min-width:0}
+.stat b{display:block;font-size:1.5rem;line-height:1.2;font-variant-numeric:tabular-nums} .stat span{font-size:.86rem;color:var(--soft)}
+.view{display:flex;flex-direction:column;gap:16px;min-width:0} .view[hidden]{display:none}
+figure{margin:0;background:var(--sheet);border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+figure img{display:block;max-width:100%;height:auto;margin:0 auto}
+figcaption{font-size:.86rem;color:var(--soft);padding:8px 12px;border-top:1px solid var(--rule)}
+/* 模擬的工作台外框 */
+.app{background:var(--sheet);border:1px solid var(--rule);border-radius:10px;overflow:hidden;min-width:0}
+.bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;padding:10px 16px;border-bottom:1px solid var(--rule);background:var(--well)}
+.bar b{font-size:1.05rem} .bar span{font-size:.88rem;color:var(--soft)}
+.pad{padding:14px 16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.tlw{overflow-x:auto} .tlw svg{display:block;width:100%;min-width:560px;height:auto;font-family:var(--font)}
+.tlw .ax{stroke:var(--soft);stroke-width:1.5} .tlw .ld{stroke:var(--rule);stroke-width:1.2}
+.tlw .t{fill:var(--ink);font-size:13px} .tlw .t.s{font-size:11.5px;fill:var(--soft)} .tlw .t.b{font-weight:700} .tlw .t.d{fill:var(--doc)}
+.tlw .rt{fill:var(--teal)} .tlw .ev{fill:var(--sheet);stroke:var(--ink);stroke-width:2} .tlw .ev.d{fill:var(--doc);stroke:var(--doc)}
+.tlw .win{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1;stroke-dasharray:4 3}
+.todo{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.todo>div{border:1px solid var(--rule);border-radius:8px;padding:10px 12px;min-width:0}
+.todo h3{font-size:.9rem;display:flex;gap:8px;align-items:center;margin-bottom:4px}
+.todo ul{margin:0;padding-left:1.2em;font-size:.92rem} .todo li{margin:2px 0}
+.chip{display:inline-block;font-size:.76rem;font-weight:700;border-radius:999px;padding:1px 9px;white-space:nowrap}
+.chip.c{background:var(--teal-soft);color:var(--teal)} .chip.f{background:var(--warn-soft);color:var(--warn)} .chip.d{background:var(--doc-soft);color:var(--doc)} .chip.a{background:var(--well);color:var(--soft)} .chip.ok{background:var(--go-soft);color:var(--go)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--rule);padding:0 12px}
+.tabs span{font-size:.9rem;padding:8px 10px;color:var(--soft);border-bottom:3px solid transparent}
+.tabs span.on{color:var(--teal);font-weight:700;border-bottom-color:var(--teal)}
+.zone{border:1px solid var(--rule);border-radius:8px;overflow:hidden;min-width:0}
+.zone>header{flex-direction:row;flex-wrap:wrap;gap:8px 10px;align-items:center;padding:8px 12px;background:var(--well);border-bottom:1px solid var(--rule)}
+.zone>header h3{flex:1 1 12em} .zone>header small{color:var(--soft);font-size:.84rem}
+.row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(110px,.9fr) minmax(0,2fr) auto;gap:6px 12px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--rule);min-width:0}
+.row:last-child{border-bottom:0}
+.row .k{font-weight:600;font-size:.94rem} .row .v{font-variant-numeric:tabular-nums}
+.row .src{font-family:var(--mono);font-size:.8rem;color:var(--soft);overflow-wrap:anywhere;min-width:0}
+.row .src mark{background:var(--mark);color:var(--ink);padding:0 2px;border-radius:2px}
+.row .why{font-size:.86rem;color:var(--soft);min-width:0}
+.row.done{background:var(--go-soft)} .row.done .k::before{content:"✓ ";color:var(--go)}
+.btn{font:inherit;font-size:.86rem;font-weight:600;padding:5px 12px;border-radius:6px;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);cursor:pointer;white-space:nowrap}
+.btn.go{background:var(--teal);border-color:var(--teal);color:var(--sheet)} .btn[disabled]{opacity:.5;cursor:default}
+.opts{display:flex;flex-wrap:wrap;gap:4px} .opts span{font-size:.86rem;border:1px solid var(--rule);border-radius:6px;padding:4px 9px;background:var(--sheet)}
+.fake{border:1px solid var(--rule);background:var(--well);border-radius:6px;height:32px;min-width:90px}
+.note{background:var(--warn-soft);border-left:4px solid var(--warn);border-radius:4px;padding:10px 14px;font-size:.93rem}
+.cmp{overflow-x:auto;background:var(--sheet);border:1px solid var(--rule);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:480px} th,td{border-bottom:1px solid var(--rule);padding:8px 12px;text-align:left;vertical-align:top;font-size:.94rem}
+th{color:var(--soft);font-weight:600} tr:last-child td{border-bottom:0} td.n{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+@media (max-width:640px){.row{grid-template-columns:1fr auto}.row .src,.row .why,.row .opts,.row .fake{grid-column:1/-1}.row .v{grid-column:1}.row .k{grid-column:1/-1}.row>.chip{justify-self:start}}
+.tag{font-size:.72rem;font-weight:700;border-radius:4px;padding:0 6px;margin-left:6px;white-space:nowrap;vertical-align:1px}
+.tag.y{background:var(--go-soft);color:var(--go)} .tag.n{background:var(--bad-soft);color:var(--bad)} .tag.h{background:var(--warn-soft);color:var(--warn)}
+.row>.chip{justify-self:end}
+</style>
+<div class="wrap">
+  <header>
+    <h1>ESCC 工作畫面示意：更動前後</h1>
+    <p class="soft">2026-11-18 示意畫面，只畫「放療療程」與「放化療細節」。病人與報告內容都是虛構的，按鈕只是示範，不會存任何資料，也沒有接到正式程式。</p>
+  </header>
+
+  <div class="seg" role="group" aria-label="切換檢視">
+    <button type="button" data-v="now" aria-pressed="false">現在</button>
+    <button type="button" data-v="asst" aria-pressed="true">更動後：助理看到的</button>
+    <button type="button" data-v="doc" aria-pressed="false">更動後：醫師看到的</button>
+  </div>
+
+  <!-- ===== 現在 ===== -->
+  <div class="view" id="v-now" hidden>
+    <div class="stats">
+      <div class="stat"><b>2</b><span>個分頁</span></div>
+      <div class="stat"><b>19</b><span>個欄位，全部要她看過</span></div>
+      <div class="stat"><b>10</b><span>個必填</span></div>
+      <div class="stat"><b>3</b><span>題臨床判斷</span></div>
+    </div>
+    <p>兩個分頁各是一長串欄位。照抄的、要判斷的、系統自動算的排在一起，看起來每一欄都同樣重要。</p>
+    <figure><img src="g2_rt.png" alt="現行的放療療程分頁：九個欄位由上到下排列"><figcaption>放療療程（測試站實際畫面）。「放療目的」要她自己判斷，和日期、劑量排在同一串。</figcaption></figure>
+    <figure><img src="g3_dcrt.png" alt="現行的放化療細節分頁：十個欄位由上到下排列"><figcaption>放化療細節（測試站實際畫面）。「放療是否依計畫完成」「同步化療處方」在別的分頁已經登過一次。</figcaption></figure>
+  </div>
+
+  <!-- ===== 更動後：助理 ===== -->
+  <div class="view" id="v-asst">
+    <div class="stats">
+      <div class="stat"><b>1</b><span>個分頁（兩頁合併）</span></div>
+      <div class="stat"><b id="nC">7</b><span>項待確認，程式已填好</span></div>
+      <div class="stat"><b>2</b><span>項要回病歷找</span></div>
+      <div class="stat"><b>0</b><span>題臨床判斷</span></div>
+    </div>
+
+    <div class="note"><b>獨立測試的結果（11-18）</b>　這個畫面是目標，不是現況。每一列名稱後面的小標是實測結果：綠色是現行程式已經做得到，紅色要新寫。完整結果在頁面最下方。</div>
+    <div class="app">
+      <div class="bar"><b>DEMO0019</b><span>2012 診斷・放化療 ≥50 Gy（未手術）</span><span style="margin-left:auto">病人總覽</span></div>
+      <div class="pad">
+        <div class="tlw"><svg viewBox="0 0 700 118" role="img" aria-label="這位病人已登事件的時間軸：診斷、放化療、第一次評估、追蹤">
+          <line class="ax" x1="26" y1="70" x2="686" y2="70"/>
+          <rect class="win" x="356" y="48" width="48" height="44" rx="3"/>
+          <rect class="rt" x="100" y="59" width="150" height="22" rx="3"/>
+          <text class="t s" x="175" y="100" text-anchor="middle">放化療 50.4 Gy</text>
+          <text class="t s" x="380" y="108" text-anchor="middle">結束後 4–6 週</text>
+          <line class="ld" x1="40" y1="34" x2="40" y2="62"/><circle class="ev" cx="40" cy="70" r="6"/><text class="t b" x="34" y="24">診斷</text>
+          <line class="ld" x1="386" y1="34" x2="386" y2="62"/><circle class="ev d" cx="386" cy="70" r="6"/><text class="t b d" x="386" y="16" text-anchor="middle">第一次評估</text><text class="t s d" x="386" y="30" text-anchor="middle">待醫師裁定</text>
+          <line class="ld" x1="600" y1="34" x2="600" y2="62"/><circle class="ev" cx="600" cy="70" r="6"/><text class="t b" x="600" y="24" text-anchor="middle">追蹤 CT</text>
+        </svg></div>
+        <div class="todo">
+          <div><h3><span class="chip f">要補 2</span>還缺什麼</h3><ul><li>放療：淋巴結照射策略</li><li>放療：非計畫性中斷天數</li></ul></div>
+          <div><h3><span class="chip c">待確認 <span id="nC2">7</span></span>程式已填，請核對</h3><ul><li id="nC3">放療摘要抓到的還有 7 項沒核對</li></ul></div>
+          <div><h3><span class="chip d">醫師 2</span>不用處理</h3><ul><li>首次臨床反應</li><li>研究用歸類</li></ul></div>
+        </div>
+      </div>
+      <div class="tabs"><span>核心</span><span>影像</span><span>病理</span><span>生物標記</span><span class="on">放療</span><span>治療線別</span><span>事件</span><span>其他癌</span></div>
+      <div class="pad">
+
+        <div class="zone">
+          <header><span class="chip c">待確認</span><h3>程式從放療摘要抓到的</h3><small>逐列核對：對的按確認，錯的按改</small></header>
+          <div class="row"><span class="k">病歷記載的計畫<span class="tag n">要新寫</span></span><span class="v">根治性</span><span class="src">Intent: <mark>Definitive</mark> concurrent chemoradiotherapy</span><span style="display:flex;gap:4px"><button class="btn" type="button" data-c>確認</button><button class="btn" type="button" disabled>改</button></span></div>
+          <div class="row"><span class="k">開始日<span class="tag y">現有</span></span><span class="v">101/11/05</span><span class="src">Period: <mark>101/11/05</mark> – 101/12/14</span><span style="display:flex;gap:4px"><button class="btn" type="button" data-c>確認</button><button class="btn" type="button" disabled>改</button></span></div>
+          <div class="row"><span class="k">結束日<span class="tag y">現有</span></span><span class="v">101/12/14</span><span class="src">Period: 101/11/05 – <mark>101/12/14</mark></span><span style="display:flex;gap:4px"><button class="btn" type="button" data-c>確認</button><button class="btn" type="button" disabled>改</button></span></div>
+          <div class="row"><span class="k">總劑量<span class="tag y">現有</span></span><span class="v">50.4 Gy</span><span class="src">Dose: <mark>50.4 Gy</mark> in 28 fractions</span><span style="display:flex;gap:4px"><button class="btn" type="button" data-c>確認</button><button class="btn" type="button" disabled>改</button></span></div>
+          <div class="row"><span class="k">分次數<span class="tag y">現有</span></span><span class="v">28</span><span class="src">Dose: 50.4 Gy in <mark>28 fractions</mark></span><span style="display:flex;gap:4px"><button class="btn" type="button" data-c>確認</button><button class="btn" type="button" disabled>改</button></span></div>
+          <div class="row"><span class="k">照射技術<span class="tag y">現有</span></span><span class="v">IMRT</span><span class="src">Technique: <mark>IMRT</mark></span><span style="display:flex;gap:4px"><button class="btn" type="button" data-c>確認</button><button class="btn" type="button" disabled>改</button></span></div>
+          <div class="row"><span class="k">是否依計畫完成<span class="tag h">現有，會誤判</span></span><span class="v">有</span><span class="src">Remark: <mark>Planned dose completed.</mark></span><span style="display:flex;gap:4px"><button class="btn" type="button" data-c>確認</button><button class="btn" type="button" disabled>改</button></span></div>
+        </div>
+
+        <div class="zone">
+          <header><span class="chip f">要補的</span><h3>程式抓不到的，請回病歷找</h3><small>找不到就選「不明」，不用猜</small></header>
+          <div class="row"><span class="k">淋巴結照射策略</span><span class="opts"><span>選擇性（ENI）</span><span>僅累及區（IFI）</span><span>不明</span></span><span class="why">看放療計畫書或放腫紀錄</span><span></span></div>
+          <div class="row"><span class="k">非計畫性中斷天數</span><span class="fake" aria-label="輸入框（示意）"></span><span class="why">因副作用、住院等原因停過幾天；例假日不算</span><span></span></div>
+        </div>
+
+        <div class="zone">
+          <header><span class="chip a">不用填</span><h3>程式算的，和交給醫師的</h3><small>只是讓您知道有這些項目</small></header>
+          <div class="row"><span class="k">每次劑量／EQD2<span class="tag y">現有</span></span><span class="v">1.8 Gy／49.6</span><span class="why">由總劑量與分次數計算</span><span class="chip a">自動</span></div>
+          <div class="row"><span class="k">同步化療處方<span class="tag n">要新寫</span></span><span class="v">Cisplatin＋5-FU</span><span class="why">由「治療線別」帶入，不用再選一次</span><span class="chip a">帶入</span></div>
+          <div class="row"><span class="k">實際治療路徑<span class="tag y">現有</span></span><span class="v">放化療 ≥50 Gy，未手術</span><span class="why">依癌登的手術、放療劑量、化療代碼推導；不會依這裡登的劑量重算</span><span class="chip a">推導</span></div>
+          <div class="row"><span class="k">首次臨床反應<span class="tag n">要新寫</span></span><span class="v">程式初值：完全反應</span><span class="why">依 102/01/21 內視鏡與切片；放療結束後 38 天</span><span class="chip d">待醫師</span></div>
+          <div class="row"><span class="k">研究用歸類<span class="tag n">新欄位</span></span><span class="v">記載與推導一致</span><span class="why">記載「根治性」，實際未手術且達 50 Gy</span><span class="chip d">待醫師</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="soft">「待確認」每一列右邊是程式在報告裡找到的那一句，黃底是抓到的字。這也是之後醫師複查時看到的依據。</p>
+  </div>
+
+  <!-- ===== 更動後：醫師 ===== -->
+  <div class="view" id="v-doc" hidden>
+    <div class="stats">
+      <div class="stat"><b>2</b><span>項要裁定</span></div>
+      <div class="stat"><b>0</b><span>項要回病歷查</span></div>
+      <div class="stat"><b>1</b><span>個畫面看完一位病人</span></div>
+    </div>
+    <p>醫師只看到程式推不出來、或兩個來源對不上的項目。每一項都附程式的初值和依據，同意就按一下，不同意才改。</p>
+    <div class="app">
+      <div class="bar"><b>DEMO0019</b><span>助理已完成・等醫師裁定 2 項</span></div>
+      <div class="pad">
+        <div class="zone">
+          <header><span class="chip d">裁定 1</span><h3>放化療後首次臨床反應</h3></header>
+          <div class="row"><span class="k">程式初值</span><span class="v">臨床完全反應</span><span class="src">102/01/21 EGD: <mark>no visible tumor</mark>… Biopsy x4: <mark>no malignancy</mark></span><span></span></div>
+          <div class="row"><span class="k">為什麼選這一次</span><span class="v">放療結束後 38 天</span><span class="why">落在 4–6 週內；之後 102/03/25 的 CT 視為追蹤</span><span></span></div>
+          <div class="row"><span class="k">裁定</span><span class="opts"><span>同意</span><span>改為殘存</span><span>改為惡化</span><span>改用另一次評估</span></span><span class="why"></span><span></span></div>
+        </div>
+        <div class="zone">
+          <header><span class="chip d">裁定 2</span><h3>研究用歸類</h3></header>
+          <div class="row"><span class="k">病歷記載的計畫</span><span class="v">根治性</span><span class="src">放療摘要：Intent: <mark>Definitive</mark> concurrent chemoradiotherapy</span><span></span></div>
+          <div class="row"><span class="k">程式推導的實際路徑</span><span class="v">放化療 ≥50 Gy，未手術</span><span class="why">50.4 Gy；無食道切除紀錄</span><span></span></div>
+          <div class="row"><span class="k">裁定</span><span class="opts"><span>同意：根治性放化療</span><span>改為其他歸類</span></span><span class="why">兩個來源一致，預設同意</span><span></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="note">這位病人兩個來源一致，其實可以設成自動通過、不用醫師看。真正要醫師花時間的，是記載與實際對不上的病人，例如原訂術前放化療後來沒開刀。這條界線怎麼畫，會決定醫師要看 191 位裡的多少位。</div>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:10px">
+    <h2>這兩頁的前後對照</h2>
+    <div class="cmp"><table>
+      <tr><th>項目</th><th>現在</th><th>更動後</th></tr>
+      <tr><td>分頁</td><td class="n">2</td><td class="n">1</td></tr>
+      <tr><td>助理要動手找的欄位</td><td class="n">19</td><td class="n">2（目標）</td></tr>
+      <tr><td>助理只需核對的欄位</td><td class="n">0</td><td class="n">7</td></tr>
+      <tr><td>助理要做的臨床判斷</td><td class="n">3</td><td class="n">0</td></tr>
+      <tr><td>同一件事登兩次</td><td class="n">2</td><td class="n">0</td></tr>
+      <tr><td>醫師要裁定的項目</td><td>事後逐筆複查</td><td class="n">2（一致時可自動通過）</td></tr>
+    </table></div>
+    <p class="soft">這是最順利的情況：本院格式固定的放療摘要，文字可以選取貼上。外院掃描檔抓不到字，七項「待確認」會全部變成「要補的」，畫面結構不變，但她要手打。</p>
+  </section>
+  <section style="display:flex;flex-direction:column;gap:10px" id="feas">
+    <h2>獨立測試結果（2026-11-18）</h2>
+    <p>另一個不知道設計者結論的測試者，拿這個示意去對現行程式。結論是<b>大致可行，但有條件</b>：三區的版面做得出來，可是示意畫的「最順利情況」現行程式還跑不出來。</p>
+    <div class="cmp"><table>
+      <tr><th>示意畫面的主張</th><th>現行程式實測</th><th>工作量</th></tr>
+      <tr><td>貼上放療摘要，7 項自動填好</td><td>現行解析只認院內編號 1–22 節的摘要格式。用那個格式時日期、劑量、分次、技術抓得到；示意用的範例格式一項都抓不到</td><td>小到中</td></tr>
+      <tr><td>抓出病歷記載的計畫（Definitive 等字眼）</td><td>沒有這個功能。現在的放療目的是用劑量和病史猜的，會把「不適合手術、單做放療 50.4 Gy」猜成術前</td><td>中到大</td></tr>
+      <tr><td>是否依計畫完成</td><td>有，但只看關鍵字。「中斷兩天，劑量做完」會被判成「無」，而且標成有把握</td><td>中</td></tr>
+      <tr><td>黃底標出原文出處</td><td>解析有回傳出處，但部分是重組過的字串，而且沒有存下來。要存就得把病歷原文片段放上雲端，需要先決定可不可以</td><td>大</td></tr>
+      <tr><td>同步化療處方由治療線別帶入</td><td>兩邊沒有連結，選項也對不上（治療線別有 12 個處方代碼不在這一頁的清單裡）</td><td>中</td></tr>
+      <tr><td>距放療結束天數</td><td>已有，但固定取最早的一筆療程。病人有兩筆療程時會跳出錯的提醒</td><td>中</td></tr>
+      <tr><td>首次臨床反應的程式初值</td><td>沒有來源，門診紀錄和內視鏡報告目前解析不了</td><td>大</td></tr>
+      <tr><td>助理不用填的欄位不擋完成</td><td>實測只填兩項「要補的」後按完成，被 5 個必填欄位擋下。要改必填、完成的定義和匯出欄位</td><td>大</td></tr>
+      <tr><td>醫師裁定畫面</td><td>雲端版的醫師帳號讀不到摘錄資料，現行做法是主持人匯出問題再匯入回覆。提問機制可以借用，但沒有「初值＋依據」的結構</td><td>大</td></tr>
+      <tr><td>外院掃描檔時「結構不變，但要手打」</td><td>只對一半。計畫與完成與否會變回助理判讀，醫師端也沒有依據可看</td><td>—</td></tr>
+    </table></div>
+    <p><b>測試時另外發現的現行程式問題：</b>把不是院內格式的放療文字用「貼上任何報告」貼進去，會被當成病理報告，新增一筆錯的病理紀錄。</p>
+    <p><b>建議的下一步：</b>先拿三到五份不同年代、去識別的本院放療摘要量現行解析的命中率；再只做「待確認」這一區，接在現有的放療療程上，不動欄位定義。第三區和醫師端等這兩步有結果再決定。</p>
+    <p class="soft">依測試結果，這一版拿掉了「全部確認」鈕：程式有把握但其實錯的值，配上一鍵確認會直接進資料。</p>
+  </section>
+</div>
+<script>
+(function(){
+  var views={now:document.getElementById("v-now"),asst:document.getElementById("v-asst"),doc:document.getElementById("v-doc")};
+  var btns=[].slice.call(document.querySelectorAll(".seg button"));
+  btns.forEach(function(b){b.addEventListener("click",function(){
+    btns.forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false");});
+    Object.keys(views).forEach(function(k){views[k].hidden=(k!==b.dataset.v);});
+  });});
+  var rows=[].slice.call(document.querySelectorAll("[data-c]"));
+  function left(){var n=rows.filter(function(b){return !b.disabled;}).length;
+    document.getElementById("nC").textContent=n;document.getElementById("nC2").textContent=n;
+    var t=document.getElementById("nC3");if(t)t.textContent=n?"放療摘要抓到的還有 "+n+" 項沒核對":"放療摘要 7 項都核對過了";}
+  function done(b){b.disabled=true;b.textContent="已確認";b.closest(".row").classList.add("done");}
+  rows.forEach(function(b){b.addEventListener("click",function(){done(b);left();});});
+})();
+</script>
+
+</html>
