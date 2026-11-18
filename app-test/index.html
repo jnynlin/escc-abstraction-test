@@ -467,7 +467,7 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-18 16:46 4bbc76d nas 5be238·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-18 18:18 454777d nas 224ec3·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -799,8 +799,10 @@ function xcheck(id,fm,inst,forComplete,E,W){
     if(ln9>=2&&!(r.systemic_line||[]).some(function(y){return (+y.line_no||0)===ln9-1;}))W.push({f:"line_no",m:"沒有第 "+(ln9-1)+" 線的紀錄，請核對是否漏登或線別有誤"});}}
   if(fm.id==="dcrt_detail"&&r.dcrt_detail&&r.dcrt_detail.ccrt_response_date&&visible(id,FIELD.ccrt_response_date,null,"main")){var rc=(r.rt_course||[]).filter(function(x){return x.rt_start&&x.rt_end;}).sort(function(p,q){return p.rt_start<q.rt_start?-1:1;})[0];
     if(rc&&r.dcrt_detail.ccrt_response_date<rc.rt_end)W.push({f:"ccrt_response_date",m:"反應評估日期早於放療結束日（"+rocOf(rc.rt_end)+"），請核對"});
-    else if(rc){var dd9=Math.round((Date.parse(r.dcrt_detail.ccrt_response_date)-Date.parse(rc.rt_end))/864e5);
-      if(dd9>42)W.push({f:"ccrt_response_date",m:"反應評估日期距放療結束日（"+rocOf(rc.rt_end)+"）"+dd9+" 天，已超過 6 週；請確認這是用來決定後續處置的第一次評估，不是之後的追蹤"});}}
+    else if(rc){var d9=r.dcrt_detail.ccrt_response_date,c9=(r.rt_course||[]).filter(function(x){return x.rt_start&&x.rt_end&&x.rt_end<=d9;}),n9=c9.filter(function(x){return String(x.rt_intent)!=="4";});
+      var e9=(n9.length?n9:c9).map(function(x){return x.rt_end;}).sort().pop();
+      if(e9){var dd9=Math.round((Date.parse(d9)-Date.parse(e9))/864e5);
+        if(dd9>42)W.push({f:"ccrt_response_date",m:"反應評估日期距放療結束日（"+rocOf(e9)+"）"+dd9+" 天，已超過 6 週；請確認這是用來決定後續處置的第一次評估，不是之後的追蹤"});}}}
   if(fm.id==="core_abstraction"){var st=r.core_abstraction.sys_tx_status,n=(r.systemic_line||[]).length;
     if(st==="3"&&n)E.push({f:"sys_tx_status",m:"已登錄 "+n+" 條治療線，不能選「確認無抗癌藥物治療」"});
     if(st==="2"&&n)W.push({f:"sys_tx_status",m:"已登錄治療線，狀態應改為「有」"});
@@ -2780,9 +2782,13 @@ var DOCP=(function(){
     if(/HBsAg|Anti-?HBc|HCV\s*Ab|Anti-?HCV/i.test(t)&&!/carcinoma|biopsy/i.test(t))return "serology";
     if(/Esophagogastroduodenoscopy|\[Report of EGD\]/i.test(t)&&!/EUS findings|endosonograph|Invasion layer/i.test(t))return "egd";
     if(/^\d{7}\s/m.test(t)&&!/carcinoma|biopsy|Gy\b/i.test(t)&&t.split("\n").some(function(l){return !!labHeader(l);}))return "labs";
-    if((t.match(/C[A-Z]-[A-Z]\d{3}-\d{4,}/g)||[]).length>=2&&!/MACROSCOPIC SUMMARY/i.test(t)&&!/^\s*(?:中中中中|Diagnosis)\s*:/m.test(t.split("\n").slice(0,3).join("\n")))return "pathlist";if(/pathology|carcinoma|biopsy|specimen/i.test(t))return "path";return "";}
+    if((t.match(/C[A-Z]-[A-Z]\d{3}-\d{4,}/g)||[]).length>=2&&!/MACROSCOPIC SUMMARY/i.test(t)&&!/^\s*(?:中中中中|Diagnosis)\s*:/m.test(t.split("\n").slice(0,3).join("\n")))return "pathlist";/* 2026-11-18：自由格式的放療文字（有放療字眼＋劑量＋分次，且沒有病理報告的結構）不可落到 path——內文常寫診斷「…carcinoma」，會被建成一筆錯的病理。歸為 rt，交給 parseRT 回報「不是院內摘要格式」。 */
+    if(rtLike(t))return "rt";
+    if(/pathology|carcinoma|biopsy|specimen/i.test(t))return "path";return "";}
+  function rtLike(t){return /radiotherap|radiation\s+(?:therap|treatment|oncolog)|chemoradi|\bC?CRT\b|\bIMRT\b|\bVMAT\b|放射治療|放療|放射腫瘤/i.test(t)&&/\d(?:\.\d+)?\s*c?Gy\b/i.test(t)&&/fraction|\bfx\b|\d\s*(?:次|分次)|分次/i.test(t)
+    &&!/MICROSCOPIC|MACROSCOPIC|Histologic|Patholog(?:y|ic|ical)\s+(?:diagnosis|report)|病理診斷|C[A-Z]-[A-Z]\d{3}-\d{4,}/i.test(t);}
   function parse(text){var k=detect(text);return k==="rt"?parseRT(text):k==="biomarker"?parseBiomarker(text):k==="imaging"?parseImaging(text):k==="serology"?parseSerology(text):k==="egd"?parseEGD(text):k==="labs"?parseLabs(text):k==="pathlist"?parsePathList(text):k==="path"?parsePath(text):{kind:"",ok:false,fields:[],note:"無法辨識文件類型"};}
-  out={parse:parse,parseRT:parseRT,parsePath:parsePath,parseBiomarker:parseBiomarker,parseImaging:parseImaging,parseSerology:parseSerology,parseEGD:parseEGD,parseLabs:parseLabs,parseKv:parseKv,parseRange:parseRange,endoDistances:endoDistances,parsePathList:parsePathList,detect:detect,toISO:toISO,norm:norm};return out;
+  out={rtLike:rtLike,parse:parse,parseRT:parseRT,parsePath:parsePath,parseBiomarker:parseBiomarker,parseImaging:parseImaging,parseSerology:parseSerology,parseEGD:parseEGD,parseLabs:parseLabs,parseKv:parseKv,parseRange:parseRange,endoDistances:endoDistances,parsePathList:parsePathList,detect:detect,toISO:toISO,norm:norm};return out;
 })();
 if(typeof module!=="undefined")module.exports=DOCP;
 
@@ -2869,7 +2875,7 @@ var DOCIMPORT=(function(){
   function pasteAny(){if(!needWho())return;
     dialog({title:"貼上任何報告",msg:"可貼入下列任一種內容：病理報告、胃鏡、放療摘要、PD-L1 報告、CT／PET／EUS 分期報告、B／C 型肝炎血清報告、檢驗報告累積表、病理清單。系統將自動辨識，並在對應分頁新增一筆。化療明細表請以 QRP 檔匯入。",
       fields:[{k:"t",label:"報告全文",type:"textarea",req:1},{k:"d",label:"報告日期（選填）"}],ok:"辨識並擷取"}).then(function(v){if(!v)return;var d=v.d?parseDate(v.d).iso:"";
-      var out=pasteAnyText(cur,v.t,d);if(!out){toast("無法辨識這段文字是哪一種報告");return;}
+      var out=pasteAnyText(cur,v.t,d);if(!out){toast(DOCP.detect(v.t)==="rt"?"這段看起來是放療資料，但不是院內放療摘要的格式，系統讀不出來，沒有新增任何紀錄。請到「放療療程」按「＋ 新增一筆」手動登錄":"無法辨識這段文字是哪一種報告");return;}
       showAny(out);});}
   function showAny(out){
       if(out.kind==="egd"){var msg=out.postop?"這是術後追蹤胃鏡（"+(out.meta.stricture?"有吻合口狹窄":"無狹窄")+(out.meta.dilation?"、建議擴張":"")+"）。已記入病人紀錄；待手術與併發症表單建立後，將轉入該表單。":
@@ -7885,7 +7891,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-11-18 16:46 4bbc76d nas 5be238·3ae239·6d4a84";
+window.__build="2026-11-18 18:18 454777d nas 224ec3·3ae239·6d4a84";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
