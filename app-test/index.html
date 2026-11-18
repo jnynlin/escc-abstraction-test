@@ -467,7 +467,7 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-18 18:18 454777d nas 224ec3·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-18 20:51 ab8d8ef nas 224ec3·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -2994,6 +2994,7 @@ var TLP=(function(){
       ".tlp-h button{font:inherit;color:inherit;cursor:pointer;}"+
       "#tlpTog{background:none;border:0;font-weight:600;padding:4px 2px;min-height:32px;}"+
       ".tlp-h .small{color:var(--soft);font-size:.84rem;}"+
+      ".tlp-win{background:var(--sheet);border:1px solid var(--rule);border-radius:4px;padding:4px 10px;font-size:.84rem;min-height:30px;white-space:nowrap;}"+
       ".tlp-z{margin-left:auto;display:flex;border:1px solid var(--rule);border-radius:4px;overflow:hidden;}"+
       ".tlp-z button{background:var(--sheet);border:0;border-right:1px solid var(--rule);padding:4px 10px;font-size:.84rem;min-height:30px;}"+
       ".tlp-z button:last-child{border-right:0;} .tlp-z button.on{background:var(--ink);color:var(--sheet);}"+
@@ -3047,17 +3048,21 @@ var TLP=(function(){
     (r.systemic_line||[]).forEach(function(x,i){var no=+x.line_no||0,reg=x.line_regimen?lbl("line_regimen",x.line_regimen):"";
       out.push({lane:"sys",form:"systemic_line",i:i,inst:x,f:"line_start",d:T(x.line_start),e:T(x.line_end),bar:1,label:(no>=1?"第 "+no+" 線 ":"")+(reg||"藥物治療")});});
     (r.clin_event||[]).forEach(function(x,i){out.push({lane:"ev",form:"clin_event",i:i,inst:x,f:"ev_date",d:T(x.ev_date),label:x.ev_type?String(lbl("ev_type",x.ev_type)).replace(/（.*$/,""):"事件"});});
+    var dc=r.dcrt_detail||{};if(dc.ccrt_response_date&&FORM_BY.dcrt_detail&&formShown(id,FORM_BY.dcrt_detail))
+      out.push({lane:"ev",form:"dcrt_detail",i:null,f:"ccrt_response_date",d:T(dc.ccrt_response_date),hollow:1,label:"放化療後評估"+(dc.ccrt_response?"："+String(lbl("ccrt_response",dc.ccrt_response)).replace(/（.*$/,""):"")});
     /* 提醒與錯誤：直接用表單的檢核結果 */
-    var swc=null;
+    var swc=null,dcc=null;
     out.forEach(function(it){var E=[],W=[];
       if(it.form==="staging_workup"){swc=swc||checkForm(id,FORM_BY.staging_workup,null,false);
         E=swc.E.filter(function(m){return m.f===it.f;});W=swc.W.filter(function(m){return m.f===it.f;});}
+      else if(it.form==="dcrt_detail"){dcc=dcc||checkForm(id,FORM_BY.dcrt_detail,null,false);
+        E=dcc.E.filter(function(m){return m.f===it.f;});W=dcc.W.filter(function(m){return m.f===it.f;});}
       else{var c=checkForm(id,FORM_BY[it.form],it.inst,false);E=c.E.filter(function(m){return !m.sec;});W=c.W.filter(function(m){return !m.sec;});}
       it.cls=E.length?"e":W.length?"w":"";it.em=E.map(function(m){return m.m;});it.wm=W.map(function(m){return m.m;});it.msgs=it.em.concat(it.wm);
       if(!ISO.test(it.d))it.d="";if(it.e&&!ISO.test(it.e))it.e="";});
     return out;
   }
-  function body(id){
+  function body(id,vw0){
     var its=items(id),dated=its.filter(function(x){return x.d;}),und=its.filter(function(x){return !x.d;});
     if(!its.length)return '<div class="tlp-n">這位病人還沒有可以畫在時間軸上的資料。登錄分期檢查、影像、病理、放療、治療線或事件之後，會依日期出現在這裡。</div>';
     var h="";
@@ -3065,7 +3070,7 @@ var TLP=(function(){
       var dxIso=String((DB.pre[id]||{}).dx_date||""),dx=ISO.test(dxIso)?dn(dxIso):null,today=dn(todayIso());
       var ds=dated.map(function(x){return dn(x.d);}),es=dated.map(function(x){return Math.min(dn(x.e||x.d),today+200);});
       var lo=Math.min.apply(null,ds.concat(dx==null?[]:[dx]))-30,hi=Math.max.apply(null,es.concat(dx==null?[]:[dx+150]))+60;
-      var zoom=+ls(ZKEY,"0")||0,sc=document.querySelector("#main"),vw=Math.max(420,((sc&&sc.clientWidth)||900)-LABW-40),PADR=230;
+      var zoom=+ls(ZKEY,"0")||0,sc=document.querySelector("#main"),vw=Math.max(420,(vw0||((sc&&sc.clientWidth)||900))-LABW-40),PADR=230;
       var ppd=zoom?vw/(zoom+60):(vw-PADR)/(hi-lo);if(zoom)hi=Math.max(hi,lo+zoom+60);
       var W=Math.round((hi-lo)*ppd)+PADR,X=function(n){return Math.round((n-lo)*ppd);};
       var mpx=30.4*ppd,step=mpx>=112?1:mpx*3>=112?3:mpx*6>=112?6:mpx*12>=112?12:24,ticks="";
@@ -3136,6 +3141,7 @@ var TLP=(function(){
     if(!cur||auditMode())return "";css();var open=isOpen(),v=view(),z=+ls(ZKEY,"0")||0;
     return '<section class="tlp" id="tlp" aria-label="登錄索引"><div class="tlp-h"><button type="button" id="tlpTog" aria-expanded="'+open+'">'+(open?"▾":"▸")+' 登錄索引</button>'+
       '<div class="tlp-sum" id="tlpSum">'+summary(cur)+'</div>'+
+      '<button type="button" id="tlpWin" class="tlp-win" title="在另一個視窗看這位病人的事件與時間，可以和表單並排">事件時間圖 ↗</button>'+
       '<div class="tlp-z" style="margin-left:auto" role="group" aria-label="檢視方式"'+(open?"":" hidden")+'>'+[["ix","清單"],["tl","病程圖"]].map(function(o){return '<button type="button" data-v="'+o[0]+'" class="'+(o[0]===v?"on":"")+'">'+o[1]+'</button>';}).join("")+'</div>'+
       '<div class="tlp-z" style="margin-left:0" role="group" aria-label="時間範圍"'+(open&&v==="tl"?"":" hidden")+'>'+[[180,"前 6 個月"],[730,"前 2 年"],[0,"全程"]].map(function(o){return '<button type="button" data-z="'+o[0]+'" class="'+(o[0]===z?"on":"")+'">'+o[1]+'</button>';}).join("")+'</div></div>'+
       '<div class="tlp-b" id="tlpB"'+(open?"":" hidden")+'>'+(open?(v==="tl"?body(cur):ixBody(cur))+'<div class="tlp-n" style="padding-top:6px;font-size:.82rem">這裡只列出已登錄的紀錄，按任一列可跳到那一筆；只能看，不能改。病歷裡還沒登的資料不會出現在這裡。</div>':"")+'</div></section>';
@@ -3147,20 +3153,84 @@ var TLP=(function(){
     var box=document.getElementById("tlp");if(!box)return;
     box.onclick=function(e){var b=e.target.closest("button");if(!b)return;
       if(b.id==="tlpTog"){lsSet(KEY,isOpen()?"0":"1");redraw(true);return;}
+      if(b.id==="tlpWin"){if(typeof CASEV!=="undefined")CASEV.open();return;}
       if(b.dataset.v!=null){lsSet(VKEY,b.dataset.v);redraw(true);return;}
       if(b.dataset.z!=null){lsSet(ZKEY,b.dataset.z);redraw(true);return;}
       if(b.dataset.form)go(b);};
-    edge();
+    edge();if(typeof CASEV!=="undefined")CASEV.refresh();
   }
   function redraw(whole){var box=document.getElementById("tlp");if(!box||!cur||auditMode())return;
     var s=box.querySelector(".tlp-s"),left=s&&!whole?s.scrollLeft:0;
     var tmp=document.createElement("div");tmp.innerHTML=html();box.replaceWith(tmp.firstChild);bind();
     s=document.querySelector("#tlp .tlp-s");if(s&&left){s.scrollLeft=left;edge();}}
   var t=null;function refresh(){clearTimeout(t);t=setTimeout(function(){try{redraw(false);}catch(e){console.error(e);}},200);}
-  return {html:html,bind:bind,refresh:refresh,items:items,todoForms:todoForms};
+  return {html:html,bind:bind,refresh:refresh,items:items,todoForms:todoForms,body:body,ixBody:ixBody,go:go,css:css,roc:roc,setZoom:function(z){lsSet(ZKEY,String(z));redraw(true);},zoom:function(){return +ls(ZKEY,"0")||0;}};
 })();
 /* 表單有任何變動（refreshCur）→ 時間軸跟著重畫 */
-(function(){var _rc=refreshCur;refreshCur=function(){_rc();TLP.refresh();};})();
+(function(){var _rc=refreshCur;refreshCur=function(){_rc();TLP.refresh();if(typeof CASEV!=="undefined")CASEV.refresh();};})();
+
+/* ---------- 事件時間圖（新視窗；唯讀；2026-11-18） ----------
+   PI 11-18：登錄人員看不到單一個案登完後的整體；面板因畫面空間預設收合 →「另開新頁『事件－時間』圖顯示」。
+   按「事件時間圖 ↗」開一個獨立視窗，可與表單並排；內容＝這位病人的病程圖（放大）＋各部分狀態＋依日期排列的清單。
+   - 只讀不寫；按任一項目＝主視窗切到那一筆。
+   - 內容由主視窗畫進去（資料只在瀏覽器記憶體，不另存、不上傳）；表單一有變動、或換病人，跟著重畫。
+   - 登出／鎖定／進入稽核重摘時自動關閉，避免畫面留著病人資料。 */
+var CASEV=(function(){
+  var win=null,t=null,watch=null;
+  function alive(){return !!win&&!win.closed;}
+  function close(){try{if(alive())win.close();}catch(e){}win=null;if(watch){clearInterval(watch);watch=null;}}
+  function ok(){try{return !!cur&&!!SEC.session()&&!auditMode();}catch(e){return false;}}
+  function parts(id){var r=recOf(id);
+    return FORMS.filter(function(fm){return fm.id!=="registry_prefill"&&formShown(id,fm);}).map(function(fm){
+      var st,cls="";
+      if(fm.rep){var a=r[fm.id]||[],dn=a.filter(function(x){return x._s===2;}).length;
+        if(a.length){st="已登 "+a.length+" 筆"+(dn===a.length?"，都已完成":dn?"，其中 "+dn+" 筆已完成":"，尚未標記完成");cls=dn===a.length?"ok":"go";}
+        else if(repNone(id,fm)){st="已確認沒有";cls="ok";}else{st="還沒處理";cls="no";}}
+      else{var s=(r[fm.id]||{})._s||0;st=s===2?"已完成":s===1?"進行中":"還沒開始";cls=s===2?"ok":s===1?"go":"no";}
+      return '<button type="button" class="cv-p '+cls+'" data-form="'+fm.id+'"><b>'+esc(fm.name)+'</b><span>'+st+'</span></button>';}).join("");}
+  function draw(){
+    if(!alive())return;if(!ok()){close();return;}
+    var d=win.document,box=d.getElementById("cv");if(!box)return;var id=cur,p=DB.pre[id]||{},z=TLP.zoom();
+    d.title="事件時間圖 · "+id;
+    var dx=/^\d{4}-\d{2}-\d{2}$/.test(String(p.dx_date||""))?TLP.roc(p.dx_date):"";
+    box.innerHTML='<header class="cv-h"><div><h1>'+esc(id)+'</h1><p>'+esc(String(p.dx_year||""))+" 診斷"+(dx?"（"+dx+"）":"")+(p.tx_pathway?"・"+esc(lbl("tx_pathway",p.tx_pathway)):"")+'</p></div>'+
+        '<div class="tlp-z" role="group" aria-label="時間範圍">'+[[180,"前 6 個月"],[730,"前 2 年"],[0,"全程"]].map(function(o){return '<button type="button" data-z="'+o[0]+'" class="'+(o[0]===z?"on":"")+'">'+o[1]+'</button>';}).join("")+'</div></header>'+
+      '<p class="cv-n">這一頁只能看，不能改。按圖上或清單裡的任一項，主視窗會跳到那一筆。這裡只有已經登錄的資料；病歷裡還沒登的不會出現。</p>'+
+      '<h2>事件與時間</h2><section class="tlp cv-tl"><div class="tlp-b">'+TLP.body(id,Math.max(520,win.innerWidth-24))+'</div></section>'+
+      '<h2>各部分做到哪裡</h2><div class="cv-ps">'+parts(id)+'</div>'+
+      '<h2>依日期排列</h2><section class="tlp"><div class="tlp-b">'+TLP.ixBody(id)+'</div></section>';
+  }
+  function refresh(){if(!alive())return;clearTimeout(t);t=setTimeout(function(){try{draw();}catch(e){console.error(e);}},250);}
+  function open(){
+    if(!ok())return;TLP.css();
+    if(!alive()){
+      win=window.open("","escc_case_view","width=980,height=760");
+      if(!win){toast("瀏覽器擋下了新視窗。請在網址列右側允許本站開啟彈出式視窗後再按一次");return;}
+      var css=[].map.call(document.querySelectorAll("style"),function(s){return s.outerHTML;}).join("");
+      var th=document.documentElement.getAttribute("data-theme");
+      win.document.open();
+      win.document.write('<!doctype html><html lang="zh-Hant"'+(th?' data-theme="'+th+'"':"")+'><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>事件時間圖</title>'+css+
+        '<style>body{margin:0;padding:14px 12px 40px;background:var(--paper,#F6F7F5);color:var(--ink);}'+
+        '.cv-h{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-end;justify-content:space-between;margin-bottom:6px;}.cv-h h1{font-size:1.3rem;margin:0;}.cv-h p{margin:2px 0 0;color:var(--soft);font-size:.92rem;}'+
+        '.cv-h .tlp-z{margin-left:0;}.cv-h .tlp-z button{cursor:pointer;font:inherit;font-size:.84rem;color:var(--ink);}.cv-h .tlp-z button.on{color:var(--sheet);}'+
+        'h2{font-size:1rem;margin:18px 0 8px;}.cv-n{color:var(--soft);font-size:.86rem;margin:0;}'+
+        '.cv-tl .tlp-b{padding:6px 0 10px;}.tlp{margin:0;}.tlp button{font:inherit;cursor:pointer;}'+
+        '.cv-ps{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;}'+
+        '.cv-p{display:flex;flex-direction:column;gap:2px;text-align:left;font:inherit;color:inherit;cursor:pointer;background:var(--sheet);border:1px solid var(--rule);border-left:5px solid var(--rule);border-radius:6px;padding:8px 10px;}'+
+        '.cv-p span{font-size:.86rem;color:var(--soft);}.cv-p.ok{border-left-color:var(--done,#1f6b5c);}.cv-p.go{border-left-color:var(--iodine,#b26a00);}'+
+        '</style></head><body><div id="cv"></div></body></html>');
+      win.document.close();
+      win.document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("button");if(!b)return;
+        if(b.dataset.z!=null){TLP.setZoom(b.dataset.z);draw();return;}
+        if(b.dataset.form){try{TLP.go(b);window.focus();}catch(x){console.error(x);}}});
+      win.addEventListener("resize",refresh);
+      if(!watch)watch=setInterval(function(){if(!alive()){close();return;}if(!ok())close();},1500);
+    }
+    draw();try{win.focus();}catch(e){}
+  }
+  window.addEventListener("pagehide",close);
+  return {open:open,refresh:refresh,close:close,alive:alive,_win:function(){return win;}};
+})();
 
 /* ---------- 登錄進度表（唯讀；2026-11-13 PI：「同意建議」） ----------
    每位病人各表單的完成狀態排成一張表。資料來源＝這個瀏覽器已解密載入的紀錄（recordState／checkForm），不另外向伺服器讀。
@@ -7891,7 +7961,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-11-18 18:18 454777d nas 224ec3·3ae239·6d4a84";
+window.__build="2026-11-18 20:51 ab8d8ef nas 224ec3·3ae239·6d4a84";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
