@@ -467,7 +467,7 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-18 22:48 a5ce35b nas 77fc1d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-19 12:16 de5985e nas 77fc1d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -2849,8 +2849,13 @@ var DOCIMPORT=(function(){
     logChange(fmId,"由"+SRC_FOR[fmId]+"擷取新增第 "+r[fmId].length+" 筆（"+set+" 欄"+(coreFilled.length?"；核心補登帶入 "+coreFilled.join("、"):"")+"）");
     if(typeof SEC!=="undefined"&&SEC.secLog)SEC.secLog("文件擷取 "+fmId+" "+id);
     persist(true);refreshStates();return {inst:inst,set:set,coreFilled:coreFilled,unsure:unsure};}
+  /* 2026-11-19 PI：貼完報告只看到那一筆，看不到整位病人的成果 → 結果視窗加一顆按鈕直接開「事件時間圖」（資料此時已存入，圖上已有這一筆） */
+  function cvBtn(){try{if(typeof CASEV==="undefined"||auditMode())return;var box=$("#mBody");if(!box||$("#mCase",box))return;var p=document.createElement("p");p.style.margin="10px 0 0";
+    p.innerHTML='<button class="btn" type="button" id="mCase">看這位病人的事件時間圖 ↗</button> <span class="desc">另開視窗，可和表單並排；之後每貼一份會自動更新</span>';box.appendChild(p);
+    $("#mCase",p).onclick=function(){CASEV.open();};}catch(e){console.error(e);}}
+  function dlgCv(o){var pr=dialog(o);cvBtn();return pr;}
   function report(res,fmId){var fm=FORM_BY[fmId];
-    dialog({title:"已從"+DOC_NAME[fmId]+"新增一筆",info:1,msg:"新增第 "+recOf(cur)[fmId].length+" 筆"+fm.name+"，帶入 "+res.set+" 個欄位"+(res.coreFilled.length?"；核心補登也帶入："+res.coreFilled.join("、"):"")+
+    dlgCv({title:"已從"+DOC_NAME[fmId]+"新增一筆",info:1,msg:"新增第 "+recOf(cur)[fmId].length+" 筆"+fm.name+"，帶入 "+res.set+" 個欄位"+(res.coreFilled.length?"；核心補登也帶入："+res.coreFilled.join("、"):"")+
       (res.unsure.length?"\n\n請特別核對：\n・"+res.unsure.join("\n・"):"")+"\n\n請逐欄與原始報告核對後再標記完成。",ok:"知道了"}).then(function(){renderForm();refreshCur();});}
   function fromText(id,fmId,text,docDate,fileName){var p=fmId==="rt_course"?DOCP.parseRT(text):fmId==="biomarker"?DOCP.parseBiomarker(text):fmId==="staging_imaging"?DOCP.parseImaging(text):DOCP.parsePath(text);
     if(!p.ok){toast(p.note||"無法解析這段文字");return null;}
@@ -2905,9 +2910,9 @@ var DOCIMPORT=(function(){
   function showAny(out){
       if(out.kind==="egd"){var msg=out.postop?"這是術後追蹤胃鏡（"+(out.meta.stricture?"有吻合口狹窄":"無狹窄")+(out.meta.dilation?"、建議擴張":"")+"）。已記入病人紀錄；待手術與併發症表單建立後，將轉入該表單。":
           (out.core?"帶入："+(out.core.filled.join("、")||"無（欄位已有值）")+(out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):""):"此份胃鏡報告無可帶入的欄位（無距門齒距離）")+"\n\n請到核心補登「① 首次內視鏡報告」核對。";
-        dialog({title:"胃鏡報告",info:1,msg:msg,ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
-      if(out.kind==="serology"){dialog({title:"已帶入肝炎血清結果",info:1,msg:"帶入："+(out.core.filled.join("、")||"無")+(out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):"")+"\n\n請到核心補登「⑥ 病毒性肝炎」核對。",ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
-      if(out.kind==="labs"){dialog({title:"已帶入基礎檢驗值",info:1,msg:"讀到 "+out.meta.rows.length+" 個檢驗值（"+out.meta.dates.length+" 個日期，全部已保存在病人紀錄），基礎值取最早一次 "+out.meta.dates[0]+"。"+(out.meta.kv?"其中 "+out.meta.kv+" 個是「項目：值」型的結果，"+out.meta.withRange+" 個帶參考範圍（連同單位一併保存）。":"")+"\n\n帶入："+((out.core&&out.core.filled.join("、"))||"無（欄位已有值）")+(out.core&&out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):"")+(out.meta.warn&&out.meta.warn.length?"\n\n⚠️ 請人工核對：\n・"+out.meta.warn.join("\n・"):"")+"\n\n請到核心補登「⑦ 治療前基礎檢驗值」確認該日期是首次治療前；若不是，請改填正確日期與數值。",ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
+        dlgCv({title:"胃鏡報告",info:1,msg:msg,ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
+      if(out.kind==="serology"){dlgCv({title:"已帶入肝炎血清結果",info:1,msg:"帶入："+(out.core.filled.join("、")||"無")+(out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):"")+"\n\n請到核心補登「⑥ 病毒性肝炎」核對。",ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
+      if(out.kind==="labs"){dlgCv({title:"已帶入基礎檢驗值",info:1,msg:"讀到 "+out.meta.rows.length+" 個檢驗值（"+out.meta.dates.length+" 個日期，全部已保存在病人紀錄），基礎值取最早一次 "+out.meta.dates[0]+"。"+(out.meta.kv?"其中 "+out.meta.kv+" 個是「項目：值」型的結果，"+out.meta.withRange+" 個帶參考範圍（連同單位一併保存）。":"")+"\n\n帶入："+((out.core&&out.core.filled.join("、"))||"無（欄位已有值）")+(out.core&&out.core.conf.length?"\n\n與已填值不一致，未覆蓋：\n・"+out.core.conf.join("\n・"):"")+(out.meta.warn&&out.meta.warn.length?"\n\n⚠️ 請人工核對：\n・"+out.meta.warn.join("\n・"):"")+"\n\n請到核心補登「⑦ 治療前基礎檢驗值」確認該日期是首次治療前；若不是，請改填正確日期與數值。",ok:"知道了"}).then(function(){tab="core_abstraction";renderMain();});return;}
       if(out.kind==="pathlist"){dialog({title:"已建立病理索引",info:1,msg:"食道相關 "+out.eso+" 份、其他 "+out.other+" 份。索引列於「病理與檢體」分頁上方；須詳細檢視的報告，請另將該份全文貼入。",ok:"知道了"}).then(function(){tab="pathology_specimen";renderMain();});return;}
       tab=out.fmId;renderMain();report(out.res,out.fmId);}
 
@@ -7986,7 +7991,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-11-18 22:48 a5ce35b nas 77fc1d·3ae239·6d4a84";
+window.__build="2026-11-19 12:16 de5985e nas 77fc1d·3ae239·6d4a84";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
