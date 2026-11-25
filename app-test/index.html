@@ -467,7 +467,7 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-25 21:20 867d4a6 nas 77fc1d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-25 23:16 d9184ff nas 77fc1d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -1259,7 +1259,7 @@ function jump(f,i){
 }
 $("#pE").onclick=$("#pW").onclick=function(){$("#issues").classList.toggle("open");};
 function showAllMsgs(){var b=$(".sheet");if(b){b._showAll=true;refreshForm(b,FORM_BY[tab],null);}
-  $$(".inst").forEach(function(box){box._showAll=true;refreshForm(box,FORM_BY[tab],recOf(cur)[tab][+box.dataset.i]);});}
+  $$(".inst[data-i]").forEach(function(box){var x=recOf(cur)[tab][+box.dataset.i];if(!x)return;box._showAll=true;refreshForm(box,FORM_BY[tab],x);});}
 function completeForm(){
   if(!needWho())return;
   var fm=FORM_BY[tab];if(fm.rep)return;
@@ -2453,9 +2453,9 @@ var CHEMO=(function(){
         if(s.role==="abstractor"&&(DB.assign||{})[id]!==s.uid){res.status="非分派給您的病人";res.sid=id;return res;}
         var rec=recOf(id),old=(rec.chemo&&rec.chemo.drafts)||[];
         var keep=old.filter(function(d){return d.status!=="pending";});
-        var drafts=r.lines.map(function(l){return Object.assign({_did:uid("d"),status:"pending"},l);});
+        var have=rec.systemic_line||[],fresh=r.lines.filter(function(l){return !have.some(function(x){return x.line_start===l.line_start&&(x.line_end||"")===(l.line_end||"")&&x.line_regimen===l.line_regimen;});});res.already=r.lines.length-fresh.length;var drafts=fresh.map(function(l){return Object.assign({_did:uid("d"),status:"pending"},l);});
         rec.chemo={at:stamp(),by:s.name,file:f.name,rows:r.n_rows,bsa:r.header.bsa,bsa_date:r.header.bsa_date,diagnosis:r.header.diagnosis,drafts:keep.concat(drafts)};
-        res.sid=id;res.drafts=drafts.length;res.status="已產生草稿";
+        res.sid=id;res.drafts=drafts.length;res.status=drafts.length?"已產生草稿"+(res.already?"（另有 "+res.already+" 條先前已採用，未重複列出）":""):(res.already?"這份明細表的治療線先前都已採用，沒有新的草稿":"已產生草稿");
         rec.log.push({t:stamp(),by:s.name,role:s.role,f:"systemic_line",w:"匯入化療明細表 "+f.name+":"+r.n_rows+" 列 → "+drafts.length+" 條草稿"});
       }catch(e){res.status="解析失敗:"+e.message;}
       return res;});})).then(function(results){
@@ -2481,7 +2481,7 @@ var CHEMO=(function(){
     $("#bPrevBack").onclick=function(){renderImportReport(results);};
   }
   function pickQrp(only){var inp=$("#fQrp");inp.onchange=function(){var fs=inp.files;if(!fs||!fs.length)return;
-    importFiles(fs,only).then(function(r){inp.value="";var mine=only&&r.length===1&&r[0].drafts&&r[0].sid===only;if(mine){tab="systemic_line";openPt(only);toast("已產生 "+r[0].drafts+" 條草稿，請在下方逐筆核對後按「採用」或「略過」");setTimeout(function(){var d=document.querySelector("#main .draft");if(d)d.scrollIntoView({block:"center"});},80);}else renderImportReport(r);});};inp.click();}
+    importFiles(fs,only).then(function(r){inp.value="";var mine=only&&r.length===1&&(r[0].drafts||r[0].already)&&r[0].sid===only;if(mine){tab="systemic_line";openPt(only);toast(r[0].drafts?"已產生 "+r[0].drafts+" 條草稿"+(r[0].already?"（另有 "+r[0].already+" 條先前已採用，沒有重複列出）":"")+"，請在下方逐筆核對後按「採用」或「略過」":"這份明細表的 "+r[0].already+" 條治療線先前都已採用，沒有新的草稿");setTimeout(function(){var d=document.querySelector("#main .draft");if(d)d.scrollIntoView({block:"center"});},80);}else renderImportReport(r);});};inp.click();}
   function draftCard(d){
     var drugs=d.line_drugs.map(function(k){return KEY_NAME[k];}).join("、");
     var dm=Object.keys(d.dose_mg_m2||{}).map(function(k){var v=d.dose_mg_m2[k];return k+" "+pyRound1(median(v))+" mg/m²";}).join("、");
@@ -2504,6 +2504,8 @@ var CHEMO=(function(){
   }
   function adopt(did){
     if(!needWho())return;var rec=recOf(cur),d=rec.chemo.drafts.filter(function(x){return x._did===did;})[0];if(!d)return;
+    var dupN=0;(rec.systemic_line||[]).forEach(function(x,i){if(x.line_start===d.line_start&&(x.line_end||"")===(d.line_end||"")&&x.line_regimen===d.line_regimen)dupN=i+1;});
+    if(dupN&&!adopt._ok){ask("這位病人已經有一筆起訖日與處方都相同的治療線（第 "+dupN+" 筆）。\n\n確定不是重複的話才繼續；重複的話請按取消，再按這張草稿的「略過」。\n\n仍要再新增一筆？").then(function(ok){if(!ok)return;adopt._ok=1;try{adopt(did);}finally{adopt._ok=0;}});return;}
     var inst={_s:1,_uid:uid("i"),_draft:did,line_regimen:d.line_regimen,line_regimen_other:d.line_regimen_other,line_drugs:d.line_drugs.slice(),
       line_start:d.line_start,line_end:d.line_end,line_cycles:String(d.line_cycles),line_dose_m2:d.line_dose_m2==null?"":String(d.line_dose_m2),
       line_oral_days:d.line_oral_days==null?"":String(d.line_oral_days),line_dose_red:d.line_dose_red,line_modification:d.line_modification,
@@ -2849,7 +2851,7 @@ var DOCIMPORT=(function(){
       if(same){same.at=stamp();same.by=who();return same;}   /* 同一份核心類原文重貼：沿用，不重複存 */
       var d={id:uid("d"),at:stamp(),by:who(),k:m.k,fm:m.fm,u:m.u||"",via:m.via||"貼上文字",d:m.d||"",t:t,h:[]};list.push(d);return d;}catch(e){console.error(e);lastSkip="原文沒有保存";return null;}}
   function unkeep(id,d){if(!d)return;var r=recOf(id);if(!r.srcdocs)return;if(d.h&&d.h.length)return;r.srcdocs=r.srcdocs.filter(function(x){return x!==d;});}
-  function keptMsg(o){return o&&o.doc?"\n\n原文已加密保存。關掉這個視窗後，原文會顯示在畫面左邊，可以和右邊的欄位對照。":(o&&o.skip?"\n\n⚠️ "+o.skip+"；欄位已照常帶入。":"");}
+  function keptMsg(o){return o&&o.doc?"\n\n原文已加密保存，關掉視窗後顯示在左邊供對照。":(o&&o.skip?"\n\n⚠️ "+o.skip+"；欄位已照常帶入。":"");}
   /* 那一筆被刪掉時，它的原文一起清掉。掛在 persist 前：跟著同一次儲存寫出去，不會因為只是看一眼就多寫一次。 */
   function gc(id){var r=id&&DB.rec[id];if(!r||!r.srcdocs||!r.srcdocs.length)return;var keepd=r.srcdocs.filter(function(d){return !d.u||(r[d.fm]||[]).some(function(x){return x._uid===d.u;});});if(keepd.length!==r.srcdocs.length)r.srcdocs=keepd;}
   (function(){var _p=persist;persist=function(now){try{gc(cur);}catch(e){console.error(e);}return _p(now);};})();
@@ -2866,6 +2868,7 @@ var DOCIMPORT=(function(){
       "#spTxt mark{background:var(--iodine-soft);color:inherit;outline:1px solid var(--iodine);border-radius:2px;cursor:pointer;scroll-margin:120px}#spTxt mark.on{background:var(--focus);color:#fff;outline-color:var(--focus)}"+
       ".srcchip{margin-left:6px;padding:0 8px;border-radius:10px;border:1px solid var(--focus);background:transparent;color:var(--focus);font:inherit;font-size:.78rem;line-height:1.5;cursor:pointer;white-space:nowrap}.srcchip.chg{border-color:var(--iodine);color:var(--iodine)}"+
       ".srcbar{margin:0 0 10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}"+
+      ".shell.srcOpen .inst>.ih{flex-wrap:wrap;row-gap:6px}.shell.srcOpen .inst>.ih>span:not(.imptag):not(.cnt){flex:1 1 100%;order:9}.inst>.ih>.imptag{flex:0 0 auto;overflow:visible}"+
       ".inst.imptodo{box-shadow:inset 5px 0 0 var(--iodine)}.imptag{font-size:.82rem;padding:0 8px;border-radius:10px;border:1px solid var(--iodine);color:var(--iodine);white-space:nowrap}.imptag.ok{border-color:var(--rule);color:var(--soft)}"+
       "#impbar{margin:0 0 10px;padding:8px 12px;border-left:5px solid var(--iodine);background:var(--iodine-soft);font-size:.95rem}#impbar.alldone{border-left-color:var(--rule);background:transparent;color:var(--soft)}"+
       "@media (max-width:880px){.shell.srcOpen{grid-template-columns:minmax(0,1fr)}#srcPane{position:fixed;left:0;right:0;top:auto;bottom:0;height:46vh;z-index:26;border-right:none;border-top:3px solid var(--focus);padding-bottom:16px}.shell.srcOpen>main{padding-bottom:48vh}}";
@@ -2911,7 +2914,7 @@ var DOCIMPORT=(function(){
       if(!$(".imptag",box)){var ih=$(".ih",box),sp=document.createElement("span");sp.className="imptag"+(done?" ok":"");sp.textContent=done?"報告帶入・已核對完成":"報告帶入・尚未核對";
         sp.title=done?"這一筆由報告帶入，已有人核對並標記完成":"這一筆的內容是程式從報告讀出來的。請對照原文逐欄看過、改正後，按這一筆的「標記完成」";var cnt=ih&&$(".cnt",ih);if(ih)ih.insertBefore(sp,cnt||null);}});
     if(!n||$("#impbar",area))return;var first=$(".inst[data-i]",area);if(!first)return;var bar=document.createElement("div");bar.id="impbar";if(dn===n)bar.className="alldone";
-    bar.textContent="這個分頁由報告帶入 "+n+" 筆：已核對完成 "+dn+" 筆"+(n-dn?"、尚未核對 "+(n-dn)+" 筆。請對照原文逐欄看過、改正後，按那一筆的「標記完成」。":"。");first.parentNode.insertBefore(bar,first);}
+    bar.textContent="報告帶入 "+n+" 筆：已核對完成 "+dn+" 筆"+(n-dn?"、尚未核對 "+(n-dn)+" 筆（核對後按那一筆的「標記完成」）":"");first.parentNode.insertBefore(bar,first);}
   function decorate(tb,area){if(auditMode()){closePane();return;}if(!cur||!area)return;var r=DB.rec[cur];if(!r)return;var fm=FORM_BY[tb];if(!fm)return;try{todo(tb,area,r,fm);}catch(e){console.error(e);}if(!r.srcdocs||!r.srcdocs.length)return;srcCss();var loose=[];
     r.srcdocs.forEach(function(d){
       if(d.u&&d.fm===tb){var arr=r[tb]||[],i=-1;arr.forEach(function(x,ix){if(x._uid===d.u)i=ix;});var box=i<0?null:$('.inst[data-i="'+i+'"]',area);
@@ -2939,19 +2942,20 @@ var DOCIMPORT=(function(){
     var dupN=dupOf(r[fmId],inst,fmId);if(dupN)unsure.unshift("這位病人已有第 "+dupN+" 筆"+DUP_WHAT[fmId]+"相同，這一筆可能是重複登錄。確定重複的話，請按這一筆右上角的「刪除」");
     inst._docnote=unsure;
     r[fmId].push(inst);
-    var doc=keep(id,{k:FM_KIND[fmId],fm:fmId,u:inst._uid,via:fileName==="檔案匯入"?"檔案匯入":(fileName&&fileName!=="貼上文字"?"PDF":"貼上文字"),d:docDate,t:text}),skip=doc?"":lastSkip;if(doc)doc.h=hits;note(id,FM_KIND[fmId],fmId,inst._uid,hits,doc);
+    var doc=keep(id,{k:FM_KIND[fmId],fm:fmId,u:inst._uid,via:fileName==="檔案匯入"?"檔案匯入":(fileName&&fileName!=="貼上文字"?"PDF":"貼上文字"),d:docDate,t:text}),skip=doc?"":lastSkip;if(doc)doc.h=hits;
+    if(skip)unsure.push("⚠️ "+esc(skip)+"，這一筆無法左右對照原文");   /* 結果視窗關掉後仍看得到 */note(id,FM_KIND[fmId],fmId,inst._uid,hits,doc);
     logChange(fmId,"由"+SRC_FOR[fmId]+"擷取新增第 "+r[fmId].length+" 筆（"+set+" 欄"+(coreFilled.length?"；核心補登帶入 "+coreFilled.join("、"):"")+"）");
     if(typeof SEC!=="undefined"&&SEC.secLog)SEC.secLog("文件擷取 "+fmId+" "+id);
     persist(true);refreshStates();return {inst:inst,set:set,coreFilled:coreFilled,unsure:unsure,doc:doc,skip:skip};}
   /* 2026-11-19 PI：貼完報告只看到那一筆，看不到整位病人的成果 → 結果視窗加一顆按鈕直接開「事件時間圖」（資料此時已存入，圖上已有這一筆） */
   function cvBtn(){try{if(typeof CASEV==="undefined"||auditMode())return;var box=$("#mBody");if(!box||$("#mCase",box))return;var p=document.createElement("p");p.style.margin="10px 0 0";
-    p.innerHTML='<button class="btn" type="button" id="mCase">看這位病人的事件時間圖 ↗</button> <span class="desc">另開視窗，可和表單並排；之後每貼一份會自動更新</span>';box.appendChild(p);
+    p.innerHTML='<button class="btn" type="button" id="mCase">看這位病人的事件時間圖 ↗</button> <span class="desc">另開視窗</span>';box.appendChild(p);
     $("#mCase",p).onclick=function(){CASEV.open();};}catch(e){console.error(e);}}
   function dlgCv(o){var pr=dialog(o);cvBtn();return pr;}
   /* 2026-11-20 助理回饋：貼上後「只知道有貼上、但看不見」— 新的一筆排在該分頁最下面、畫面不會捲過去；核心補登帶入的欄位散在長頁面裡。
      → 關掉結果視窗後自動捲到剛帶入的地方，並用外框標出來（外框留到下次重畫為止）。 */
   function justCss(){if($("#justCss"))return;var st=document.createElement("style");st.id="justCss";
-    st.textContent=".inst.justin{outline:3px solid var(--focus,#1F5F99);outline-offset:3px;scroll-margin-top:96px}.inst.justin>.ih::after{content:'剛由報告帶入，請核對';margin-left:8px;padding:1px 8px;border-radius:10px;background:var(--focus,#1F5F99);color:#fff;font-size:.8rem;white-space:nowrap}"+
+    st.textContent=".inst.justin{outline:3px solid var(--focus,#1F5F99);outline-offset:3px;scroll-margin-top:96px}"+
       ".f.justin{outline:3px solid var(--focus,#1F5F99);outline-offset:2px;border-radius:4px;scroll-margin-top:120px}";document.head.appendChild(st);}
   function openUp(el){for(var n=el;n&&n!==document.body;n=n.parentNode){if(n.tagName==="DETAILS")n.open=true;}}
   function showInst(fmId,inst){try{justCss();var arr=recOf(cur)[fmId]||[],i=arr.indexOf(inst);if(i<0)return;if(inst._open===false){inst._open=true;renderForm();}
@@ -2959,12 +2963,21 @@ var DOCIMPORT=(function(){
   function showCore(keys){try{justCss();var first=null;(keys||[]).forEach(function(k){var w=$('#formArea .f[data-f="'+k+'"]');if(!w)return;openUp(w);w.classList.add("justin");if(!first)first=w;});
     if(first){first.scrollIntoView({block:"center"});setTimeout(function(){var w=$('#formArea .f.justin');if(w)w.scrollIntoView({block:"center"});},350);}}catch(e){console.error(e);}}
   function report(res,fmId){var fm=FORM_BY[fmId];
+    if(res.dup){var forced=false,pr=dialog({title:"這份報告已經貼過了",info:1,msg:"內容和第 "+res.dup+" 筆"+fm.name+"保存的原文完全相同，所以沒有再新增一筆，欄位也沒有變動。",ok:"去看第 "+res.dup+" 筆"});
+      /* 不硬擋：確實要再登一筆時（少見）仍可新增，那一筆會帶「可能是重複登錄」的提醒 */
+      var bx=$("#mBody"),pp=document.createElement("p");pp.style.margin="10px 0 0";pp.innerHTML='<button class="btn mini" type="button" id="mForce">仍要再新增一筆</button>';bx.appendChild(pp);
+      $("#mForce",pp).onclick=function(){forced=true;$("#mYes").click();};
+      pr.then(function(){if(forced){var r2=res.force();if(r2){renderMain();report(r2,fmId);}return;}renderForm();refreshCur();if(res.doc)openPane(res.doc.id);showInst(fmId,res.inst);});return;}
     dlgCv({title:"已從"+DOC_NAME[fmId]+"新增一筆",info:1,msg:"新增第 "+recOf(cur)[fmId].length+" 筆"+fm.name+"，帶入 "+res.set+" 個欄位"+(res.coreFilled.length?"；核心補登也帶入："+res.coreFilled.join("、"):"")+
-      (res.unsure.length?"\n\n請特別核對：\n・"+res.unsure.join("\n・"):"")+"\n\n請逐欄與原始報告核對後再標記完成。"+keptMsg(res),ok:"去核對這一筆"}).then(function(){renderForm();refreshCur();if(res.doc)openPane(res.doc.id);showInst(fmId,res.inst);});}
+      (res.unsure.length?"\n\n請特別核對：\n・"+res.unsure.join("\n・"):"")+"\n\n核對後按那一筆的「標記完成」。"+keptMsg(res),ok:"去核對這一筆"}).then(function(){renderForm();refreshCur();if(res.doc)openPane(res.doc.id);showInst(fmId,res.inst);});}
   function fromText(id,fmId,text,docDate,fileName){var p=fmId==="rt_course"?DOCP.parseRT(text):fmId==="biomarker"?DOCP.parseBiomarker(text):fmId==="staging_imaging"?DOCP.parseImaging(text):DOCP.parsePath(text);
     if(!p.ok){toast(p.note||"無法解析這段文字");return null;}
     if(fmId==="pathology_specimen"&&DOCP.detect(text)==="biomarker"){toast("此為生物標記（PD-L1）報告，請至「生物標記」分頁匯入");return null;}
+    var dn=sameDoc(id,fmId,text);if(dn)return {dup:dn.n,doc:dn.doc,inst:dn.inst,force:function(){return apply(id,fmId,p,docDate,fileName,text);}};   /* 2026-11-25 C：同一份原文已貼過 → 不新增，也不動任何欄位 */
     return apply(id,fmId,p,docDate,fileName,text);}
+  /* 這份原文是不是已經貼過（內容完全相同、而且那一筆還在）。只比保存下來的原文；原文沒存成或已刪的比不了，仍靠 dupOf 的日期比對提醒。 */
+  function sameDoc(id,fmId,text){var r=recOf(id),t=String(text||"").replace(/\r\n?/g,"\n").replace(/\s+$/,""),out=null;if(!t)return null;
+    (r.srcdocs||[]).forEach(function(d){if(!d.u||d.fm!==fmId||d.t!==t)return;(r[fmId]||[]).forEach(function(x,i){if(x._uid===d.u)out={n:i+1,doc:d,inst:x};});});return out;}
   function pasteDialog(fmId){if(!needWho())return;var fm=FORM_BY[fmId];
     dialog({title:"貼上"+DOC_NAME[fmId]+"文字",msg:"從醫院系統複製整份報告文字貼到下面。系統會擷取欄位，並把原文加密保存在這位病人的紀錄裡，之後可以和欄位左右對照。",
       fields:[{k:"t",label:"報告全文",type:"textarea",req:1},{k:"d",label:"報告日期（民國或西元，選填）"}],ok:"擷取並新增一筆"}).then(function(v){if(!v)return;
@@ -2980,7 +2993,7 @@ var DOCIMPORT=(function(){
   function pickPdf(fmId){if(!needWho())return;var inp=$("#fDoc");inp.onchange=function(){var f=inp.files&&inp.files[0];if(!f)return;inp.value="";
     pdfText(f).then(function(t){if(!t.replace(/\s/g,"").length){toast("這個 PDF 是掃描影像，系統讀不到文字。請改貼文字；若原始報告也選不到文字，請按「＋ 新增一筆」照報告手動填寫");return;}var res=fromText(cur,fmId,t,"",f.name);if(res)report(res,fmId);}).catch(function(e){toast(e.message||String(e));});};inp.click();}
   function bar(fmId,area){if(fmId==="pathology_specimen")indexBox(area);if(!SEC.can("docin")||auditMode())return;var d=document.createElement("div");d.className="addrow";
-    d.innerHTML='<button class="btn" type="button" data-docpaste="'+fmId+'">貼上'+DOC_NAME[fmId]+'文字 → 新增一筆</button> <button class="btn" type="button" data-docpdf="'+fmId+'">上傳'+DOC_NAME[fmId]+' PDF → 新增一筆</button><span class="desc"> 擷取後請逐欄核對；原文會加密保存，供對照</span>';
+    d.innerHTML='<button class="btn" type="button" data-docpaste="'+fmId+'">貼上'+DOC_NAME[fmId]+'文字 → 新增一筆</button> <button class="btn" type="button" data-docpdf="'+fmId+'">上傳'+DOC_NAME[fmId]+' PDF → 新增一筆</button>';
     area.insertBefore(d,area.firstChild);$("[data-docpaste]",d).onclick=function(){pasteDialog(fmId);};$("[data-docpdf]",d).onclick=function(){pickPdf(fmId);};}
   /* one entry point: paste anything, the type is detected and routed */
   var KIND_FM={rt:"rt_course",path:"pathology_specimen",biomarker:"biomarker",imaging:"staging_imaging"};
@@ -3011,7 +3024,8 @@ var DOCIMPORT=(function(){
   function pasteAny(){if(!needWho())return;
     dialog({title:"貼上任何報告",msg:"可貼入下列任一種內容：病理報告、胃鏡、放療摘要、PD-L1 報告、CT／PET／EUS 分期報告、B／C 型肝炎血清報告、檢驗報告累積表、病理清單。系統將自動辨識，並在對應分頁新增一筆。化療明細表請以 QRP 檔匯入。\n\n貼入的原文會加密保存在這位病人的紀錄裡，之後可以和欄位左右對照。",
       fields:[{k:"t",label:"報告全文",type:"textarea",req:1},{k:"d",label:"報告日期（選填）"}],ok:"辨識並擷取"}).then(function(v){if(!v)return;var d=v.d?parseDate(v.d).iso:"";
-      var out=pasteAnyText(cur,v.t,d);if(!out){toast(DOCP.detect(v.t)==="rt"?"這段看起來是放療資料，但不是院內放療摘要的格式，系統讀不出來，沒有新增任何紀錄。請到「放療療程」按「＋ 新增一筆」手動登錄":"無法辨識這段文字是哪一種報告");return;}
+      var out=pasteAnyText(cur,v.t,d);if(!out&&FM_KIND[tab]){var r2=fromText(cur,tab,v.t,d,"貼上文字");if(r2){report(r2,tab);return;}return;}
+      if(!out){toast(DOCP.detect(v.t)==="rt"?"這段看起來是放療資料，但不是院內放療摘要的格式，系統讀不出來，沒有新增任何紀錄。請到「放療療程」按「＋ 新增一筆」手動登錄":"無法辨識這段文字是哪一種報告");return;}
       showAny(out);});}
   function showAny(out){
       if(out.kind==="egd"){var msg=out.postop?"這是術後追蹤胃鏡（"+(out.meta.stricture?"有吻合口狹窄":"無狹窄")+(out.meta.dilation?"、建議擴張":"")+"）。已記入病人紀錄；待手術與併發症表單建立後，將轉入該表單。":
@@ -3090,18 +3104,26 @@ var DOCIMPORT=(function(){
       more:"<b>放療摘要</b>能選取文字 → 用上面兩顆按鈕（貼上文字、上傳 PDF），系統會新增一筆，請逐欄核對。同時會帶入核心補登的 ECOG、共病、抽菸、臨床分期（已有值不覆蓋）。<br>"+MANUAL},
     systemic_line:{one:"<b>每一線抗癌藥一筆</b>（化療、標靶、免疫）；止吐、類固醇不登。",
     more:"同步放化療的化療也算一線。<br>匯入只收 QuickReport .qrp（可多選），不收 .csv／.xls／.pdf，也不能用「貼上任何報告」。<br>外院給的藥或沒有明細表的治療：捲到最下方按「＋ 新增一筆」手動填。"}};
-  function hint(tab,area){try{hint0(tab,area);}catch(e){console.error(e);}try{decorate(tab,area);}catch(e){console.error(e);}}
+  function slimDesc(area){$$(".inst[data-i]",area).forEach(function(box){if(box.dataset.i==="0")return;$$(".ib>p.desc",box).forEach(function(p){if(!/^由文件擷取/.test(p.textContent))p.hidden=true;});});}
+  function hint(tab,area){try{spineBar();}catch(e){console.error(e);}try{slimDesc(area);}catch(e){console.error(e);}try{hint0(tab,area);}catch(e){console.error(e);}try{decorate(tab,area);}catch(e){console.error(e);}}
   function hint0(tab,area){var H=HINTS[tab];if(!H||!SEC.can("docin")||auditMode()||$("#upnote",area))return;
     if(SLIM[tab])H=SLIM[tab].one+' <details style="display:inline-block;vertical-align:top"><summary style="cursor:pointer;color:var(--focus)">更多說明</summary><div style="margin-top:4px">'+SLIM[tab].more+'</div></details>';
     var d=document.createElement("p");d.className="desc";d.id="upnote";d.style.margin="4px 0 10px";d.innerHTML=H;
     var f=area.firstChild;if(f&&f.classList&&f.classList.contains("addrow"))area.insertBefore(d,f.nextSibling);else area.insertBefore(d,area.firstChild);}
-  function spineBar(){var sp=$(".spine");if(!sp||$("#spinePaste")||!SEC.can("docin")||auditMode())return;var b=document.createElement("button");b.className="btn go";b.type="button";b.id="spinePaste";b.textContent="貼上任何報告 → 自動辨識";b.style.marginTop="8px";b.onclick=pasteAny;sp.appendChild(b);var b2=document.createElement("button");b2.className="btn";b2.type="button";b2.id="spineFile";b2.textContent="選檔案匯入報告（.csv／.txt／.xls／.pdf）";b2.style.marginTop="8px";b2.onclick=pickReportFile;sp.appendChild(b2);}
+  function spineBar(){var sp=$(".spine");if(!sp||$("#spinePaste")||!SEC.can("docin")||auditMode())return;var b=document.createElement("button");b.className="btn go";b.type="button";b.id="spinePaste";b.textContent="貼上任何報告 → 自動辨識";b.style.marginTop="8px";b.onclick=pasteAny;sp.appendChild(b);var b2=document.createElement("button");b2.className="btn";b2.type="button";b2.id="spineFile";b2.textContent="選檔案匯入報告（.csv／.txt／.xls／.pdf）";b2.style.marginTop="8px";b2.onclick=pickReportFile;sp.appendChild(b2);
+    var b3=document.createElement("button");b3.className="btn mini";b3.type="button";b3.id="spineStuck";b3.textContent="這裡卡住了，回報";b3.style.margin="8px 0 0 8px";b3.title="只記下卡在哪一類、哪個分頁，不含病人內容";b3.onclick=stuck;sp.appendChild(b3);}
+  /* 2026-11-25 一鍵回報卡住：只記分類與分頁（存進這位病人的加密紀錄＋安全紀錄一行），不寫任何內容。主持人在「報告帶入比對」頁看得到次數。 */
+  var STUCK={s1:"找不到這份報告，或不知道去哪裡找",s2:"不確定這份報告或這一項要不要登",s3:"程式沒有辨識出來，或帶入的值不對",s4:"欄位看不懂，不知道怎麼選",s5:"畫面出錯或操作不順",s6:"其他"};
+  function stuck(){if(!needWho()||!cur)return;var labs=Object.keys(STUCK).map(function(k){return STUCK[k];});
+    dialog({title:"這裡卡住了",msg:"選一個最接近的。只會記下分類和目前的分頁（"+(FORM_BY[tab]?FORM_BY[tab].name:tab)+"），不含病人內容；主持人會看到次數，用來改進程式和說明。",fields:[{k:"c",label:"卡在哪裡",type:"select",options:labs,req:1}],ok:"送出"}).then(function(v){if(!v)return;
+      var code="s6";Object.keys(STUCK).forEach(function(k){if(STUCK[k]===v.c)code=k;});var r=recOf(cur);(r.stuck=r.stuck||[]).push({at:stamp(),by:who(),tab:tab,c:code});
+      logChange(tab,"回報卡住："+STUCK[code]);if(typeof SEC!=="undefined"&&SEC.secLog)SEC.secLog("卡關 "+code+" "+tab+" "+cur);persist(true);toast("已回報，謝謝。可以先做別的部分");});}
   function indexBox(area){var r=recOf(cur),ix=r.pathindex;if(!ix)return;var d=document.createElement("div");d.className="draftbox";
     d.innerHTML='<h3 class="drafth">病理索引（'+esc(ix.at)+' 貼入）：食道相關 '+ix.items.length+' 份</h3><div class="tw"><table><thead><tr><th>報告號</th><th>日期</th><th>診斷</th><th>已擷取</th></tr></thead><tbody>'+
       ix.items.map(function(x){var done=(r.pathology_specimen||[]).some(function(pth){return pth.path_report_no&&pth.path_report_no===x.report_no;});return '<tr><td class="mono">'+esc(x.report_no)+'</td><td>'+esc(x.date||"")+'</td><td>'+esc(x.diagnosis)+'</td><td>'+(done?'✓':'<span class="desc">尚未</span>')+'</td></tr>';}).join("")+'</tbody></table></div>'+
       (ix.others&&ix.others.length?'<p class="desc">其他部位報告 '+ix.others.length+' 份（例如 '+esc(ix.others[0].diagnosis.slice(0,60))+'…）— 若為其他原發癌請登在「其他原發癌」</p>':'');
     area.insertBefore(d,area.firstChild);}
-  return {fromText:fromText,bar:bar,pdfText:pdfText,pasteAny:pasteAny,pasteAnyText:pasteAnyText,spineBar:spineBar,indexBox:indexBox,fileToText:fileToText,importFile:importFile,showAny:showAny,hint:hint,HINTS:HINTS,events:events,KIND_NAME:KIND_NAME,FM_KIND:FM_KIND,src:{open:openPane,close:closePane,isOpen:function(){return !!PANE;},DOC_MAX:DOC_MAX,REC_MAX:REC_MAX}};
+  return {fromText:fromText,bar:bar,pdfText:pdfText,pasteAny:pasteAny,pasteAnyText:pasteAnyText,spineBar:spineBar,indexBox:indexBox,fileToText:fileToText,importFile:importFile,showAny:showAny,hint:hint,HINTS:HINTS,events:events,STUCK:STUCK,KIND_NAME:KIND_NAME,FM_KIND:FM_KIND,src:{open:openPane,close:closePane,isOpen:function(){return !!PANE;},DOC_MAX:DOC_MAX,REC_MAX:REC_MAX}};
 })();
 
 /* 2026-11-13 晚 PI：「時間軸對登錄幫忙不大…改為類似索引，時間軸比較像是放在成品」→ 登錄人員預設看「登錄索引」（收合成一行），
@@ -3476,7 +3498,7 @@ var PGV=(function(){
    算的是「程式與登錄人員不一致」，不等於程式讀錯：也可能是登錄人員改錯，要點進病人對照原文才知道。
    限制：正式站舊版貼入、之後整筆被刪或原文被刪的，貼入紀錄已不在，不會出現在這裡。 */
 var IVW=(function(){
-  var DEMO=null,DATA=null,PICK=null,VIS=null;   /* VIS：測試用，替換欄位是否顯示的判斷 */
+  var DEMO=null,DATA=null,PICK=null,VIS=null,XP=false;   /* VIS：測試用，替換欄位是否顯示的判斷 */
   var COLS=[["same","一致"],["chg","改成別的值"],["clr","清空"],["hid","條件隱藏而清除"],["add","人工補填"]];
   function allowed(){return typeof SEC!=="undefined"&&SEC.can("impview")&&!auditMode();}
   function empty(v){return v==null||v===""||(Array.isArray(v)&&!v.length);}
@@ -3491,12 +3513,15 @@ var IVW=(function(){
       ".ivw th:first-child,.ivw td:first-child{text-align:left;white-space:normal}.ivw thead th{position:sticky;top:0;background:var(--sheet);font-weight:600}"+
       ".ivw td button{font:inherit;color:var(--focus);background:none;border:0;border-bottom:1px dotted var(--focus);padding:0;cursor:pointer;font-variant-numeric:tabular-nums}"+
       ".ivw .bad{color:var(--iodine);font-weight:600}.ivw .soft{color:var(--soft)}.ivw-ids{margin:8px 0 4px;padding:8px 12px;border-left:4px solid var(--focus);display:flex;flex-wrap:wrap;gap:6px;align-items:center}"+
-      ".ivw-tw{overflow-x:auto}";
+      ".ivw-tw{overflow-x:auto}.ivw-xp{margin:8px 0;padding:10px 12px;border:1px solid var(--rule);border-radius:6px;background:var(--well)}";
     document.head.appendChild(st);}
   function compute(){
     var K={},order=[],P={},ids=DB.order.slice();
     function kind(k){if(!K[k]){K[k]={n:0,done:0,open:0,gone:0,legacy:0,F:{}};order.push(k);}return K[k];}
-    function cell(k,f){var S=kind(k);return S.F[f]=S.F[f]||{imp:0,pend:0,same:0,chg:0,clr:0,hid:0,add:0,ids:{chg:{},clr:{},hid:{},add:{}}};}
+    function cell(k,f){var S=kind(k);return S.F[f]=S.F[f]||{imp:0,pend:0,same:0,chg:0,clr:0,hid:0,add:0,ids:{chg:{},clr:{},hid:{},add:{}},cases:{chg:[],clr:[],hid:[],add:[]}};}
+    /* 錯例：只留在記憶體，主持人按「檢視並匯出」才顯示。snip＝原文裡程式讀到的那一句（原文還在才有） */
+    function snip(r,ev,f){var o="";(r.srcdocs||[]).forEach(function(d){if(d.id===ev.d)(d.h||[]).forEach(function(h){if(h.f===f&&h.s)o=h.s;});});return o;}
+    function txt(v){return v==null?"":Array.isArray(v)?v.join(","):String(v);}
     var rows=[];ids.forEach(function(id){var r=DB.rec[id];if(!r)return;var demo=/^DEMO/.test(id);if(demo&&!DEMO)return;var evs=DOCIMPORT.events(r);
       evs.forEach(function(ev){if(ev.u)(ev.h||[]).forEach(function(h){if(!h.c)(P[ev.k]=P[ev.k]||{})[h.f]=1;});});rows.push({id:id,r:r,evs:evs});});
     rows.forEach(function(w){var id=w.id,r=w.r,core=r.core_abstraction||{},coreDone=core._s===2,linked={};
@@ -3505,18 +3530,19 @@ var IVW=(function(){
         else{if(coreDone)S.done++;else S.open++;}
         var hit={};(ev.h||[]).forEach(function(h){var toCore=!!h.c||!ev.u,tgt=toCore?core:inst,fin=toCore?coreDone:inst._s===2,fd=FIELD[h.f];if(!fd||h.v===undefined)return;if(!toCore)hit[h.f]=1;
           var c=cell(ev.k,h.f);if(!fin){c.pend++;return;}c.imp++;var cv=tgt[h.f];
-          if(empty(cv)){var vis=true;try{vis=(VIS||visible)(id,fd,toCore?null:inst,"main");}catch(e){}if(vis){c.clr++;c.ids.clr[id]=1;}else{c.hid++;c.ids.hid[id]=1;}}
-          else if(same(cv,h.v))c.same++;else{c.chg++;c.ids.chg[id]=1;}});
-        if(inst&&inst._s===2)Object.keys(P[ev.k]||{}).forEach(function(f){if(hit[f]||empty(inst[f]))return;var c=cell(ev.k,f);c.add++;c.ids.add[id]=1;});});
+          if(empty(cv)){var vis=true;try{vis=(VIS||visible)(id,fd,toCore?null:inst,"main");}catch(e){}var cs={prog:txt(h.v),fin:"",snip:snip(r,ev,h.f)};if(vis){c.clr++;c.ids.clr[id]=1;c.cases.clr.push(cs);}else{c.hid++;c.ids.hid[id]=1;c.cases.hid.push(cs);}}
+          else if(same(cv,h.v))c.same++;else{c.chg++;c.ids.chg[id]=1;c.cases.chg.push({prog:txt(h.v),fin:txt(cv),snip:snip(r,ev,h.f)});}});
+        if(inst&&inst._s===2)Object.keys(P[ev.k]||{}).forEach(function(f){if(hit[f]||empty(inst[f]))return;var c=cell(ev.k,f);c.add++;c.ids.add[id]=1;c.cases.add.push({prog:"",fin:txt(inst[f]),snip:""});});});
       Object.keys(DOCIMPORT.FM_KIND).forEach(function(fm){(r[fm]||[]).forEach(function(x){if(x&&x._docsrc&&!linked[x._uid])kind(DOCIMPORT.FM_KIND[fm]).legacy++;});});});
-    return {K:K,order:order,pts:rows.length};}
+    var ST={},stN=0;rows.forEach(function(w){(w.r.stuck||[]).forEach(function(x){var k=(x.c||"?")+"|"+(x.tab||"");(ST[k]=ST[k]||{c:x.c,tab:x.tab,n:0,ids:{}}).n++;ST[k].ids[w.id]=1;stN++;});});
+    return {K:K,order:order,pts:rows.length,stuck:ST,stuckN:stN};}
   function pct(a,b){return b?Math.round(a/b*100)+"%":"—";}
   function num(k,f,col,n){return n?'<button type="button" data-k="'+esc(k)+'" data-f="'+esc(f)+'" data-c="'+col+'">'+n+'</button>':'<span class="soft">0</span>';}
   function render(){var box=document.getElementById("ivw");if(!box)return;var D=DATA,h=[],hasDemo=DB.order.some(function(id){return /^DEMO/.test(id);}),hasReal=DB.order.some(function(id){return !/^DEMO/.test(id);});
     h.push('<div class="ivw-box"><div class="ivw-h"><h2 id="ivwT">報告帶入比對</h2><span class="soft">'+D.pts+' 位病人・僅主持人可見</span>'+
       (hasDemo&&hasReal?'<label><input type="checkbox" id="ivwDemo"'+(DEMO?" checked":"")+'> 包含示範病人（DEMO）</label>':"")+'<button class="btn" type="button" id="ivwX">關閉</button></div><div class="ivw-w">');
     h.push('<p>程式從報告讀出來的值，對上登錄人員按「標記完成」後留下的值。這裡算的是「程式與登錄人員不一致」，不等於程式讀錯；按數字可以看是哪幾位病人，點進去對照原文才能判斷誰對。</p>');
-    if(!D.order.length){h.push('<p><b>目前沒有可比對的貼入紀錄。</b>貼入紀錄從 2026-11-21 開始保存；更早貼的報告只有結果，沒有「程式當時帶入的值」。</p></div></div>');box.innerHTML=h.join("");return;}
+    if(!D.order.length&&!D.stuckN){h.push('<p><b>目前沒有可比對的貼入紀錄。</b>貼入紀錄從 2026-11-21 開始保存；更早貼的報告只有結果，沒有「程式當時帶入的值」。</p></div></div>');box.innerHTML=h.join("");return;}
     h.push('<h3>各類報告</h3><div class="ivw-tw"><table><thead><tr><th>報告種類</th><th>貼入筆數</th><th>已核對完成</th><th>尚未核對</th><th>整筆已刪除</th><th>舊資料（無帶入紀錄）</th></tr></thead><tbody>');
     D.order.forEach(function(k){var S=D.K[k];h.push('<tr><td>'+esc(DOCIMPORT.KIND_NAME[k]||k)+'</td><td>'+S.n+'</td><td>'+S.done+'</td><td'+(S.open?' class="bad"':"")+'>'+S.open+'</td><td>'+S.gone+'</td><td class="soft">'+S.legacy+'</td></tr>');});
     h.push('</tbody></table></div><p class="soft">「整筆已刪除」多半是重複貼入後刪掉的。核心補登類（胃鏡、肝炎血清、檢驗累積表）以「核心補登」表單是否標記完成為準。</p>');
@@ -3525,11 +3551,26 @@ var IVW=(function(){
       h.push('<h3>'+esc(DOCIMPORT.KIND_NAME[k]||k)+'</h3><div class="ivw-tw"><table><thead><tr><th>欄位</th><th>程式帶入（已核對）</th>'+COLS.map(function(c){return '<th>'+c[1]+'</th>';}).join("")+'<th>不一致率</th><th>尚未核對</th></tr></thead><tbody>');
       fs.forEach(function(f){var c=S.F[f],fd=FIELD[f],bad=c.chg+c.clr;
         h.push('<tr><td>'+esc(fd?fd.l.replace(/（.*$/,""):f)+'</td><td>'+c.imp+'</td><td>'+c.same+'</td><td>'+num(k,f,"chg",c.chg)+'</td><td>'+num(k,f,"clr",c.clr)+'</td><td>'+num(k,f,"hid",c.hid)+'</td><td>'+num(k,f,"add",c.add)+'</td><td'+(bad?' class="bad"':"")+'>'+(c.imp?bad+"／"+c.imp+"（"+pct(bad,c.imp)+"）":"—")+'</td><td class="soft">'+c.pend+'</td></tr>');
-        if(PICK&&PICK.k===k&&PICK.f===f){var L=Object.keys(c.ids[PICK.c]||{});h.push('<tr><td colspan="9"><div class="ivw-ids"><span>'+esc(COLS.filter(function(x){return x[0]===PICK.c;})[0][1])+'：</span>'+L.map(function(id){return '<button class="btn mini" type="button" data-open="'+esc(id)+'">'+esc(id)+'</button>';}).join("")+'</div></td></tr>');}});
+        if(PICK&&PICK.k===k&&PICK.f===f){var L=Object.keys(c.ids[PICK.c]||{});h.push('<tr><td colspan="9"><div class="ivw-ids"><span>'+esc(COLS.filter(function(x){return x[0]===PICK.c;})[0][1])+'：</span>'+L.map(function(id){return '<button class="btn mini" type="button" data-open="'+esc(id)+'">'+esc(id)+'</button>';}).join("")+(PICK.c!=="hid"?'<button class="btn mini" type="button" id="ivwXp">'+(XP?"收起錯例":"檢視並匯出這些錯例")+'</button>':"")+'</div>'+(XP&&PICK.c!=="hid"?xpHtml(k,f,c):"")+'</td></tr>');}});
       h.push('</tbody></table></div>');});
+    if(D.stuckN){var SL=(DOCIMPORT.STUCK||{});h.push('<h3>登錄人員回報「這裡卡住了」（'+D.stuckN+' 次）</h3><div class="ivw-tw"><table><thead><tr><th>卡在哪裡</th><th>分頁</th><th>次數</th><th>病人</th></tr></thead><tbody>'+
+      Object.keys(D.stuck).map(function(k){return D.stuck[k];}).sort(function(a,b){return b.n-a.n;}).map(function(x){return '<tr><td>'+esc(SL[x.c]||x.c)+'</td><td style="text-align:left">'+esc(FORM_BY[x.tab]?FORM_BY[x.tab].name:x.tab)+'</td><td>'+x.n+'</td><td style="text-align:left;white-space:normal">'+Object.keys(x.ids).map(function(id){return '<button class="btn mini" type="button" data-open="'+esc(id)+'">'+esc(id)+'</button>';}).join(" ")+'</td></tr>';}).join("")+'</tbody></table></div>');}
     h.push('<h3>怎麼讀這張表</h3><p><b>改成別的值</b>、<b>清空</b>：程式帶入後被登錄人員改掉，算進不一致率。<b>條件隱藏而清除</b>：欄位因為其他答案而不適用，標記完成時系統自動清掉，不算不一致。<b>人工補填</b>：這類報告有時讀得到這一欄，但這一筆程式沒帶入、由登錄人員自己填；可能是程式漏讀，也可能報告裡本來就沒有。</p>'+
       '<p class="soft">限制：只統計已核對完成的筆數；整筆被刪或原文被刪的舊貼入不在內；化療明細表另見「影子模式比對報告」。</p></div></div>');
     box.innerHTML=h.join("");}
+  /* 匯出錯例：給維護程式的人修辨識規則用。內容是欄位值與報告裡的一小句，不含研究編號、病歷號；仍可能帶到日期或人名，所以先給主持人逐列看、可取消勾選。 */
+  var XLAB={chg:"改成別的值",clr:"清空",add:"人工補填"};
+  function xpHtml(k,f,c){var L=c.cases[PICK.c]||[],fd=FIELD[f];
+    return '<div class="ivw-xp"><p><b>錯例預覽（'+L.length+' 列）</b>　下面會顯示欄位值和報告裡的一小句。請逐列看過，含有姓名、病歷號或不想帶出去的，取消勾選。檔案只下載到這台電腦，不會上傳。</p>'+
+      '<div class="ivw-tw"><table><thead><tr><th>匯出</th><th>程式帶入的值</th><th>登錄人員留下的值</th><th>報告裡程式讀到的那一句</th></tr></thead><tbody>'+
+      L.map(function(x,i){return '<tr><td style="text-align:left"><input type="checkbox" data-xi="'+i+'" checked aria-label="匯出第 '+(i+1)+' 列"></td><td style="text-align:left;white-space:normal">'+esc(x.prog||"（沒有帶入）")+'</td><td style="text-align:left;white-space:normal">'+esc(x.fin||"（空白）")+'</td><td style="text-align:left;white-space:normal">'+esc(x.snip||"（原文已不在或沒有記下字句）")+'</td></tr>';}).join("")+
+      '</tbody></table></div><p><button class="btn go" type="button" id="ivwDl">下載勾選的錯例（CSV）</button> <span class="soft">'+esc(DOCIMPORT.KIND_NAME[k]||k)+'・'+esc(fd?fd.l.replace(/（.*$/,""):f)+'・'+XLAB[PICK.c]+'</span></p></div>';}
+  function xpCsv(){var c=DATA.K[PICK.k].F[PICK.f],L=c.cases[PICK.c]||[],fd=FIELD[PICK.f],box=document.getElementById("ivw"),keep=[];
+    [].forEach.call(box.querySelectorAll("input[data-xi]"),function(el){if(el.checked)keep.push(L[+el.dataset.xi]);});
+    var q=function(v){return '"'+String(v==null?"":v).replace(/"/g,'""')+'"';};
+    var out=[["報告種類","欄位代碼","欄位名稱","分類","程式帶入的值","登錄人員留下的值","報告裡程式讀到的字句"].map(q).join(",")];
+    keep.forEach(function(x){out.push([DOCIMPORT.KIND_NAME[PICK.k]||PICK.k,PICK.f,fd?fd.l.replace(/（.*$/,""):PICK.f,XLAB[PICK.c],x.prog,x.fin,x.snip].map(q).join(","));});
+    return {n:keep.length,text:"\ufeff"+out.join("\r\n")+"\r\n"};}
   function close(){var b=document.getElementById("ivw");if(b)b.remove();document.removeEventListener("keydown",onKey,true);PICK=null;}
   function onKey(e){if(e.key==="Escape"){e.stopPropagation();close();}}
   function open(){if(!allowed()){toast("您的身分無此權限");return;}css();close();
@@ -3539,9 +3580,13 @@ var IVW=(function(){
       if(b.id==="ivwX"){close();return;}
       if(b.id==="ivwDemo"){DEMO=b.checked;PICK=null;DATA=compute();render();return;}
       if(b.dataset.open){var id=b.dataset.open;close();openPt(id);return;}
-      if(b.dataset.c){var p={k:b.dataset.k,f:b.dataset.f,c:b.dataset.c};PICK=(PICK&&PICK.k===p.k&&PICK.f===p.f&&PICK.c===p.c)?null:p;render();}};
+      if(b.id==="ivwXp"){XP=!XP;render();return;}
+      if(b.dataset.xi!==undefined)return;
+      if(b.id==="ivwDl"){var o=xpCsv();if(!o.n){toast("沒有勾選任何一列");return;}
+        SEC.secLog("資料選單：匯出辨識錯例 "+o.n+" 列（"+PICK.k+" "+PICK.f+" "+PICK.c+"）");offer("ESCC_辨識錯例_"+PICK.k+"_"+PICK.f+"_"+PICK.c+"_"+nameStamp()+".csv",o.text);toast("已下載 "+o.n+" 列。請放在受限資料夾，不要用通訊軟體傳送");return;}
+      if(b.dataset.c){var p={k:b.dataset.k,f:b.dataset.f,c:b.dataset.c};PICK=(PICK&&PICK.k===p.k&&PICK.f===p.f&&PICK.c===p.c)?null:p;XP=false;render();}};
     document.addEventListener("keydown",onKey,true);var x=document.getElementById("ivwX");if(x)x.focus();SEC.secLog("資料選單：報告帶入比對");}
-  return {open:open,close:close,compute:function(demo){var d0=DEMO;DEMO=demo==null?true:!!demo;var o=compute();DEMO=d0;return o;},allowed:allowed,_setVis:function(f){VIS=f||null;}};
+  return {open:open,close:close,compute:function(demo){var d0=DEMO;DEMO=demo==null?true:!!demo;var o=compute();DEMO=d0;return o;},allowed:allowed,_csv:function(){return xpCsv();},_setVis:function(f){VIS=f||null;}};
 })();
 
 /* ---------- PROM assets (generated by build_cloud.py; sources in /home/jnynlin/work/epro/v2) ---------- */
@@ -8174,7 +8219,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-11-25 21:20 867d4a6 nas 77fc1d·3ae239·6d4a84";
+window.__build="2026-11-25 23:16 d9184ff nas 77fc1d·3ae239·6d4a84";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
@@ -8251,8 +8296,13 @@ window.addEventListener("popstate",function(ev){
   new MutationObserver(function(){
     var open=m.classList.contains("open");
     if(open&&!pushed){pushed=true;try{history.pushState({modal:1},"");}catch(e){}}
-    else if(!open&&pushed){pushed=false;
-      if(!closing&&history.state&&history.state.modal){window.__MODALNAV=Date.now();try{history.back();}catch(e){}}   /* 用按鈕關的：把那一筆紀錄收回去；留記號讓各頁的 popstate 知道這一下是對話框造成的 */
+    else if(!open&&pushed){
+      /* 2026-11-25：用按鈕關的 → 把那一筆紀錄收回去。但要晚一拍再做：若程式緊接著開下一個對話框（貼上視窗 → 結果視窗），
+         立刻 history.back() 的 popstate 會落在第二個對話框上、被當成「使用者按返回」而把它關掉（貼完報告看不到結果視窗）。
+         晚一拍時若對話框又開著，就沿用同一筆紀錄，不退也不再推。 */
+      if(closing){pushed=false;return;}
+      setTimeout(function(){if(m.classList.contains("open")||!pushed)return;pushed=false;
+        if(history.state&&history.state.modal){window.__MODALNAV=Date.now();try{history.back();}catch(e){}}},0);
     }
   }).observe(m,{attributes:true,attributeFilter:["class"]});
   window.addEventListener("popstate",function(){
