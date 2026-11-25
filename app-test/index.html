@@ -467,7 +467,7 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-25 23:16 d9184ff nas 77fc1d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-26 00:14 fcd5d5c nas 77fc1d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -2435,7 +2435,7 @@ var CHEMO=(function(){
     return {lines:out,unmapped:Object.keys(unmapped).sort().map(function(k){return unmapped[k];})};
   }
   function convertBuffer(buf){var lines=qrpLines(buf),p=parseSheet(lines),bsa=p.header.bsa?parseFloat(p.header.bsa):null,b=buildLines(p.rows,bsa);
-    return {header:p.header,n_rows:p.rows.length,unparsed:p.unparsed,lines:b.lines,unmapped:b.unmapped};}
+    return {header:p.header,rows:p.rows,n_rows:p.rows.length,unparsed:p.unparsed,lines:b.lines,unmapped:b.unmapped};}
 
   /* ---- import UI ---- */
   function normChart(c){return String(c||"").replace(/^0+/,"");}
@@ -2454,7 +2454,7 @@ var CHEMO=(function(){
         var rec=recOf(id),old=(rec.chemo&&rec.chemo.drafts)||[];
         var keep=old.filter(function(d){return d.status!=="pending";});
         var have=rec.systemic_line||[],fresh=r.lines.filter(function(l){return !have.some(function(x){return x.line_start===l.line_start&&(x.line_end||"")===(l.line_end||"")&&x.line_regimen===l.line_regimen;});});res.already=r.lines.length-fresh.length;var drafts=fresh.map(function(l){return Object.assign({_did:uid("d"),status:"pending"},l);});
-        rec.chemo={at:stamp(),by:s.name,file:f.name,rows:r.n_rows,bsa:r.header.bsa,bsa_date:r.header.bsa_date,diagnosis:r.header.diagnosis,drafts:keep.concat(drafts)};
+        rec.chemo={at:stamp(),by:s.name,file:f.name,rows:r.n_rows,bsa:r.header.bsa,bsa_date:r.header.bsa_date,diagnosis:r.header.diagnosis,drafts:keep.concat(drafts),src:(r.rows||[]).slice(0,1500).map(function(x){return {c:x.code,s:x.start,e:x.stop,n:x.drug,d:x.dose,u:x.unit,f:x.freq||""};})};
         res.sid=id;res.drafts=drafts.length;res.status=drafts.length?"已產生草稿"+(res.already?"（另有 "+res.already+" 條先前已採用，未重複列出）":""):(res.already?"這份明細表的治療線先前都已採用，沒有新的草稿":"已產生草稿");
         rec.log.push({t:stamp(),by:s.name,role:s.role,f:"systemic_line",w:"匯入化療明細表 "+f.name+":"+r.n_rows+" 列 → "+drafts.length+" 條草稿"});
       }catch(e){res.status="解析失敗:"+e.message;}
@@ -2464,7 +2464,7 @@ var CHEMO=(function(){
   function renderImportReport(results){
     cur=null;$("#dock").hidden=true;
     var ok=results.filter(function(r){return r.drafts;}).length;
-    $("#main").innerHTML='<section class="sheet report"><h3>化療明細表匯入結果</h3><p class="desc">共 '+results.length+' 檔,'+ok+' 檔產生草稿。原始檔僅在記憶體中解析，未儲存。草稿在各病人的「治療線別」分頁,逐筆確認後才會成為正式資料。</p>'+
+    $("#main").innerHTML='<section class="sheet report"><h3>化療明細表匯入結果</h3><p class="desc">共 '+results.length+' 檔,'+ok+' 檔產生草稿。原始檔不保存；讀出的用藥列會加密存進該病人的紀錄，供對照。草稿在各病人的「治療線別」分頁,逐筆確認後才會成為正式資料。</p>'+
       '<div class="tw"><table><thead><tr><th>檔案</th><th>結果</th><th>病人</th><th>用藥列</th><th>草稿</th></tr></thead><tbody>'+
       results.map(function(r){return '<tr><td>'+esc(r.file)+'</td><td>'+esc(r.status)+(r.unmapped&&r.unmapped.length?'<br><small>未知醫令代碼:'+esc(r.unmapped.map(function(u){return u[0];}).join("、"))+'</small>':"")+'</td><td>'+
         (r.sid&&r.drafts?'<button class="btn" type="button" data-open="'+esc(r.sid)+'">'+esc(r.sid)+'</button>':r.preview?'<button class="btn" type="button" data-prev="'+results.indexOf(r)+'">預覽解析結果</button>':esc(r.sid||"—"))+'</td><td>'+(r.rows||"—")+'</td><td>'+(r.drafts||(r.preview?r.preview.lines.length+"(僅預覽)":"—"))+'</td></tr>';}).join("")+
@@ -2490,7 +2490,7 @@ var CHEMO=(function(){
       '<div class="ib"><p class="desc">藥物:'+esc(drugs)+'・週期 '+d.line_cycles+'(主藥 '+esc(d.backbone)+(d.median_interval_days?',間隔中位 '+d.median_interval_days+' 天':"")+')'+(dm?'・'+esc(dm):"")+
       (d.line_oral_days?'・口服 '+d.line_oral_days+' 天':"")+'・給付:'+esc(lbl("line_selfpay",d.line_selfpay))+'</p>'+
       (d.flags.length?'<ul class="dflags">'+d.flags.map(function(f){return '<li>'+esc(f)+'</li>';}).join("")+'</ul>':"")+
-      (d.line_setting_hint==="8"?'<p class="desc">提示：依規則判斷屬維持治療</p>':"")+'</div></div>';
+      (d.line_setting_hint==="8"?'<p class="desc">提示：依規則判斷屬維持治療</p>':"")+srcTable(d)+'</div></div>';
   }
   function renderDrafts(area){
     var rec=recOf(cur),ch=rec.chemo;if(!ch)return;
@@ -2502,6 +2502,13 @@ var CHEMO=(function(){
     $$("[data-skip]",box).forEach(function(b){b.onclick=function(){var d=ch.drafts.filter(function(x){return x._did===b.dataset.skip;})[0];if(!d)return;
       d.status="skipped";logChange("systemic_line","略過草稿 "+d.line_start+" "+d.line_regimen);persist(true);renderForm();};});
   }
+  /* 這條治療線用到明細表的哪幾列：起訖日之內的全部列出，標明哪些計入、哪些沒計入（支持性用藥、清單外） */
+  function srcTable(d){var ch=(recOf(cur)||{}).chemo||{},src=ch.src;
+    if(!src||!src.length)return '<p class="desc csrc0">這份明細表匯入時還沒有保存原始列；重新匯入同一個 QRP 檔就能對照。</p>';
+    var rows=src.filter(function(x){var a;try{a=iso(day(x.s));}catch(e){return false;}return a>=d.line_start&&a<=(d.line_end||d.line_start);}),used=0;
+    var body=rows.map(function(x){var c=classify({code:x.c,drug:x.n,dose:x.d,unit:x.u,freq:x.f,start:x.s,stop:x.e}),inl=c[0]!==null&&c[1]!=="supportive"&&d.line_drugs.indexOf(c[0])>=0;if(inl)used++;
+      return '<tr'+(inl?'':' class="off"')+'><td>'+esc(iso(day(x.s)))+'</td><td>'+esc(iso(day(x.e)))+'</td><td>'+esc(x.c)+'</td><td style="text-align:left;white-space:normal">'+esc(x.n)+'</td><td>'+esc(x.d)+' '+esc(x.u)+'</td><td style="text-align:left">'+esc(x.f)+'</td><td style="text-align:left">'+(inl?'計入':'未計入')+'</td></tr>';}).join("");
+    return '<details class="csrc"><summary>對照明細表原始列（這段期間 '+rows.length+' 列，'+used+' 列計入這條治療線）</summary><div class="tw"><table><thead><tr><th>開始</th><th>停止</th><th>醫令代碼</th><th>藥名</th><th>劑量</th><th>頻次</th><th>是否計入</th></tr></thead><tbody>'+body+'</tbody></table></div><p class="desc">「未計入」是止吐、類固醇等支持性用藥，或不在抗癌藥清單內的藥。若其中有抗癌藥，請回報主持人。</p></details>';}
   function adopt(did){
     if(!needWho())return;var rec=recOf(cur),d=rec.chemo.drafts.filter(function(x){return x._did===did;})[0];if(!d)return;
     var dupN=0;(rec.systemic_line||[]).forEach(function(x,i){if(x.line_start===d.line_start&&(x.line_end||"")===(d.line_end||"")&&x.line_regimen===d.line_regimen)dupN=i+1;});
@@ -2510,7 +2517,7 @@ var CHEMO=(function(){
       line_start:d.line_start,line_end:d.line_end,line_cycles:String(d.line_cycles),line_dose_m2:d.line_dose_m2==null?"":String(d.line_dose_m2),
       line_oral_days:d.line_oral_days==null?"":String(d.line_oral_days),line_dose_red:d.line_dose_red,line_modification:d.line_modification,
       line_selfpay:d.line_selfpay,line_source:"1",line_no:"",line_setting:"",line_stop:""};
-    rec.systemic_line.push(inst);d.status="adopted";d.inst=inst._uid;
+    rec.systemic_line.push(inst);d.status="adopted";d.inst=inst._uid;try{if(typeof DOCIMPORT!=="undefined"&&DOCIMPORT.note){var hs=[];["line_regimen","line_regimen_other","line_drugs","line_start","line_end","line_cycles","line_dose_m2","line_oral_days","line_dose_red","line_modification","line_selfpay"].forEach(function(k){var v=inst[k];if(v==null||v===""||(Array.isArray(v)&&!v.length))return;hs.push({f:k,v:Array.isArray(v)?v.join(","):String(v)});});DOCIMPORT.note(cur,"chemo","systemic_line",inst._uid,hs,null);}}catch(e){console.error(e);}
     logChange("systemic_line","採用草稿為第 "+rec.systemic_line.length+" 筆("+d.line_start+" "+d.line_regimen+")");persist(true);renderForm();refreshCur();
     toast("已採用,請補線別、治療時機與停藥原因");
   }
@@ -2547,7 +2554,7 @@ var CHEMO=(function(){
       '<h3>不一致(最近 50 筆)</h3>'+(dis.length?'<div class="tw"><table><thead><tr><th>病人</th><th>系統</th><th>人工</th><th>依據</th></tr></thead><tbody>'+dis.slice(-50).reverse().map(function(x){
         return '<tr><td>'+esc(x.sid)+'</td><td>'+esc(lbl("line_setting",x.sugg.setting))+' / 線別 '+esc(x.sugg.no)+'</td><td>'+esc(lbl("line_setting",x.human.setting))+' / 線別 '+esc(x.human.no)+'</td><td>'+esc(x.sugg.basis)+'</td></tr>';}).join("")+'</tbody></table></div>':'<p class="desc">目前沒有不一致。</p>')+'</section>';
   }
-  return {_report:renderImportReport,pickQrp:pickQrp,importFiles:importFiles,renderDrafts:renderDrafts,shadow:shadow,renderShadow:renderShadow,convertBuffer:convertBuffer,buildLines:buildLines,parseSheet:parseSheet,qrpLines:qrpLines,suggest:suggest,adopt:adopt};
+  return {_report:renderImportReport,pickQrp:pickQrp,importFiles:importFiles,renderDrafts:renderDrafts,shadow:shadow,renderShadow:renderShadow,convertBuffer:convertBuffer,buildLines:buildLines,parseSheet:parseSheet,qrpLines:qrpLines,suggest:suggest,adopt:adopt,srcTable:srcTable};
 })();
 
 /* ---------- 文件解析:放療摘要 + 病理報告 (2026-09-30, v1) ----------
@@ -2840,7 +2847,7 @@ var DOCIMPORT=(function(){
      - 原文不進修改紀錄、不進 seclog、不進任何 CSV 匯出；加密備份因為備的是整份密文，會包含。
      - 稽核重摘模式一律不顯示（避免稽核者看到原摘錄的帶入結果）。 */
   var FM_KIND={rt_course:"rt",pathology_specimen:"path",biomarker:"biomarker",staging_imaging:"imaging"},
-      KIND_NAME={path:"病理報告",rt:"放療摘要",biomarker:"生物標記報告",imaging:"分期影像報告",egd:"胃鏡報告",serology:"肝炎血清報告",labs:"檢驗報告累積表",pathlist:"病理清單"},
+      KIND_NAME={path:"病理報告",rt:"放療摘要",biomarker:"生物標記報告",imaging:"分期影像報告",egd:"胃鏡報告",serology:"肝炎血清報告",labs:"檢驗報告累積表",pathlist:"病理清單",chemo:"化療明細表"},
       DOC_MAX=150000,REC_MAX=560000,lastSkip="",PANE=null;
   function nbytes(s){return new TextEncoder().encode(s).length;}
   function hitOf(f,core){var v=f.v==null?"":String(f.v),o={f:f.f,s:String(f.src||"")};if(v.length<=300)o.v=v;if(core)o.c=1;return o;}
@@ -2869,6 +2876,7 @@ var DOCIMPORT=(function(){
       ".srcchip{margin-left:6px;padding:0 8px;border-radius:10px;border:1px solid var(--focus);background:transparent;color:var(--focus);font:inherit;font-size:.78rem;line-height:1.5;cursor:pointer;white-space:nowrap}.srcchip.chg{border-color:var(--iodine);color:var(--iodine)}"+
       ".srcbar{margin:0 0 10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}"+
       ".shell.srcOpen .inst>.ih{flex-wrap:wrap;row-gap:6px}.shell.srcOpen .inst>.ih>span:not(.imptag):not(.cnt){flex:1 1 100%;order:9}.inst>.ih>.imptag{flex:0 0 auto;overflow:visible}"+
+      ".csrc{margin:8px 0 10px}.csrc>summary{cursor:pointer;color:var(--focus);font-size:.95rem}.csrc table{border-collapse:collapse;width:100%;font-size:.88rem;margin-top:6px;font-variant-numeric:tabular-nums}.csrc th,.csrc td{border-bottom:1px solid var(--rule);padding:4px 8px;text-align:right;white-space:nowrap}.csrc tr.off td{color:var(--soft)}.csrc .tw{overflow-x:auto}"+
       ".inst.imptodo{box-shadow:inset 5px 0 0 var(--iodine)}.imptag{font-size:.82rem;padding:0 8px;border-radius:10px;border:1px solid var(--iodine);color:var(--iodine);white-space:nowrap}.imptag.ok{border-color:var(--rule);color:var(--soft)}"+
       "#impbar{margin:0 0 10px;padding:8px 12px;border-left:5px solid var(--iodine);background:var(--iodine-soft);font-size:.95rem}#impbar.alldone{border-left-color:var(--rule);background:transparent;color:var(--soft)}"+
       "@media (max-width:880px){.shell.srcOpen{grid-template-columns:minmax(0,1fr)}#srcPane{position:fixed;left:0;right:0;top:auto;bottom:0;height:46vh;z-index:26;border-right:none;border-top:3px solid var(--focus);padding-bottom:16px}.shell.srcOpen>main{padding-bottom:48vh}}";
@@ -2910,9 +2918,12 @@ var DOCIMPORT=(function(){
   /* 每次表單重畫後：有原文的那一筆加「對照原文」按鈕；帶入的欄位加標記；核心類原文列在分頁上方 */
   /* 報告帶入的那幾筆：還沒按「標記完成」的標成「尚未核對」，分頁上方列筆數。核對的動作就是原本的「標記完成」，不另設按鈕。 */
   function todo(tb,area,r,fm){if(!fm.rep)return;var arr=r[tb]||[],n=0,dn=0;
-    arr.forEach(function(x,i){if(!x||!x._docsrc)return;n++;var done=x._s===2;if(done)dn++;var box=$('.inst[data-i="'+i+'"]',area);if(!box)return;srcCss();box.classList.toggle("imptodo",!done);
-      if(!$(".imptag",box)){var ih=$(".ih",box),sp=document.createElement("span");sp.className="imptag"+(done?" ok":"");sp.textContent=done?"報告帶入・已核對完成":"報告帶入・尚未核對";
-        sp.title=done?"這一筆由報告帶入，已有人核對並標記完成":"這一筆的內容是程式從報告讀出來的。請對照原文逐欄看過、改正後，按這一筆的「標記完成」";var cnt=ih&&$(".cnt",ih);if(ih)ih.insertBefore(sp,cnt||null);}});
+    arr.forEach(function(x,i){if(!x||!(x._docsrc||x._draft))return;n++;var done=x._s===2;if(done)dn++;var box=$('.inst[data-i="'+i+'"]',area);if(!box)return;srcCss();box.classList.toggle("imptodo",!done);
+      if(!$(".imptag",box)){var ih=$(".ih",box),sp=document.createElement("span");sp.className="imptag"+(done?" ok":"");sp.textContent=(x._draft?"明細表帶入":"報告帶入")+(done?"・已核對完成":"・尚未核對");
+        sp.title=done?"這一筆由報告帶入，已有人核對並標記完成":"這一筆的內容是程式從報告讀出來的。請對照原文逐欄看過、改正後，按這一筆的「標記完成」";var cnt=ih&&$(".cnt",ih);if(ih)ih.insertBefore(sp,cnt||null);}
+      /* 由化療明細表草稿採用的治療線：可展開看它用到的原始列 */
+      if(x._draft&&!$(".csrc,.csrc0",box)&&typeof CHEMO!=="undefined"&&CHEMO.srcTable){var dd=null;((r.chemo||{}).drafts||[]).forEach(function(q){if(q._did===x._draft)dd=q;});
+        if(dd){var w=document.createElement("div");w.innerHTML=CHEMO.srcTable(dd);var ib=$(".ib",box);if(ib&&w.firstChild)ib.insertBefore(w.firstChild,ib.firstChild);}}});
     if(!n||$("#impbar",area))return;var first=$(".inst[data-i]",area);if(!first)return;var bar=document.createElement("div");bar.id="impbar";if(dn===n)bar.className="alldone";
     bar.textContent="報告帶入 "+n+" 筆：已核對完成 "+dn+" 筆"+(n-dn?"、尚未核對 "+(n-dn)+" 筆（核對後按那一筆的「標記完成」）":"");first.parentNode.insertBefore(bar,first);}
   function decorate(tb,area){if(auditMode()){closePane();return;}if(!cur||!area)return;var r=DB.rec[cur];if(!r)return;var fm=FORM_BY[tb];if(!fm)return;try{todo(tb,area,r,fm);}catch(e){console.error(e);}if(!r.srcdocs||!r.srcdocs.length)return;srcCss();var loose=[];
@@ -3105,7 +3116,7 @@ var DOCIMPORT=(function(){
     systemic_line:{one:"<b>每一線抗癌藥一筆</b>（化療、標靶、免疫）；止吐、類固醇不登。",
     more:"同步放化療的化療也算一線。<br>匯入只收 QuickReport .qrp（可多選），不收 .csv／.xls／.pdf，也不能用「貼上任何報告」。<br>外院給的藥或沒有明細表的治療：捲到最下方按「＋ 新增一筆」手動填。"}};
   function slimDesc(area){$$(".inst[data-i]",area).forEach(function(box){if(box.dataset.i==="0")return;$$(".ib>p.desc",box).forEach(function(p){if(!/^由文件擷取/.test(p.textContent))p.hidden=true;});});}
-  function hint(tab,area){try{spineBar();}catch(e){console.error(e);}try{slimDesc(area);}catch(e){console.error(e);}try{hint0(tab,area);}catch(e){console.error(e);}try{decorate(tab,area);}catch(e){console.error(e);}}
+  function hint(tab,area){try{spineBar();if(tab==="systemic_line")srcCss();}catch(e){console.error(e);}try{slimDesc(area);}catch(e){console.error(e);}try{hint0(tab,area);}catch(e){console.error(e);}try{decorate(tab,area);}catch(e){console.error(e);}}
   function hint0(tab,area){var H=HINTS[tab];if(!H||!SEC.can("docin")||auditMode()||$("#upnote",area))return;
     if(SLIM[tab])H=SLIM[tab].one+' <details style="display:inline-block;vertical-align:top"><summary style="cursor:pointer;color:var(--focus)">更多說明</summary><div style="margin-top:4px">'+SLIM[tab].more+'</div></details>';
     var d=document.createElement("p");d.className="desc";d.id="upnote";d.style.margin="4px 0 10px";d.innerHTML=H;
@@ -3123,7 +3134,7 @@ var DOCIMPORT=(function(){
       ix.items.map(function(x){var done=(r.pathology_specimen||[]).some(function(pth){return pth.path_report_no&&pth.path_report_no===x.report_no;});return '<tr><td class="mono">'+esc(x.report_no)+'</td><td>'+esc(x.date||"")+'</td><td>'+esc(x.diagnosis)+'</td><td>'+(done?'✓':'<span class="desc">尚未</span>')+'</td></tr>';}).join("")+'</tbody></table></div>'+
       (ix.others&&ix.others.length?'<p class="desc">其他部位報告 '+ix.others.length+' 份（例如 '+esc(ix.others[0].diagnosis.slice(0,60))+'…）— 若為其他原發癌請登在「其他原發癌」</p>':'');
     area.insertBefore(d,area.firstChild);}
-  return {fromText:fromText,bar:bar,pdfText:pdfText,pasteAny:pasteAny,pasteAnyText:pasteAnyText,spineBar:spineBar,indexBox:indexBox,fileToText:fileToText,importFile:importFile,showAny:showAny,hint:hint,HINTS:HINTS,events:events,STUCK:STUCK,KIND_NAME:KIND_NAME,FM_KIND:FM_KIND,src:{open:openPane,close:closePane,isOpen:function(){return !!PANE;},DOC_MAX:DOC_MAX,REC_MAX:REC_MAX}};
+  return {fromText:fromText,bar:bar,pdfText:pdfText,pasteAny:pasteAny,pasteAnyText:pasteAnyText,spineBar:spineBar,indexBox:indexBox,fileToText:fileToText,importFile:importFile,showAny:showAny,hint:hint,HINTS:HINTS,events:events,note:note,STUCK:STUCK,KIND_NAME:KIND_NAME,FM_KIND:FM_KIND,src:{open:openPane,close:closePane,isOpen:function(){return !!PANE;},DOC_MAX:DOC_MAX,REC_MAX:REC_MAX}};
 })();
 
 /* 2026-11-13 晚 PI：「時間軸對登錄幫忙不大…改為類似索引，時間軸比較像是放在成品」→ 登錄人員預設看「登錄索引」（收合成一行），
@@ -3556,7 +3567,7 @@ var IVW=(function(){
     if(D.stuckN){var SL=(DOCIMPORT.STUCK||{});h.push('<h3>登錄人員回報「這裡卡住了」（'+D.stuckN+' 次）</h3><div class="ivw-tw"><table><thead><tr><th>卡在哪裡</th><th>分頁</th><th>次數</th><th>病人</th></tr></thead><tbody>'+
       Object.keys(D.stuck).map(function(k){return D.stuck[k];}).sort(function(a,b){return b.n-a.n;}).map(function(x){return '<tr><td>'+esc(SL[x.c]||x.c)+'</td><td style="text-align:left">'+esc(FORM_BY[x.tab]?FORM_BY[x.tab].name:x.tab)+'</td><td>'+x.n+'</td><td style="text-align:left;white-space:normal">'+Object.keys(x.ids).map(function(id){return '<button class="btn mini" type="button" data-open="'+esc(id)+'">'+esc(id)+'</button>';}).join(" ")+'</td></tr>';}).join("")+'</tbody></table></div>');}
     h.push('<h3>怎麼讀這張表</h3><p><b>改成別的值</b>、<b>清空</b>：程式帶入後被登錄人員改掉，算進不一致率。<b>條件隱藏而清除</b>：欄位因為其他答案而不適用，標記完成時系統自動清掉，不算不一致。<b>人工補填</b>：這類報告有時讀得到這一欄，但這一筆程式沒帶入、由登錄人員自己填；可能是程式漏讀，也可能報告裡本來就沒有。</p>'+
-      '<p class="soft">限制：只統計已核對完成的筆數；整筆被刪或原文被刪的舊貼入不在內；化療明細表另見「影子模式比對報告」。</p></div></div>');
+      '<p class="soft">限制：只統計已核對完成的筆數；整筆被刪或原文被刪的舊貼入不在內；化療明細表從 2026-11-26 起採用的治療線才有紀錄，治療時機與線別的建議另見「影子模式比對報告」。</p></div></div>');
     box.innerHTML=h.join("");}
   /* 匯出錯例：給維護程式的人修辨識規則用。內容是欄位值與報告裡的一小句，不含研究編號、病歷號；仍可能帶到日期或人名，所以先給主持人逐列看、可取消勾選。 */
   var XLAB={chg:"改成別的值",clr:"清空",add:"人工補填"};
@@ -8219,7 +8230,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-11-25 23:16 d9184ff nas 77fc1d·3ae239·6d4a84";
+window.__build="2026-11-26 00:14 fcd5d5c nas 77fc1d·3ae239·6d4a84";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
