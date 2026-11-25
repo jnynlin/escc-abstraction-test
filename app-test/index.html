@@ -467,7 +467,7 @@ tr.ir-new td{animation:irflash 2.6s ease-out;} @keyframes irflash{from{backgroun
   <h1>ESCC 病歷摘錄工作台</h1>
   <span class="sp"></span>
   <input id="who" type="hidden"><select id="role" hidden><option value="abstractor">登錄人員</option><option value="physician">醫師</option><option value="auditor">稽核員</option></select>
-  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-26 00:14 fcd5d5c nas 77fc1d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
+  <span class="sync" id="sync"></span><span class="chip" id="chip"></span><span class="buildmark" id="buildmark" title="建置版本（回報問題時請一起提供）">2026-11-26 01:02 815dd3c nas 77fc1d·3ae239·6d4a84</span><button class="btn" type="button" id="bSwitch" hidden>切換作業</button><button class="btn" type="button" id="bAssign" hidden>分派病人</button><button class="btn" type="button" id="bUsers" hidden>帳號管理</button><button class="btn" type="button" id="bRec" hidden>復原碼</button><button class="btn" type="button" id="bPw">變更密碼</button><button class="btn" type="button" id="bLock">登出</button>
   <div class="menu" id="menu">
     <button class="btn" type="button" id="bMenu" aria-haspopup="true">資料 ▾</button>
     <div class="dd" role="menu">
@@ -2924,13 +2924,18 @@ var DOCIMPORT=(function(){
       /* 由化療明細表草稿採用的治療線：可展開看它用到的原始列 */
       if(x._draft&&!$(".csrc,.csrc0",box)&&typeof CHEMO!=="undefined"&&CHEMO.srcTable){var dd=null;((r.chemo||{}).drafts||[]).forEach(function(q){if(q._did===x._draft)dd=q;});
         if(dd){var w=document.createElement("div");w.innerHTML=CHEMO.srcTable(dd);var ib=$(".ib",box);if(ib&&w.firstChild)ib.insertBefore(w.firstChild,ib.firstChild);}}});
-    if(!n||$("#impbar",area))return;var first=$(".inst[data-i]",area);if(!first)return;var bar=document.createElement("div");bar.id="impbar";if(dn===n)bar.className="alldone";
+    /* 「由文件擷取：貼上文字」那一行與標題列的狀態標記重複 → 不顯示 */
+    arr.forEach(function(x,i){if(!x||!x._docsrc)return;var bx=$('.inst[data-i="'+i+'"]',area);if(bx)$$(".ib>p.desc",bx).forEach(function(p){if(/^由文件擷取/.test(p.textContent))p.hidden=true;});});
+    /* 筆數列：只有一筆時標題列的標記已經夠了，兩筆以上才列總數 */
+    if(n<2||$("#impbar",area))return;var first=$(".inst[data-i]",area);if(!first)return;var bar=document.createElement("div");bar.id="impbar";if(dn===n)bar.className="alldone";
     bar.textContent="報告帶入 "+n+" 筆：已核對完成 "+dn+" 筆"+(n-dn?"、尚未核對 "+(n-dn)+" 筆（核對後按那一筆的「標記完成」）":"");first.parentNode.insertBefore(bar,first);}
   function decorate(tb,area){if(auditMode()){closePane();return;}if(!cur||!area)return;var r=DB.rec[cur];if(!r)return;var fm=FORM_BY[tb];if(!fm)return;try{todo(tb,area,r,fm);}catch(e){console.error(e);}if(!r.srcdocs||!r.srcdocs.length)return;srcCss();var loose=[];
     r.srcdocs.forEach(function(d){
       if(d.u&&d.fm===tb){var arr=r[tb]||[],i=-1;arr.forEach(function(x,ix){if(x._uid===d.u)i=ix;});var box=i<0?null:$('.inst[data-i="'+i+'"]',area);
         if(box){if(!$("[data-sd]",box)){var b=document.createElement("button");b.type="button";b.className="btn mini";b.dataset.sd=d.id;b.textContent="對照原文";b.style.marginLeft="8px";b.onclick=function(){openPane(d.id);};
-            var ps=$$(".ib>p.desc",box).filter(function(x){return /^由文件擷取/.test(x.textContent);})[0];if(ps)ps.appendChild(b);else{var ib=$(".ib",box);if(ib)ib.insertBefore(b,ib.firstChild);}}
+            /* 2026-11-26 精簡：按鈕放進這一筆的標題列（原本另佔一行「由文件擷取：貼上文字」） */
+            var ih0=$(".ih",box),tg0=ih0&&$("[data-tog]",ih0);b.style.marginLeft="0";b.title="在左邊打開這一筆的報告原文（"+(d.via||"貼上文字")+"）";
+            if(ih0)ih0.insertBefore(b,tg0||null);else{var ib=$(".ib",box);if(ib)ib.insertBefore(b,ib.firstChild);}}
           (d.h||[]).forEach(function(h){if(!h.c)chip($('.f[data-f="'+h.f+'"]>.lab',box),d,h,arr[i][h.f]);});}}
       if(!d.u&&d.fm===tb)loose.push(d);
       if(tb==="core_abstraction")(d.h||[]).forEach(function(h){if(d.fm==="core_abstraction"||h.c)chip($('.f[data-f="'+h.f+'"]>.lab',area),d,h,r.core_abstraction?r.core_abstraction[h.f]:"");});});
@@ -3115,7 +3120,12 @@ var DOCIMPORT=(function(){
       more:"<b>放療摘要</b>能選取文字 → 用上面兩顆按鈕（貼上文字、上傳 PDF），系統會新增一筆，請逐欄核對。同時會帶入核心補登的 ECOG、共病、抽菸、臨床分期（已有值不覆蓋）。<br>"+MANUAL},
     systemic_line:{one:"<b>每一線抗癌藥一筆</b>（化療、標靶、免疫）；止吐、類固醇不登。",
     more:"同步放化療的化療也算一線。<br>匯入只收 QuickReport .qrp（可多選），不收 .csv／.xls／.pdf，也不能用「貼上任何報告」。<br>外院給的藥或沒有明細表的治療：捲到最下方按「＋ 新增一筆」手動填。"}};
-  function slimDesc(area){$$(".inst[data-i]",area).forEach(function(box){if(box.dataset.i==="0")return;$$(".ib>p.desc",box).forEach(function(p){if(!/^由文件擷取/.test(p.textContent))p.hidden=true;});});}
+  /* 2026-11-26 每一筆開頭那段填寫說明與分頁上方的說明重複：第一筆收成「填寫說明」（點開才看），其餘各筆不顯示；只有一個段落的表單，段落標題也不必每筆重複 */
+  function slimDesc(area){$$(".inst[data-i]",area).forEach(function(box){var first=box.dataset.i==="0";
+      $$(".ib>p.desc",box).forEach(function(p){if(/^由文件擷取/.test(p.textContent)||p.classList.contains("csrc0"))return;
+        if(!first){p.hidden=true;return;}var d=document.createElement("details");d.className="fdesc";d.innerHTML='<summary>填寫說明</summary>';p.parentNode.insertBefore(d,p);d.appendChild(p);});
+      var hs=$$(".ib>h3[data-sech]",box);if(hs.length===1)hs[0].hidden=true;});
+    if(!$("#fdescCss")){var st=document.createElement("style");st.id="fdescCss";st.textContent=".fdesc{margin:4px 0 8px}.fdesc>summary{cursor:pointer;color:var(--focus);font-size:.9rem}";document.head.appendChild(st);}}
   function hint(tab,area){try{spineBar();if(tab==="systemic_line")srcCss();}catch(e){console.error(e);}try{slimDesc(area);}catch(e){console.error(e);}try{hint0(tab,area);}catch(e){console.error(e);}try{decorate(tab,area);}catch(e){console.error(e);}}
   function hint0(tab,area){var H=HINTS[tab];if(!H||!SEC.can("docin")||auditMode()||$("#upnote",area))return;
     if(SLIM[tab])H=SLIM[tab].one+' <details style="display:inline-block;vertical-align:top"><summary style="cursor:pointer;color:var(--focus)">更多說明</summary><div style="margin-top:4px">'+SLIM[tab].more+'</div></details>';
@@ -3562,15 +3572,15 @@ var IVW=(function(){
       h.push('<h3>'+esc(DOCIMPORT.KIND_NAME[k]||k)+'</h3><div class="ivw-tw"><table><thead><tr><th>欄位</th><th>程式帶入（已核對）</th>'+COLS.map(function(c){return '<th>'+c[1]+'</th>';}).join("")+'<th>不一致率</th><th>尚未核對</th></tr></thead><tbody>');
       fs.forEach(function(f){var c=S.F[f],fd=FIELD[f],bad=c.chg+c.clr;
         h.push('<tr><td>'+esc(fd?fd.l.replace(/（.*$/,""):f)+'</td><td>'+c.imp+'</td><td>'+c.same+'</td><td>'+num(k,f,"chg",c.chg)+'</td><td>'+num(k,f,"clr",c.clr)+'</td><td>'+num(k,f,"hid",c.hid)+'</td><td>'+num(k,f,"add",c.add)+'</td><td'+(bad?' class="bad"':"")+'>'+(c.imp?bad+"／"+c.imp+"（"+pct(bad,c.imp)+"）":"—")+'</td><td class="soft">'+c.pend+'</td></tr>');
-        if(PICK&&PICK.k===k&&PICK.f===f){var L=Object.keys(c.ids[PICK.c]||{});h.push('<tr><td colspan="9"><div class="ivw-ids"><span>'+esc(COLS.filter(function(x){return x[0]===PICK.c;})[0][1])+'：</span>'+L.map(function(id){return '<button class="btn mini" type="button" data-open="'+esc(id)+'">'+esc(id)+'</button>';}).join("")+(PICK.c!=="hid"?'<button class="btn mini" type="button" id="ivwXp">'+(XP?"收起錯例":"檢視並匯出這些錯例")+'</button>':"")+'</div>'+(XP&&PICK.c!=="hid"?xpHtml(k,f,c):"")+'</td></tr>');}});
+        if(PICK&&PICK.k===k&&PICK.f===f){var L=Object.keys(c.ids[PICK.c]||{});h.push('<tr><td colspan="9"><div class="ivw-ids"><span>'+esc(COLS.filter(function(x){return x[0]===PICK.c;})[0][1])+'：</span>'+L.map(function(id){return '<button class="btn mini" type="button" data-open="'+esc(id)+'">'+esc(id)+'</button>';}).join("")+'<button class="btn mini" type="button" id="ivwXp">'+(XP?"收起錯例":"檢視並匯出這些錯例")+'</button></div>'+(XP?xpHtml(k,f,c):"")+'</td></tr>');}});
       h.push('</tbody></table></div>');});
     if(D.stuckN){var SL=(DOCIMPORT.STUCK||{});h.push('<h3>登錄人員回報「這裡卡住了」（'+D.stuckN+' 次）</h3><div class="ivw-tw"><table><thead><tr><th>卡在哪裡</th><th>分頁</th><th>次數</th><th>病人</th></tr></thead><tbody>'+
       Object.keys(D.stuck).map(function(k){return D.stuck[k];}).sort(function(a,b){return b.n-a.n;}).map(function(x){return '<tr><td>'+esc(SL[x.c]||x.c)+'</td><td style="text-align:left">'+esc(FORM_BY[x.tab]?FORM_BY[x.tab].name:x.tab)+'</td><td>'+x.n+'</td><td style="text-align:left;white-space:normal">'+Object.keys(x.ids).map(function(id){return '<button class="btn mini" type="button" data-open="'+esc(id)+'">'+esc(id)+'</button>';}).join(" ")+'</td></tr>';}).join("")+'</tbody></table></div>');}
-    h.push('<h3>怎麼讀這張表</h3><p><b>改成別的值</b>、<b>清空</b>：程式帶入後被登錄人員改掉，算進不一致率。<b>條件隱藏而清除</b>：欄位因為其他答案而不適用，標記完成時系統自動清掉，不算不一致。<b>人工補填</b>：這類報告有時讀得到這一欄，但這一筆程式沒帶入、由登錄人員自己填；可能是程式漏讀，也可能報告裡本來就沒有。</p>'+
+    h.push('<h3>怎麼讀這張表</h3><p><b>改成別的值</b>、<b>清空</b>：程式帶入後被登錄人員改掉，算進不一致率。<b>條件隱藏而清除</b>：程式帶入了值，但依其他答案這一欄不適用，標記完成時系統自動清掉；不算進不一致率，但次數多代表程式可能讀錯了地方（2026-11-18 把淋巴結位置讀成氣管侵犯就是這一類），同樣可以匯出錯例。<b>人工補填</b>：這類報告有時讀得到這一欄，但這一筆程式沒帶入、由登錄人員自己填；可能是程式漏讀，也可能報告裡本來就沒有。</p>'+
       '<p class="soft">限制：只統計已核對完成的筆數；整筆被刪或原文被刪的舊貼入不在內；化療明細表從 2026-11-26 起採用的治療線才有紀錄，治療時機與線別的建議另見「影子模式比對報告」。</p></div></div>');
     box.innerHTML=h.join("");}
   /* 匯出錯例：給維護程式的人修辨識規則用。內容是欄位值與報告裡的一小句，不含研究編號、病歷號；仍可能帶到日期或人名，所以先給主持人逐列看、可取消勾選。 */
-  var XLAB={chg:"改成別的值",clr:"清空",add:"人工補填"};
+  var XLAB={chg:"改成別的值",clr:"清空",hid:"條件隱藏而清除",add:"人工補填"};
   function xpHtml(k,f,c){var L=c.cases[PICK.c]||[],fd=FIELD[f];
     return '<div class="ivw-xp"><p><b>錯例預覽（'+L.length+' 列）</b>　下面會顯示欄位值和報告裡的一小句。請逐列看過，含有姓名、病歷號或不想帶出去的，取消勾選。檔案只下載到這台電腦，不會上傳。</p>'+
       '<div class="ivw-tw"><table><thead><tr><th>匯出</th><th>程式帶入的值</th><th>登錄人員留下的值</th><th>報告裡程式讀到的那一句</th></tr></thead><tbody>'+
@@ -8230,7 +8240,7 @@ return {onSession:onSession,onLock:onLock,loadFromBackup:loadFromBackup,count:fu
   _t:{planImport:planImport,impScan:impScan,impFactId:impFactId,timelineSvg:timelineSvg,toIso:toIso,isoOk:isoOk,parseDates:parseDates,expandDoses:expandDoses,normDrug:normDrug,list:function(){return LIST;},cur:function(){return CD;},sums:function(){return SUMS;},today:today,TL:IRAE_TL,SC:IRAE_SCHEMA}};
 })();
 
-window.__build="2026-11-26 00:14 fcd5d5c nas 77fc1d·3ae239·6d4a84";
+window.__build="2026-11-26 01:02 815dd3c nas 77fc1d·3ae239·6d4a84";
 
 /* ---- 寫入失敗的常駐橫幅（2026-10-10，P0）----
    toast 3.4 秒就不見了，不適合用來講「你的變更沒有存上去」。這支讓各模組把那類訊息改走
